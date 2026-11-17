@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "hts-lookup": {
+      "command": "npx",
+      "args": [
+        "tsx",
+        "tools/hts-mcp/server.ts"
+      ],
+      "env": {}
+    }
+  }
+}
