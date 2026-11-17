@@ -29,13 +29,11 @@ inclusion: always
 
 ## Commands
 
-The maintainer runs shell commands. **Do not run `npm install`, test, or build commands
-yourself.** When commands are needed, list them in your reply so the maintainer can run
-them, and continue with file edits.
-
-- `npm run test` runs `vitest --run`.
-- `npm run typecheck` runs `tsc --noEmit`.
-- `npm run dev` / `npm run build` for Next.js.
+You may run exactly these four commands yourself to check your own work, and fix what they
+report: `npm test`, `npm test <args>`, `npm run typecheck`, `npx vitest <args>`. Do not
+run any other shell command (no `npm install`, no build, no dev server, no git, no file
+deletion); list those in your reply for the maintainer. The maintainer's own test run
+decides whether a task is done.
 
 ## Tests
 
