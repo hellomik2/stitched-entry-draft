@@ -46,6 +46,12 @@ interface LoadedDocument {
 
 const CANVAS_SCALE = 0.95
 
+/** Thread colours: blue to a document line, gold to the values a field is computed from. */
+const THREAD_DOC_COLOR = '#2563eb'
+const THREAD_CALC_COLOR = '#b8860b'
+/** Cross stitches drawn over every thread (and later in the legend): short bars across the line. */
+const STITCH = { width: 5, dash: '1.5 5', opacity: 0.8 }
+
 export default function StitchBoard({
   bundle,
   reading: readingData,
@@ -189,9 +195,11 @@ export default function StitchBoard({
     return () => observer.disconnect()
   }, [loadState, activeDocId, documents])
 
-  // Helper: draw threads when a field is selected
+  // Helper: draw threads when a field is selected.
+  // A thread leaves a value through the gap just left of it and runs along the gap above its table row
+  // or card before it crosses over, so it never runs across other values.
   const redrawThreads = useCallback(() => {
-    if (!selectedField || !containerRef.current || !pageViewRef.current) {
+    if (!selectedField || !containerRef.current || !pageViewRef.current || !draftPaneRef.current) {
       setThreads([])
       return
     }
@@ -205,53 +213,68 @@ export default function StitchBoard({
     const container = containerRef.current
     const pageView = pageViewRef.current
 
-    // Measure the selected value button
+    // Measure the selected value button (not drawn when it is hidden, for example inside a closed <details>)
     const valueButton = container.querySelector<HTMLButtonElement>(
       `[data-field-id="${selectedField}"]`
     )
-    if (!valueButton) {
+    if (!valueButton || !isRendered(valueButton)) {
       setThreads([])
       return
     }
 
-    const buttonRect = valueButton.getBoundingClientRect()
     const containerRect = container.getBoundingClientRect()
+    const toLocal = (r: DOMRect) => ({
+      left: r.left - containerRect.left + container.scrollLeft,
+      right: r.right - containerRect.left + container.scrollLeft,
+      top: r.top - containerRect.top + container.scrollTop,
+      bottom: r.bottom - containerRect.top + container.scrollTop,
+    })
+    // Where a thread meets a value: its left middle, the gap just left of it, the gap just above its row or card
+    const anchorOf = (el: HTMLElement) => {
+      const r = toLocal(el.getBoundingClientRect())
+      const row = el.closest<HTMLElement>('tr, .field-card')
+      const rowTop = row ? toLocal(row.getBoundingClientRect()).top : r.top
+      return {
+        x: r.left,
+        y: (r.top + r.bottom) / 2,
+        gapX: r.left - 4,
+        laneY: rowTop - (row && row.tagName === 'TR' ? 1 : 5),
+      }
+    }
 
-    const x1 = buttonRect.left - containerRect.left + container.scrollLeft
-    const y1 = buttonRect.top - containerRect.top + container.scrollTop + buttonRect.height / 2
+    const a = anchorOf(valueButton)
+    const gutterX = toLocal(draftPaneRef.current.getBoundingClientRect()).left + 4
 
     const newThreads: Array<{ kind: 'doc' | 'calc'; d: string }> = []
 
-    // Doc threads: from selected value to each box in active document
+    // Doc threads: up to the gap above the value's row, left to the edge of the draft pane, then a curve to the box
     for (const source of field.sources) {
       if (source.kind === 'document' && source.doc === activeDocId) {
         const box = pageView.querySelector<HTMLDivElement>(`[data-reading="${source.readingField}"]`)
         if (box) {
-          const boxRect = box.getBoundingClientRect()
-
-          const x2 = boxRect.right - containerRect.left + container.scrollLeft
-          const y2 = boxRect.top - containerRect.top + container.scrollTop + boxRect.height / 2
-
-          // Cubic curve: M x1 y1 C x1-80 y1, x2+80 y2, x2 y2
-          const d = `M ${x1} ${y1} C ${x1 - 80} ${y1}, ${x2 + 80} ${y2}, ${x2} ${y2}`
+          const b = toLocal(box.getBoundingClientRect())
+          const x2 = b.right
+          const y2 = (b.top + b.bottom) / 2
+          const d =
+            roundedPath([[a.x, a.y], [a.gapX, a.y], [a.gapX, a.laneY], [gutterX, a.laneY]]) +
+            ` C ${gutterX - 60} ${a.laneY}, ${x2 + 60} ${y2}, ${x2} ${y2}`
           newThreads.push({ kind: 'doc', d })
         }
       }
     }
 
-    // Calc threads: from selected value to each input value button
+    // Calc threads: along the gaps between values to each input value
     for (const inputId of field.inputs) {
       const inputButton = container.querySelector<HTMLButtonElement>(
         `[data-field-id="${inputId}"]`
       )
-      if (inputButton) {
-        const inputRect = inputButton.getBoundingClientRect()
-        const x2 = inputRect.left - containerRect.left + container.scrollLeft
-        const y2 = inputRect.top - containerRect.top + container.scrollTop + inputRect.height / 2
-
-        // Cubic curve: M x1 y1 C x1-40 y1, x2-40 y2, x2 y2
-        const d = `M ${x1} ${y1} C ${x1 - 40} ${y1}, ${x2 - 40} ${y2}, ${x2} ${y2}`
-        newThreads.push({ kind: 'calc', d })
+      if (inputButton && isRendered(inputButton)) {
+        const b = anchorOf(inputButton)
+        const points: Array<[number, number]> =
+          Math.abs(a.gapX - b.gapX) < 2
+            ? [[a.x, a.y], [a.gapX, a.y], [b.gapX, b.y], [b.x, b.y]]
+            : [[a.x, a.y], [a.gapX, a.y], [a.gapX, b.laneY], [b.gapX, b.laneY], [b.gapX, b.y], [b.x, b.y]]
+        newThreads.push({ kind: 'calc', d: roundedPath(points) })
       }
     }
 
@@ -497,6 +520,7 @@ export default function StitchBoard({
           flex: 1,
           minHeight: 0,
           position: 'relative',
+          overflow: 'hidden',
         }}
       >
         {/* Left pane - documents */}
@@ -804,17 +828,31 @@ export default function StitchBoard({
             overflow: 'visible',
           }}
         >
-          {threads.map((thread, idx) => (
-            <path
-              key={idx}
-              data-testid={thread.kind === 'doc' ? 'thread-doc' : 'thread-calc'}
-              d={thread.d}
-              fill="none"
-              strokeWidth={2}
-              strokeDasharray="6 4"
-              stroke={thread.kind === 'doc' ? '#2563eb' : '#daa520'}
-            />
-          ))}
+          {threads.map((thread, idx) => {
+            const color = thread.kind === 'doc' ? THREAD_DOC_COLOR : THREAD_CALC_COLOR
+            return (
+              <g key={idx}>
+                {/* Cross stitches along the thread */}
+                <path
+                  d={thread.d}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={STITCH.width}
+                  strokeDasharray={STITCH.dash}
+                  opacity={STITCH.opacity}
+                />
+                <path
+                  data-testid={thread.kind === 'doc' ? 'thread-doc' : 'thread-calc'}
+                  d={thread.d}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1.75}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+            )
+          })}
         </svg>
       </div>
 
@@ -854,6 +892,38 @@ function fieldTitle(field: DraftField | undefined, fallback: string): string {
  */
 function tidyText(text: string): string {
   return text.replace(/\b([A-Za-z]+) \1\b/g, '$1').replace(/(?<!\.)\.\.(?!\.)/g, '.')
+}
+
+/** True when the element takes up space on screen (false inside a closed <details>). */
+function isRendered(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect()
+  return r.width > 0 || r.height > 0
+}
+
+/**
+ * SVG path through the points of a route made of straight segments, with each corner rounded
+ * by a quadratic curve of radius r (smaller when a segment is short). Repeated points are skipped.
+ */
+function roundedPath(points: Array<[number, number]>, r = 6): string {
+  const pts = points.filter(
+    (p, i) => i === 0 || Math.abs(p[0] - points[i - 1][0]) > 0.5 || Math.abs(p[1] - points[i - 1][1]) > 0.5
+  )
+  let d = `M ${pts[0][0]} ${pts[0][1]}`
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1]
+    const [x, y] = pts[i]
+    const [nx, ny] = pts[i + 1]
+    const inLen = Math.hypot(x - px, y - py)
+    const outLen = Math.hypot(nx - x, ny - y)
+    const k = Math.min(r, inLen / 2, outLen / 2)
+    d += ` L ${x - ((x - px) / inLen) * k} ${y - ((y - py) / inLen) * k}`
+    d += ` Q ${x} ${y} ${x + ((nx - x) / outLen) * k} ${y + ((ny - y) / outLen) * k}`
+  }
+  if (pts.length > 1) {
+    const last = pts[pts.length - 1]
+    d += ` L ${last[0]} ${last[1]}`
+  }
+  return d
 }
 
 /**
