@@ -923,7 +923,7 @@ function DraftFieldButton({
 }
 
 /**
- * SourceStrip: fixed footer showing sources for selected field
+ * SourceStrip: last row of the board showing sources for the selected field
  */
 function SourceStrip({
   selectedField,
@@ -959,18 +959,21 @@ function SourceStrip({
       style={{
         position: 'relative',
         zIndex: 10,
-        flex: '0 0 9rem',
+        flex: '0 0 auto',
+        minHeight: '9rem',
         background: '#fff',
         borderTop: '1px solid #ddd',
         padding: '0.75rem 1rem',
         fontSize: '0.75rem',
-        maxHeight: '9rem',
+        maxHeight: '12rem',
         overflowY: 'auto',
         lineHeight: 1.4,
       }}
     >
       {!field ? (
-        <div style={{ color: '#999' }}>Select a value to see where it came from.</div>
+        <div style={{ color: '#999', minHeight: '7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+          Click any value in the draft to see where it came from: the document line, the tariff row, or the values it was computed from.
+        </div>
       ) : (
         <>
           {/* Header: Block and label */}
@@ -980,10 +983,9 @@ function SourceStrip({
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '1.5rem', alignItems: 'start' }}>
             <div>
-              {/* Status */}
-              <div style={{ marginBottom: '0.5rem', color: '#666' }}>
-                <span data-testid="strip-status">{statusWords[field.status]}</span>
-              </div>
+              {/* Status, with the value form or the Undo button on the same row */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
+                <span data-testid="strip-status" style={{ color: '#666' }}>{statusWords[field.status]}</span>
 
               {/* Override form for needsReview or personInput */}
               {(field.status === 'needsReview' || field.status === 'personInput') && (
@@ -994,7 +996,7 @@ function SourceStrip({
                     const v = String(new FormData(e.currentTarget).get('value') ?? '').trim()
                     if (v) onApply(field.id, v)
                   }}
-                  style={{ marginBottom: '0.5rem' }}
+                  style={{ margin: 0 }}
                 >
                   <input
                     name="value"
@@ -1032,7 +1034,6 @@ function SourceStrip({
                   data-testid="override-undo"
                   onClick={() => onUndo(field.id)}
                   style={{
-                    marginBottom: '0.5rem',
                     padding: '0.5rem 1rem',
                     background: '#ff9800',
                     color: '#fff',
@@ -1045,6 +1046,7 @@ function SourceStrip({
                   Undo
                 </button>
               )}
+              </div>
 
               {/* Reason */}
               {field.reason && (

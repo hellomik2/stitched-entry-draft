@@ -214,12 +214,13 @@ html, body {
 /* Source strip */
 [data-testid="source-strip"] {
   position: relative;
-  flex: 0 0 9rem;
+  flex: 0 0 auto;
+  min-height: 9rem;
   background: #fff;
   border-top: 1px solid #ddd;
   padding: 1rem;
   font-size: 0.75rem;
-  max-height: 9rem;
+  max-height: 12rem;
   overflow-y: auto;
   line-height: 1.4;
   z-index: 10;
