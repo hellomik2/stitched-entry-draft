@@ -18,6 +18,11 @@ export const intakeConfig = {
     source: "Anthropic model pricing, Claude Haiku 5.5 (USD per million tokens: 0.10 input, 0.50 output up to 100K prompt tokens; 0.50 and 2.50 above)",
     checked: "2026-11-18",
   },
+  // Default AI call caps. local: the file store on a developer machine. publicSite: the Netlify Blobs store on the deployed site. The DOCUMENT_INTAKE_*_CAP environment variables override each number.
+  caps: {
+    local: { total: 300, daily: 0, perVisitorDaily: 3 },
+    publicSite: { total: 500, daily: 30, perVisitorDaily: 3 },
+  },
 } as const;
 
 export type IntakeLimits = typeof intakeConfig;

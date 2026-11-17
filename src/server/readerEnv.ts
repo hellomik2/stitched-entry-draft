@@ -1,4 +1,5 @@
 import type { Caps } from "../core/budget";
+import { intakeConfig } from "../core/intakeConfig";
 
 export type ReaderMode = "off" | "fake" | "claude";
 
@@ -6,7 +7,7 @@ export type ReaderSetup = {
   mode: ReaderMode;
   reason: string | null;
   caps: Caps;
-  store: "file" | null;
+  store: "file" | "netlify-blobs" | null;
   storeDir: string;
   visitorSalt: string | null;
   apiKey: string | null;
@@ -38,16 +39,29 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     };
   }
 
-  // 2. Parse caps
-  const totalCapStr = trimEnv(env.DOCUMENT_INTAKE_TOTAL_CAP) ?? "300";
-  const dailyCapStr = trimEnv(env.DOCUMENT_INTAKE_DAILY_CAP) ?? "0";
-  const visitorCapStr = trimEnv(env.DOCUMENT_INTAKE_VISITOR_DAILY_CAP) ?? "3";
+  // 2. Read store BEFORE parsing caps
+  const storeEnv = trimEnv(env.DOCUMENT_INTAKE_STORE);
+  let store: "file" | "netlify-blobs" | null;
+  if (storeEnv === "file") {
+    store = "file";
+  } else if (storeEnv === "netlify-blobs") {
+    store = "netlify-blobs";
+  } else {
+    store = null;
+  }
+
+  // 3. Parse caps with defaults based on store
+  const defaultCaps = store === "netlify-blobs" ? intakeConfig.caps.publicSite : intakeConfig.caps.local;
+
+  const totalCapStr = trimEnv(env.DOCUMENT_INTAKE_TOTAL_CAP) ?? String(defaultCaps.total);
+  const dailyCapStr = trimEnv(env.DOCUMENT_INTAKE_DAILY_CAP) ?? String(defaultCaps.daily);
+  const visitorCapStr = trimEnv(env.DOCUMENT_INTAKE_VISITOR_DAILY_CAP) ?? String(defaultCaps.perVisitorDaily);
 
   const totalCap = parseCapValue(totalCapStr);
   const dailyCap = parseCapValue(dailyCapStr);
   const visitorCap = parseCapValue(visitorCapStr);
 
-  const caps: Caps = { total: 300, daily: 0, perVisitorDaily: 3 };
+  const caps: Caps = { total: defaultCaps.total, daily: defaultCaps.daily, perVisitorDaily: defaultCaps.perVisitorDaily };
   let capError: string | null = null;
 
   if (totalCap === null) {
@@ -67,14 +81,14 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
       mode: "off",
       reason: capError,
       caps,
-      store: null,
+      store,
       storeDir: "logs",
       visitorSalt: null,
       apiKey: null,
     };
   }
 
-  // 3. Check for fake mode
+  // 4. Check for fake mode
   const intakeMode = trimEnv(env.DOCUMENT_INTAKE_MODE);
   if (intakeMode === "fake") {
     return {
@@ -88,11 +102,6 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     };
   }
 
-  // 4. Parse store
-  const storeEnv = trimEnv(env.DOCUMENT_INTAKE_STORE);
-  const store: "file" | null = storeEnv === "file" ? "file" : null;
-  const storeDir = trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs";
-
   // 5. Check for Claude mode
   const apiKey = trimEnv(env.ANTHROPIC_API_KEY);
 
@@ -102,7 +111,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
       reason: "no API key",
       caps,
       store,
-      storeDir,
+      storeDir: trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs",
       visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),
       apiKey: null,
     };
@@ -114,7 +123,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
       reason: "no durable usage store configured",
       caps,
       store,
-      storeDir,
+      storeDir: trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs",
       visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),
       apiKey: null,
     };
@@ -125,7 +134,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     reason: null,
     caps,
     store,
-    storeDir,
+    storeDir: trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs",
     visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),
     apiKey,
   };

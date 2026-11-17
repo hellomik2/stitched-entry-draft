@@ -3,6 +3,7 @@ import { intakeConfig } from "../../../core/intakeConfig";
 import {
   resolveReaderSetup,
   createFileUsageStore,
+  createBlobsUsageStore,
   createMemoryUsageStore,
   createFakeReader,
   loadRecordings,
@@ -119,6 +120,8 @@ export async function POST(request: Request): Promise<Response> {
   let store: UsageStore | null = null;
   if (setup.mode === "claude" && setup.store === "file") {
     store = createFileUsageStore(path.join(/*turbopackIgnore: true*/ process.cwd(), setup.storeDir));
+  } else if (setup.mode === "claude" && setup.store === "netlify-blobs") {
+    store = createBlobsUsageStore();
   }
 
   const fakeStore = getMemoryFakeStore();

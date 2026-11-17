@@ -10,6 +10,34 @@ export interface UsageStore {
   appendRecord(r: UsageRecord): Promise<void>;
 }
 
+export function parseUsageState(value: unknown): UsageState {
+  const parsed = value;
+
+  // Validate structure
+  if (
+    !parsed ||
+    typeof parsed !== "object" ||
+    !Number.isInteger((parsed as Record<string, unknown>).totalCalls) ||
+    typeof (parsed as Record<string, unknown>).days !== "object"
+  ) {
+    throw new Error("invalid usage state");
+  }
+
+  // Validate days structure
+  for (const [, day] of Object.entries((parsed as Record<string, unknown>).days as Record<string, unknown>)) {
+    if (
+      !day ||
+      typeof day !== "object" ||
+      !Number.isInteger((day as Record<string, unknown>).calls) ||
+      typeof (day as Record<string, unknown>).visitors !== "object"
+    ) {
+      throw new Error("invalid usage state");
+    }
+  }
+
+  return parsed as UsageState;
+}
+
 export function createFileUsageStore(dir: string): UsageStore {
   const capsPath = path.join(dir, "caps.json");
   const usagePath = path.join(dir, "usage.jsonl");
@@ -18,31 +46,7 @@ export function createFileUsageStore(dir: string): UsageStore {
     async readState(): Promise<UsageState> {
       try {
         const content = await fs.readFile(capsPath, "utf-8");
-        const parsed = JSON.parse(content);
-
-        // Validate structure
-        if (
-          !parsed ||
-          typeof parsed !== "object" ||
-          !Number.isInteger(parsed.totalCalls) ||
-          typeof parsed.days !== "object"
-        ) {
-          throw new Error("invalid caps.json structure");
-        }
-
-        // Validate days structure
-        for (const [, day] of Object.entries(parsed.days)) {
-          if (
-            !day ||
-            typeof day !== "object" ||
-            !Number.isInteger((day as Record<string, unknown>).calls) ||
-            typeof (day as Record<string, unknown>).visitors !== "object"
-          ) {
-            throw new Error("invalid day structure in caps.json");
-          }
-        }
-
-        return parsed as UsageState;
+        return parseUsageState(JSON.parse(content));
       } catch (error) {
         // If file doesn't exist, return empty state
         if ((error as NodeJS.ErrnoException).code === "ENOENT") {

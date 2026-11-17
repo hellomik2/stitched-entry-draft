@@ -1,12 +1,13 @@
 import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import { resolveReaderSetup } from "./index";
+import { intakeConfig } from "../core/intakeConfig";
 
 const optional = (values: string[]) => fc.option(fc.constantFrom(...values), { nil: undefined });
 const envArb = fc.record({
   DOCUMENT_INTAKE_KILL_SWITCH: optional(["", "  ", "1"]),
   DOCUMENT_INTAKE_MODE: optional(["fake", "claude", "x", ""]),
-  DOCUMENT_INTAKE_STORE: optional(["file", "blobs", ""]),
+  DOCUMENT_INTAKE_STORE: optional(["file", "netlify-blobs", "blobs", ""]),
   ANTHROPIC_API_KEY: optional(["", "test-key-not-real"]),
   DOCUMENT_INTAKE_TOTAL_CAP: optional(["5", "abc", ""]),
   DOCUMENT_INTAKE_DAILY_CAP: optional(["0", "7", "x1"]),
@@ -53,16 +54,17 @@ describe("Feature: document-intake, Property 14: Resolver Mode Fake Needs No Key
 });
 
 describe("Feature: document-intake, Property 15: Resolver Mode Claude Needs Key and Store (Validates: Requirements 7.1, 7.2)", () => {
-  it("mode is claude only when: key set, store file, no kill switch, valid caps, mode not fake; apiKey is non-null only in that case", () => {
+  it("store file or netlify-blobs: mode is claude only when: key set, store file or netlify-blobs, no kill switch, valid caps, mode not fake; apiKey is non-null only in that case", () => {
     fc.assert(
       fc.property(envArb, (env) => {
         const s = resolveReaderSetup(env);
+        const storeTrimmed = env.DOCUMENT_INTAKE_STORE?.trim();
         const shouldBeClaude =
           !isSet(env.DOCUMENT_INTAKE_KILL_SWITCH) &&
           capsValid(env) &&
           env.DOCUMENT_INTAKE_MODE?.trim() !== "fake" &&
           isSet(env.ANTHROPIC_API_KEY) &&
-          env.DOCUMENT_INTAKE_STORE?.trim() === "file";
+          (storeTrimmed === "file" || storeTrimmed === "netlify-blobs");
         expect((s.mode === "claude") === shouldBeClaude).toBe(true);
         expect((s.apiKey !== null) === (s.mode === "claude")).toBe(true);
       }),
@@ -82,3 +84,40 @@ describe("Feature: document-intake, Property 16: Resolver Provides Reason When O
     );
   });
 });
+
+describe("Feature: document-intake, Property 30: Public Site Caps Default (Validates: Requirements 11.1)", () => {
+  it("when cap variable not set, use publicSite for netlify-blobs store and local for file store; when set, use parsed number", () => {
+    fc.assert(
+      fc.property(envArb, (env) => {
+        const s = resolveReaderSetup(env);
+
+        // Only check when mode is claude (has both key and store)
+        if (s.mode === "claude") {
+          if (env.DOCUMENT_INTAKE_STORE?.trim() === "netlify-blobs") {
+            if (!isSet(env.DOCUMENT_INTAKE_TOTAL_CAP)) {
+              expect(s.caps.total).toBe(intakeConfig.caps.publicSite.total);
+            }
+            if (!isSet(env.DOCUMENT_INTAKE_DAILY_CAP)) {
+              expect(s.caps.daily).toBe(intakeConfig.caps.publicSite.daily);
+            }
+            if (!isSet(env.DOCUMENT_INTAKE_VISITOR_DAILY_CAP)) {
+              expect(s.caps.perVisitorDaily).toBe(intakeConfig.caps.publicSite.perVisitorDaily);
+            }
+          } else if (env.DOCUMENT_INTAKE_STORE?.trim() === "file") {
+            if (!isSet(env.DOCUMENT_INTAKE_TOTAL_CAP)) {
+              expect(s.caps.total).toBe(intakeConfig.caps.local.total);
+            }
+            if (!isSet(env.DOCUMENT_INTAKE_DAILY_CAP)) {
+              expect(s.caps.daily).toBe(intakeConfig.caps.local.daily);
+            }
+            if (!isSet(env.DOCUMENT_INTAKE_VISITOR_DAILY_CAP)) {
+              expect(s.caps.perVisitorDaily).toBe(intakeConfig.caps.local.perVisitorDaily);
+            }
+          }
+        }
+      }),
+      { numRuns: 300 },
+    );
+  });
+});
+

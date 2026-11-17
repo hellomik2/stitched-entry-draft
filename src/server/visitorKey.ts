@@ -10,19 +10,22 @@ export function visitorKey(ip: string | null, salt: string | null, dayUtc: strin
 }
 
 export function clientIp(headers: { get(name: string): string | null }): string | null {
-  // Try x-forwarded-for first
+  // Check x-nf-client-connection-ip first (Netlify platform header, connecting address)
+  const xNfClient = headers.get("x-nf-client-connection-ip");
+  if (xNfClient) {
+    const trimmed = xNfClient.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  // Fall back to first x-forwarded-for entry
   const xForwardedFor = headers.get("x-forwarded-for");
   if (xForwardedFor) {
     const first = xForwardedFor.split(",")[0]?.trim();
     if (first) {
       return first;
     }
-  }
-
-  // Fall back to x-nf-client-connection-ip
-  const xNfClient = headers.get("x-nf-client-connection-ip");
-  if (xNfClient) {
-    return xNfClient;
   }
 
   return null;

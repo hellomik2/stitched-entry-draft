@@ -1,0 +1,88 @@
+import { randomUUID } from "node:crypto";
+import type { UsageState } from "../core/budget";
+import { emptyUsageState } from "../core/budget";
+import type { UsageRecord } from "./readerTypes";
+import type { UsageStore } from "./usageStore";
+import { parseUsageState } from "./usageStore";
+
+export type BlobsLike = {
+  getWithMetadata(key: string): Promise<{ data: unknown; etag?: string } | null>;
+  setJSON(key: string, data: unknown, options?: { onlyIfMatch?: string; onlyIfNew?: boolean }): Promise<{ modified: boolean; etag?: string }>;
+};
+
+export const BLOBS_STORE_NAME = "document-intake-usage";
+export const BLOBS_STATE_KEY = "caps-state";
+
+async function openNetlifyBlobs(name: string): Promise<BlobsLike> {
+  const { getStore } = await import("@netlify/blobs");
+  const store = getStore({ name, consistency: "strong" });
+  return {
+    getWithMetadata: (key) => store.getWithMetadata(key, { type: "json" }),
+    setJSON: (key, data, options) =>
+      store.setJSON(key, data, options?.onlyIfMatch ? { onlyIfMatch: options.onlyIfMatch } : options?.onlyIfNew ? { onlyIfNew: true } : {}),
+  };
+}
+
+export function createBlobsUsageStore(options: { blobs?: BlobsLike; storeName?: string } = {}): UsageStore {
+  // One instance per request. writeState is a conditional write against the version this instance read,
+  // so two requests that read the same state cannot both reserve a call: the second write fails and
+  // the service does not call the reader.
+
+  let blobsPromise: Promise<BlobsLike> | null = null;
+  let lastRead: { exists: false } | { exists: true; etag: string | null } | null = null;
+
+  async function getBlobs(): Promise<BlobsLike> {
+    if (options.blobs) {
+      return options.blobs;
+    }
+    if (!blobsPromise) {
+      blobsPromise = openNetlifyBlobs(options.storeName ?? BLOBS_STORE_NAME);
+    }
+    return blobsPromise;
+  }
+
+  return {
+    async readState(): Promise<UsageState> {
+      const blobs = await getBlobs();
+      const entry = await blobs.getWithMetadata(BLOBS_STATE_KEY);
+
+      if (entry === null) {
+        lastRead = { exists: false };
+        return emptyUsageState();
+      }
+
+      const state = parseUsageState(entry.data);
+      lastRead = { exists: true, etag: entry.etag ?? null };
+      return state;
+    },
+
+    async writeState(s: UsageState): Promise<void> {
+      if (lastRead === null) {
+        throw new Error("usage state must be read before it is written");
+      }
+
+      const blobs = await getBlobs();
+      let r: { modified: boolean; etag?: string };
+
+      if (!lastRead.exists) {
+        r = await blobs.setJSON(BLOBS_STATE_KEY, s, { onlyIfNew: true });
+      } else if (lastRead.etag) {
+        r = await blobs.setJSON(BLOBS_STATE_KEY, s, { onlyIfMatch: lastRead.etag });
+      } else {
+        throw new Error("usage state has no version tag; not written");
+      }
+
+      if (!r.modified) {
+        throw new Error("usage state changed by another request; not written");
+      }
+
+      lastRead = { exists: true, etag: r.etag ?? null };
+    },
+
+    async appendRecord(r: UsageRecord): Promise<void> {
+      const blobs = await getBlobs();
+      const key = `usage/${r.timestamp.replace(/[^0-9]/g, "")}-${randomUUID()}`;
+      await blobs.setJSON(key, r, { onlyIfNew: true });
+    },
+  };
+}

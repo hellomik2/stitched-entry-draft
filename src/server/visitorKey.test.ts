@@ -95,4 +95,20 @@ describe("clientIp example tests", () => {
 
     expect(clientIp(headers)).toBeNull();
   });
+
+  it("clientIp with both headers prefers x-nf-client-connection-ip", () => {
+    const headers = {
+      get: (name: string) => {
+        if (name === "x-forwarded-for") {
+          return "198.51.100.9, 203.0.113.5";
+        }
+        if (name === "x-nf-client-connection-ip") {
+          return "203.0.113.5";
+        }
+        return null;
+      },
+    };
+
+    expect(clientIp(headers)).toBe("203.0.113.5");
+  });
 });
