@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { PDFDocumentProxy, PDFWorker } from 'pdfjs-dist'
 import type {
   DocumentText,
@@ -61,6 +61,12 @@ export default function StitchBoard({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const taskRef = useRef<{ promise: Promise<void>; cancel: () => void } | null>(null)
   const cancelledRef = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const redrawTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 })
+  const [threads, setThreads] = useState<Array<{ kind: 'doc' | 'calc'; d: string }>>([])
 
   // Parse and validate reading data
   const readingAnswer = useMemo(() => {
@@ -160,6 +166,75 @@ export default function StitchBoard({
     return map
   }, [draft])
 
+  // Helper: draw threads when a field is selected
+  const redrawThreads = useCallback(() => {
+    if (!selectedField || !containerRef.current || !pageViewRef.current) {
+      setThreads([])
+      return
+    }
+
+    const field = fieldMap.get(selectedField)
+    if (!field) {
+      setThreads([])
+      return
+    }
+
+    const container = containerRef.current
+    const pageView = pageViewRef.current
+
+    // Measure the selected value button
+    const valueButton = container.querySelector<HTMLButtonElement>(
+      `[data-field-id="${selectedField}"]`
+    )
+    if (!valueButton) {
+      setThreads([])
+      return
+    }
+
+    const buttonRect = valueButton.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+
+    const x1 = buttonRect.left - containerRect.left + container.scrollLeft
+    const y1 = buttonRect.top - containerRect.top + container.scrollTop + buttonRect.height / 2
+
+    const newThreads: Array<{ kind: 'doc' | 'calc'; d: string }> = []
+
+    // Doc threads: from selected value to each box in active document
+    for (const source of field.sources) {
+      if (source.kind === 'document' && source.doc === activeDocId) {
+        const box = pageView.querySelector<HTMLDivElement>(`[data-reading="${source.readingField}"]`)
+        if (box) {
+          const boxRect = box.getBoundingClientRect()
+
+          const x2 = boxRect.right - containerRect.left + container.scrollLeft
+          const y2 = boxRect.top - containerRect.top + container.scrollTop + boxRect.height / 2
+
+          // Cubic curve: M x1 y1 C x1-80 y1, x2+80 y2, x2 y2
+          const d = `M ${x1} ${y1} C ${x1 - 80} ${y1}, ${x2 + 80} ${y2}, ${x2} ${y2}`
+          newThreads.push({ kind: 'doc', d })
+        }
+      }
+    }
+
+    // Calc threads: from selected value to each input value button
+    for (const inputId of field.inputs) {
+      const inputButton = container.querySelector<HTMLButtonElement>(
+        `[data-field-id="${inputId}"]`
+      )
+      if (inputButton) {
+        const inputRect = inputButton.getBoundingClientRect()
+        const x2 = inputRect.left - containerRect.left + container.scrollLeft
+        const y2 = inputRect.top - containerRect.top + container.scrollTop + inputRect.height / 2
+
+        // Cubic curve: M x1 y1 C x1-40 y1, x2-40 y2, x2 y2
+        const d = `M ${x1} ${y1} C ${x1 - 40} ${y1}, ${x2 - 40} ${y2}, ${x2} ${y2}`
+        newThreads.push({ kind: 'calc', d })
+      }
+    }
+
+    setThreads(newThreads)
+  }, [selectedField, fieldMap, activeDocId])
+
   // When a field is selected and its first source is a document, switch to that document
   useEffect(() => {
     if (!selectedField || !draft) return
@@ -170,6 +245,93 @@ export default function StitchBoard({
       setActiveDocId(first.doc)
     }
   }, [selectedField, draft, fieldMap])
+
+  // Redraw threads when selection or active doc changes
+  useEffect(() => {
+    if (loadState !== 'ready') return
+
+    // Clear any pending timeout
+    if (redrawTimeoutRef.current) {
+      clearTimeout(redrawTimeoutRef.current)
+    }
+
+    if (!selectedField) {
+      setThreads([])
+      return
+    }
+
+    const field = fieldMap.get(selectedField)
+    if (!field || !pageViewRef.current) {
+      setThreads([])
+      return
+    }
+
+    // Scroll first doc source into view
+    const firstDocSource = field.sources.find(
+      (s) => s.kind === 'document' && s.doc === activeDocId
+    )
+    if (firstDocSource && firstDocSource.kind === 'document') {
+      const box = pageViewRef.current.querySelector<HTMLDivElement>(
+        `[data-reading="${firstDocSource.readingField}"]`
+      )
+      if (box) {
+        box.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      }
+    }
+
+    // Redraw after delay
+    redrawTimeoutRef.current = setTimeout(redrawThreads, 60)
+
+    // Also redraw after canvas render completes
+    const timeoutCanvas = setTimeout(redrawThreads, 300)
+
+    return () => {
+      clearTimeout(timeoutCanvas)
+    }
+  }, [selectedField, activeDocId, loadState, fieldMap, redrawThreads])
+
+  // Update SVG dimensions when threads change or container resizes
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    setSvgDimensions({
+      width: containerRef.current.scrollWidth,
+      height: containerRef.current.scrollHeight,
+    })
+  }, [threads])
+
+  // Listen for scroll and resize to redraw threads
+  useEffect(() => {
+    if (loadState !== 'ready' || !containerRef.current) return
+
+    const container = containerRef.current
+
+    const handleScroll = () => {
+      if (redrawTimeoutRef.current) {
+        clearTimeout(redrawTimeoutRef.current)
+      }
+      redrawTimeoutRef.current = setTimeout(redrawThreads, 60)
+    }
+
+    const handleResize = () => {
+      if (redrawTimeoutRef.current) {
+        clearTimeout(redrawTimeoutRef.current)
+      }
+      redrawTimeoutRef.current = setTimeout(redrawThreads, 60)
+    }
+
+    // Use capture phase to catch scroll events from panes
+    container.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      if (redrawTimeoutRef.current) {
+        clearTimeout(redrawTimeoutRef.current)
+      }
+    }
+  }, [loadState, redrawThreads])
 
   // Render active document page
   useEffect(() => {
@@ -270,7 +432,15 @@ export default function StitchBoard({
       </div>
 
       {/* Main layout */}
-      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+      <div
+        ref={containerRef}
+        style={{
+          display: 'flex',
+          flex: 1,
+          minHeight: 0,
+          position: 'relative',
+        }}
+      >
         {/* Left pane - documents */}
         <div data-testid="documents-pane" style={{ display: 'flex', flexDirection: 'column', width: '50%' }}>
           {/* Document tabs */}
@@ -527,6 +697,34 @@ export default function StitchBoard({
             </>
           )}
         </div>
+
+        {/* Threads SVG overlay */}
+        <svg
+          ref={svgRef}
+          data-testid="threads"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: `${svgDimensions.width}px`,
+            height: `${svgDimensions.height}px`,
+            pointerEvents: 'none',
+            zIndex: 5,
+            overflow: 'visible',
+          }}
+        >
+          {threads.map((thread, idx) => (
+            <path
+              key={idx}
+              data-testid={thread.kind === 'doc' ? 'thread-doc' : 'thread-calc'}
+              d={thread.d}
+              fill="none"
+              strokeWidth={2}
+              strokeDasharray="6 4"
+              stroke={thread.kind === 'doc' ? '#2563eb' : '#daa520'}
+            />
+          ))}
+        </svg>
       </div>
 
       {/* Source Strip */}
