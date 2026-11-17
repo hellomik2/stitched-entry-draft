@@ -1,6 +1,6 @@
 import { normalizeSpace, Box } from "./pdfText";
 import { VerifiedReading } from "./reading";
-import { HtsTable, lookupHts } from "./hts";
+import { HtsTable, lookupHts, normalizeHts } from "./hts";
 import {
   parseMoneyToCents,
   parseCount,
@@ -10,7 +10,7 @@ import {
   countryCode,
   formatCents,
 } from "./parse";
-import { roundEnteredValue, computeDuty, allocateGrossWeight, config } from "../rules";
+import { roundEnteredValue, computeDuty, allocateGrossWeight, totalEnteredValue, computeMPF, config } from "../rules";
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
@@ -1070,10 +1070,21 @@ export function buildDraft(input: {
             const originStr = normalizeSpace(r.value);
             const codeResult = countryCode(originStr);
             if (!codeResult.ok) {
-              reasons.push(`Line ${n}: reader suggested "${originStr}" but its quote is not on the page.`);
+              reasons.push(
+                `Invoice line ${n}: the reader suggested "${originStr}" but its quote is not on the page, so it was rejected.`
+              );
             }
           } else {
-            reasons.push(`Line ${n}: no origin reading.`);
+            const originReading = verified.find(
+              (v) => v.field === `invoice.lines.${n}.origin` && v.status === "rejected"
+            );
+            if (originReading) {
+              reasons.push(
+                `Invoice line ${n}: the reader suggested "${normalizeSpace(originReading.value ?? "")}" but its quote is not on the page, so it was rejected.`
+              );
+            } else {
+              reasons.push(`Line ${n}: no origin reading.`);
+            }
           }
         }
 
@@ -1759,6 +1770,955 @@ export function buildDraft(input: {
     headerFields.push(b10Field);
   }
 
+  // Build totals section
+  const totalFields: DraftField[] = [];
+
+  // Helper: extract value from a field in header or lines (searches before totals are computed)
+  const getFieldValue = (fieldId: string): string | null => {
+    // Search header first
+    for (const f of headerFields) {
+      if (f.id === fieldId) {
+        return f.value;
+      }
+    }
+    // Then search all line fields
+    for (const line of draftLines) {
+      for (const f of line.fields) {
+        if (f.id === fieldId) {
+          return f.value;
+        }
+      }
+    }
+    // Finally search totalFields (which may already have computed values from earlier totals)
+    for (const f of totalFields) {
+      if (f.id === fieldId) {
+        return f.value;
+      }
+    }
+    return null;
+  };
+
+  // B39: Total entered value
+  {
+    const id = "B39";
+    const lineValueIds = draftLines
+      .map((line) => {
+        const field = line.fields.find((f) => f.id.endsWith(".36A"));
+        return field ? field.id : null;
+      })
+      .filter((id): id is string => id !== null);
+
+    // Check if all line entered values are available
+    const missingIds: string[] = [];
+    let totalCentsExact = 0;
+
+    for (const valueId of lineValueIds) {
+      const value = getFieldValue(valueId);
+      if (!value) {
+        missingIds.push(valueId);
+      } else {
+        const dollars = parseInt(value, 10);
+        if (!isNaN(dollars)) {
+          totalCentsExact += dollars * 100;
+        } else {
+          missingIds.push(valueId);
+        }
+      }
+    }
+
+    if (missingIds.length > 0) {
+      totalFields.push(
+        field_helper({
+          id,
+          block: "39",
+          label: "Total entered value (USD)",
+          status: "needsReview",
+          inputs: lineValueIds,
+          reason: `Waiting on ${missingIds.join(", ")}.`,
+          rule: null,
+        })
+      );
+    } else {
+      // Compute total using config mode
+      const totalResult = totalEnteredValue([totalCentsExact], config.totalEnteredValueMode);
+      if (!totalResult.ok) {
+        totalFields.push(
+          field_helper({
+            id,
+            block: "39",
+            label: "Total entered value (USD)",
+            status: "needsReview",
+            inputs: lineValueIds,
+            reason: totalResult.reason,
+            rule: null,
+          })
+        );
+      } else {
+        const totalDollars = totalResult.value;
+        totalFields.push(
+          field_helper({
+            id,
+            block: "39",
+            label: "Total entered value (USD)",
+            value: String(totalDollars),
+            status: "computed",
+            rule: "P5",
+            inputs: lineValueIds,
+          })
+        );
+      }
+    }
+  }
+
+  // FEE.MPF: Merchandise Processing Fee
+  {
+    const id = "FEE.MPF";
+    const b39Id = "B39";
+    const b39Value = getFieldValue(b39Id);
+
+    if (!b39Value) {
+      totalFields.push(
+        field_helper({
+          id,
+          block: "43",
+          label: "Merchandise processing fee (USD)",
+          status: "needsReview",
+          inputs: [b39Id],
+          reason: `Waiting on ${b39Id}.`,
+          rule: null,
+        })
+      );
+    } else {
+      const b39Dollars = parseInt(b39Value, 10);
+      const b39Cents = b39Dollars * 100;
+      const mpfResult = computeMPF(b39Cents);
+
+      if (!mpfResult.ok) {
+        totalFields.push(
+          field_helper({
+            id,
+            block: "43",
+            label: "Merchandise processing fee (USD)",
+            status: "needsReview",
+            inputs: [b39Id],
+            reason: mpfResult.reason,
+            rule: null,
+          })
+        );
+      } else {
+        const mpfFormatted = formatCents(mpfResult.value);
+        const baseAmount = (b39Cents * config.mpfRate) / 1000000; // 0.3464% of B39
+        const baseFormatted = formatCents(Math.round(baseAmount));
+
+        let note = `0.3464% of ${b39Value} = ${baseFormatted}`;
+        if (mpfResult.value === config.mpfMinimumCents) {
+          note += ` (minimum applied: $${formatCents(config.mpfMinimumCents)})`;
+        } else if (mpfResult.value === config.mpfMaximumCents) {
+          note += ` (maximum applied: $${formatCents(config.mpfMaximumCents)})`;
+        }
+
+        totalFields.push(
+          field_helper({
+            id,
+            block: "43",
+            label: "Merchandise processing fee (USD)",
+            value: mpfFormatted,
+            status: "computed",
+            rule: "P8",
+            note,
+            inputs: [b39Id],
+          })
+        );
+      }
+    }
+  }
+
+  // FEE.HMF: Harbor Maintenance Fee (personInput)
+  {
+    const id = "FEE.HMF";
+    totalFields.push(
+      field_helper({
+        id,
+        block: "43",
+        label: "Harbor maintenance fee (USD)",
+        status: "personInput",
+        reason: "The harbor maintenance fee rate is not confirmed in our sources.",
+      })
+    );
+  }
+
+  // B41: Duty (sum of all L<nnn>.38 and L<nnn>.ch99)
+  {
+    const id = "B41";
+    // Order: all L<nnn>.38 first, then all L<nnn>.ch99
+    const dutyIds: string[] = [];
+    // First add all .38 fields
+    for (const line of draftLines) {
+      const dutyField = line.fields.find((f) => f.id.endsWith(".38"));
+      if (dutyField) dutyIds.push(dutyField.id);
+    }
+    // Then add all .ch99 fields
+    for (const line of draftLines) {
+      const ch99Field = line.fields.find((f) => f.id.endsWith(".ch99"));
+      if (ch99Field) dutyIds.push(ch99Field.id);
+    }
+
+    const missingIds: string[] = [];
+    let totalDutyCents = 0;
+
+    for (const dutyId of dutyIds) {
+      const value = getFieldValue(dutyId);
+      if (!value) {
+        missingIds.push(dutyId);
+      } else {
+        const dutyResult = parseMoneyToCents(value);
+        if (dutyResult.ok) {
+          totalDutyCents += dutyResult.value;
+        } else {
+          missingIds.push(dutyId);
+        }
+      }
+    }
+
+    if (missingIds.length > 0) {
+      totalFields.push(
+        field_helper({
+          id,
+          block: "41",
+          label: "Duty (USD)",
+          status: "needsReview",
+          inputs: dutyIds,
+          reason: `Waiting on ${missingIds.join(", ")}.`,
+          rule: null,
+        })
+      );
+    } else {
+      const dutyFormatted = formatCents(totalDutyCents);
+      totalFields.push(
+        field_helper({
+          id,
+          block: "41",
+          label: "Duty (USD)",
+          value: dutyFormatted,
+          status: "computed",
+          rule: "7501 p.20",
+          inputs: dutyIds,
+        })
+      );
+    }
+  }
+
+  // B42: Tax (computed 0.00)
+  {
+    const id = "B42";
+    totalFields.push(
+      field_helper({
+        id,
+        block: "42",
+        label: "Tax (USD)",
+        value: "0.00",
+        status: "computed",
+        rule: "7501 p.20",
+        note: "No line in this bundle has an I.R. tax rate.",
+      })
+    );
+  }
+
+  // B43: Other (FEE.MPF + FEE.HMF)
+  {
+    const id = "B43";
+    const mpfValue = getFieldValue("FEE.MPF");
+    const hmfValue = getFieldValue("FEE.HMF");
+
+    if (!mpfValue || !hmfValue) {
+      const missingIds: string[] = [];
+      if (!mpfValue) missingIds.push("FEE.MPF");
+      if (!hmfValue) missingIds.push("FEE.HMF");
+
+      totalFields.push(
+        field_helper({
+          id,
+          block: "43",
+          label: "Other (fees, USD)",
+          status: "needsReview",
+          inputs: ["FEE.MPF", "FEE.HMF"],
+          reason: `Waiting on ${missingIds.join(", ")}.`,
+          rule: null,
+        })
+      );
+    } else {
+      const mpfResult = parseMoneyToCents(mpfValue);
+      const hmfResult = parseMoneyToCents(hmfValue);
+
+      if (!mpfResult.ok || !hmfResult.ok) {
+        totalFields.push(
+          field_helper({
+            id,
+            block: "43",
+            label: "Other (fees, USD)",
+            status: "needsReview",
+            inputs: ["FEE.MPF", "FEE.HMF"],
+            reason: "Could not parse fee values.",
+            rule: null,
+          })
+        );
+      } else {
+        const totalCents = mpfResult.value + hmfResult.value;
+        const totalFormatted = formatCents(totalCents);
+        totalFields.push(
+          field_helper({
+            id,
+            block: "43",
+            label: "Other (fees, USD)",
+            value: totalFormatted,
+            status: "computed",
+            rule: "7501 p.20",
+            inputs: ["FEE.MPF", "FEE.HMF"],
+          })
+        );
+      }
+    }
+  }
+
+  // B44: Total (B41 + B42 + B43)
+  {
+    const id = "B44";
+    const b41Value = getFieldValue("B41");
+    const b42Value = getFieldValue("B42");
+    const b43Value = getFieldValue("B43");
+
+    if (!b41Value || !b42Value || !b43Value) {
+      const missingIds: string[] = [];
+      if (!b41Value) missingIds.push("B41");
+      if (!b42Value) missingIds.push("B42");
+      if (!b43Value) missingIds.push("B43");
+
+      totalFields.push(
+        field_helper({
+          id,
+          block: "44",
+          label: "Total (USD)",
+          status: "needsReview",
+          inputs: ["B41", "B42", "B43"],
+          reason: `Waiting on ${missingIds.join(", ")}.`,
+          rule: null,
+        })
+      );
+    } else {
+      const b41Result = parseMoneyToCents(b41Value);
+      const b42Result = parseMoneyToCents(b42Value);
+      const b43Result = parseMoneyToCents(b43Value);
+
+      if (!b41Result.ok || !b42Result.ok || !b43Result.ok) {
+        totalFields.push(
+          field_helper({
+            id,
+            block: "44",
+            label: "Total (USD)",
+            status: "needsReview",
+            inputs: ["B41", "B42", "B43"],
+            reason: "Could not parse total inputs.",
+            rule: null,
+          })
+        );
+      } else {
+        const totalCents = b41Result.value + b42Result.value + b43Result.value;
+        const totalFormatted = formatCents(totalCents);
+        totalFields.push(
+          field_helper({
+            id,
+            block: "44",
+            label: "Total (USD)",
+            value: totalFormatted,
+            status: "computed",
+            rule: "P10",
+            inputs: ["B41", "B42", "B43"],
+          })
+        );
+      }
+    }
+  }
+
+  // Collect all fields before applying overrides
+  const allFieldsList = [
+    ...headerFields,
+    ...draftLines.flatMap((line) => line.fields),
+    ...totalFields,
+  ];
+
+  // Apply person value overrides
+  for (const override of overrides) {
+    const field = allFieldsList.find((f) => f.id === override.fieldId);
+    if (!field) continue;
+
+    // Parse value based on field kind
+    let parseResult: { ok: boolean; value?: string | number; reason?: string } | null = null;
+    let oldValue = field.value;
+    let oldReason = field.reason;
+
+    try {
+      switch (field.block) {
+        // dollars (36A, B39): parseMoneyToCents and require whole dollars
+        case "36A":
+        case "39": {
+          const parsed = parseMoneyToCents(override.value);
+          if (parsed.ok) {
+            const cents = parsed.value;
+            if (cents % 100 === 0) {
+              parseResult = { ok: true, value: String(cents / 100) };
+            } else {
+              parseResult = {
+                ok: false,
+                reason: `Person value "${override.value}" must be whole dollars.`,
+              };
+            }
+          } else {
+            parseResult = { ok: false, reason: `Person value "${override.value}" was not accepted: ${parsed.reason}` };
+          }
+          break;
+        }
+
+        // money (38, ch99, FEE.*, B41..B44): parseMoneyToCents -> formatCents
+        case "38":
+        case "43":
+        case "41":
+        case "42":
+        case "44": {
+          const parsed = parseMoneyToCents(override.value);
+          if (parsed.ok) {
+            parseResult = { ok: true, value: formatCents(parsed.value) };
+          } else {
+            parseResult = { ok: false, reason: `Person value "${override.value}" was not accepted: ${parsed.reason}` };
+          }
+          break;
+        }
+
+        // hts (33A): normalizeHts -> entry form; lookup; use new number
+        case "33A": {
+          const normalized = normalizeHts(override.value);
+          if (normalized.ok) {
+            const lookup = lookupHts(hts, normalized.value.entry);
+            if (lookup.found) {
+              parseResult = { ok: true, value: lookup.number.entry };
+              // Update hts sources
+              field.sources = [
+                {
+                  kind: "hts",
+                  revision: hts.revision,
+                  htsno: lookup.row.htsno,
+                },
+              ];
+
+              // Re-derive dependent fields in this line: .35 (unit), .37A (rate), .38 (duty)
+              if (field.line) {
+                const lineNum = field.line;
+                
+                // Update .35 unit from new HTS
+                const field35 = allFieldsList.find((f) => f.id === `L${lineNum}.35`);
+                if (field35) {
+                  field35.unit = lookup.unit;
+                  // If .35 was computed before, keep it; otherwise leave it as is
+                  if (field35.status === "computed" || field35.status === "personEdited") {
+                    // Keep its value; just update unit
+                  } else if (field35.status === "needsReview" && field35.reason && field35.reason.includes("HTS number is not")) {
+                    // Was waiting on HTS; try to recompute if we have quantity data
+                    // For now, mark as needs review to be recomputed in recomputeTotals
+                    field35.status = "needsReview";
+                    field35.reason = "Re-derived from new HTS number; awaiting quantity recalculation.";
+                  }
+                }
+
+                // Update .37A rate from new HTS
+                const field37A = allFieldsList.find((f) => f.id === `L${lineNum}.37A`);
+                if (field37A) {
+                  if (lookup.rateText) {
+                    field37A.value = lookup.rateText;
+                    field37A.status = "copied";
+                    field37A.sources = [
+                      {
+                        kind: "hts",
+                        revision: hts.revision,
+                        htsno: lookup.rateFrom,
+                      },
+                    ];
+                    field37A.rule = lookup.rateFrom !== lookup.row.htsno ? "P16" : null;
+                    field37A.reason = null;
+                    field37A.inputs = [];
+                  }
+                }
+
+                // Mark .38 as needing re-computation (its inputs now use the new rate)
+                const field38 = allFieldsList.find((f) => f.id === `L${lineNum}.38`);
+                if (field38 && field38.status !== "personEdited") {
+                  // Don't override if user already entered this value
+                  field38.status = "needsReview";
+                  field38.value = null;
+                  field38.reason = "Re-computed from new HTS number.";
+                  field38.note = null;
+                }
+              }
+            } else {
+              parseResult = { ok: false, reason: `HTS ${normalized.value.entry} not found in ${hts.revisionTitle}.` };
+            }
+          } else {
+            parseResult = { ok: false, reason: `Person value "${override.value}" was not accepted: ${normalized.reason}` };
+          }
+          break;
+        }
+
+        // country (10, B10, B14): countryCode
+        case "10":
+        case "14": {
+          const parsed = countryCode(override.value);
+          if (parsed.ok) {
+            parseResult = { ok: true, value: parsed.value };
+          } else {
+            parseResult = { ok: false, reason: `Person value "${override.value}" was not accepted: ${parsed.reason}` };
+          }
+          break;
+        }
+
+        // quantity (34A, 35): ^\d+(\.\d{1,2})?$ kept as typed; .35 keeps HTS unit
+        case "34A":
+        case "35": {
+          if (/^\d+(\.\d{1,2})?$/.test(override.value)) {
+            parseResult = { ok: true, value: override.value };
+          } else {
+            parseResult = {
+              ok: false,
+              reason: `Person value "${override.value}" was not accepted: quantity must match pattern \\d+(\\.\\d{1,2})?`,
+            };
+          }
+          break;
+        }
+
+        // date (B11, B15): parseUsDate
+        case "11":
+        case "15": {
+          const parsed = parseUsDate(override.value);
+          if (parsed.ok) {
+            parseResult = { ok: true, value: parsed.value };
+          } else {
+            parseResult = { ok: false, reason: `Person value "${override.value}" was not accepted: ${parsed.reason}` };
+          }
+          break;
+        }
+
+        // everything else: non-empty text
+        default: {
+          if (override.value && override.value.trim()) {
+            parseResult = { ok: true, value: override.value };
+          } else {
+            parseResult = {
+              ok: false,
+              reason: `Person value must be non-empty.`,
+            };
+          }
+        }
+      }
+    } catch (err) {
+      parseResult = { ok: false, reason: `Error parsing person value: ${err}` };
+    }
+
+    // Apply result
+    if (parseResult && parseResult.ok) {
+      field.status = "personEdited";
+      field.reason = null;
+      field.value = parseResult.value as string;
+      field.note = `Entered by a person. Before: ${oldReason || (oldValue ? `"${oldValue}"` : "empty")}`;
+
+      // Mark field as no longer computed; if it had inputs, they're now moot
+      // But keep the rule for fields that have inherent rule contexts (like .33A with P15)
+      if (!field.id.includes(".33A")) {
+        field.rule = null;
+      }
+
+      // If this field feeds into computed totals, mark those as needsReview
+      // (Will be done after collecting needsReview/personInput lists)
+    } else if (parseResult) {
+      field.status = "needsReview";
+      field.value = null;
+      field.reason = parseResult.reason || "Invalid person value.";
+      field.note = null;
+    }
+  }
+
+  // Rebuild totals section after applying overrides (recalculate B39..B44)
+  // Clear and rebuild
+  const totalFieldsMap = new Map(totalFields.map((f) => [f.id, f]));
+
+  // Re-compute totals and line fields if any dependent values were overridden
+  const recomputeTotals = () => {
+    // After HTS or quantity overrides on a line, recompute:
+    // - .35 (unit from HTS)
+    // - .37A (rate from HTS)  
+    // - .38 (duty from value and rate)
+    // - B39, B41, B43, B44
+    
+    // First, for each line, check if .33A was personEdited and recompute .35 if it was waiting on HTS
+    for (const line of draftLines) {
+      const lineNum = line.lineNumber;
+      const field33A = line.fields.find((f) => f.id === `L${lineNum}.33A`);
+      const field35 = line.fields.find((f) => f.id === `L${lineNum}.35`);
+      const field36A = line.fields.find((f) => f.id === `L${lineNum}.36A`);
+      const field37A = line.fields.find((f) => f.id === `L${lineNum}.37A`);
+      const field38 = line.fields.find((f) => f.id === `L${lineNum}.38`);
+      
+      // If .33A was personEdited and .35 is now marked as needs review due to HTS, recompute it
+      if (field33A && field33A.status === "personEdited" && field35 && field35.status === "needsReview") {
+        // Look up the new HTS to get unit
+        const newHtsLookup = lookupHts(hts, field33A.value || "");
+        if (newHtsLookup.found) {
+          // Try to compute quantity from invoice data
+          // Find the line numbers that map to this 7501 line
+          const invoiceLineNumbers = line.invoiceLines;
+          
+          let totalQuantity: number | null = null;
+          const quantityReadingSources: DocSource[] = [];
+
+          for (const n of invoiceLineNumbers) {
+            const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+            const unitReading = accepted.get(`invoice.lines.${n}.unit`);
+
+            if (qtyReading && qtyReading.value && unitReading && unitReading.value) {
+              const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+              const invoiceUnit = normalizeSpace(unitReading.value).toUpperCase();
+
+              if (qtyResult.ok) {
+                let convertedQty: number | null = null;
+
+                if (invoiceUnit === "PCS" || invoiceUnit === "PC" || invoiceUnit === "EA" || invoiceUnit === "PIECES") {
+                  convertedQty = qtyResult.value;
+                } else if (invoiceUnit === "NO.") {
+                  convertedQty = qtyResult.value;
+                } else if (invoiceUnit === "DZ PCS" || invoiceUnit === "DOZ." || invoiceUnit === "DZ.") {
+                  const quotient = qtyResult.value / 12;
+                  if (qtyResult.value % 12 === 0) {
+                    convertedQty = quotient;
+                  } else {
+                    convertedQty = qtyResult.value;
+                  }
+                } else if (invoiceUnit === "KG") {
+                  convertedQty = qtyResult.value;
+                } else {
+                  convertedQty = null;
+                }
+
+                if (convertedQty !== null) {
+                  if (totalQuantity === null) totalQuantity = 0;
+                  totalQuantity += convertedQty;
+                }
+
+                quantityReadingSources.push(docSource(qtyReading));
+              }
+            }
+          }
+
+          if (totalQuantity !== null) {
+            let displayValue = String(totalQuantity);
+            const htsUnit = newHtsLookup.unit;
+            if (htsUnit && htsUnit.toUpperCase() === "DZ PCS") {
+              const dozenCount = totalQuantity / 12;
+              if (dozenCount === Math.floor(dozenCount)) {
+                displayValue = String(Math.floor(dozenCount));
+              } else {
+                displayValue = dozenCount.toFixed(2);
+              }
+            }
+
+            field35.value = displayValue;
+            field35.status = "computed";
+            field35.rule = "P12";
+            field35.unit = htsUnit;
+            field35.sources = quantityReadingSources;
+            field35.reason = null;
+            field35.inputs = [];
+          } else {
+            field35.value = null;
+            field35.status = "needsReview";
+            field35.unit = newHtsLookup.unit;
+            field35.reason = "Could not parse quantities from invoice lines.";
+          }
+        }
+      }
+    }
+
+    // Recompute L<nnn>.37A for lines where .10 or .33A was personEdited
+    for (const line of draftLines) {
+      const lineNum = line.lineNumber;
+      const field10 = line.fields.find((f) => f.id === `L${lineNum}.10`);
+      const field33A = line.fields.find((f) => f.id === `L${lineNum}.33A`);
+      const field37A = line.fields.find((f) => f.id === `L${lineNum}.37A`);
+
+      if (field37A && field37A.status === "needsReview" && field37A.inputs?.includes(`L${lineNum}.10`)) {
+        // .37A is waiting on .10 and .10 is now available
+        if (field33A && field33A.status !== "needsReview" && field33A.value && field10 && field10.value) {
+          // Look up HTS to get rate
+          const rateHtsLookup = lookupHts(hts, field33A.value || "");
+          if (rateHtsLookup.found) {
+            // Check if origin is in column 2 countries
+            if (config.column2Countries.includes(field10.value)) {
+              field37A.status = "needsReview";
+              field37A.value = null;
+              field37A.inputs = [];
+              field37A.reason = `Origin ${field10.value} is a Column 2 country. Rate lookup not built.`;
+            } else {
+              // Check if rate is computable
+              const dutyTest = computeDuty(rateHtsLookup.rateText, 0);
+              if (!dutyTest.ok) {
+                field37A.status = "needsReview";
+                field37A.value = null;
+                field37A.inputs = [];
+                field37A.reason = `Rate "${rateHtsLookup.rateText}" is not Free or a simple percentage. A person decides.`;
+              } else {
+                const rateSource: HtsSource = {
+                  kind: "hts",
+                  revision: hts.revision,
+                  htsno: rateHtsLookup.rateFrom,
+                };
+                const rule = rateHtsLookup.rateFrom !== rateHtsLookup.row.htsno ? "P16" : null;
+                field37A.value = rateHtsLookup.rateText;
+                field37A.status = "copied";
+                field37A.rule = rule;
+                field37A.sources = [rateSource];
+                field37A.inputs = [];
+                field37A.reason = null;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Now handle duty recomputation
+    for (const line of draftLines) {
+      const lineNum = line.lineNumber;
+      const field36A = line.fields.find((f) => f.id === `L${lineNum}.36A`);
+      const field37A = line.fields.find((f) => f.id === `L${lineNum}.37A`);
+      const field38 = line.fields.find((f) => f.id === `L${lineNum}.38`);
+
+      // If .36A or .37A changed, recompute .38
+      if (field38 && field36A && field37A) {
+        // Only recompute if .38 is not personEdited and both inputs are available
+        if (field38.status !== "personEdited" && field36A.status !== "needsReview" && field36A.value && 
+            field37A.status !== "needsReview" && field37A.value) {
+          const enteredDollars = parseInt(field36A.value, 10);
+          const dutyResult = computeDuty(field37A.value, enteredDollars * 100);
+          if (dutyResult.ok) {
+            field38.value = formatCents(dutyResult.value);
+            field38.status = "computed";
+            field38.rule = "P7";
+            field38.reason = null;
+            field38.inputs = [`L${lineNum}.36A`, `L${lineNum}.37A`];
+          }
+        }
+      }
+    }
+
+    // B39
+    const lineValueIds = draftLines
+      .map((line) => {
+        const field = line.fields.find((f) => f.id.endsWith(".36A"));
+        return field ? field.id : null;
+      })
+      .filter((id): id is string => id !== null);
+
+    const missingB39: string[] = [];
+    let totalCentsExact = 0;
+
+    for (const valueId of lineValueIds) {
+      const field = allFieldsList.find((f) => f.id === valueId);
+      if (!field || !field.value) {
+        missingB39.push(valueId);
+      } else {
+        const dollars = parseInt(field.value, 10);
+        if (!isNaN(dollars)) {
+          totalCentsExact += dollars * 100;
+        } else {
+          missingB39.push(valueId);
+        }
+      }
+    }
+
+    const b39Field = totalFieldsMap.get("B39");
+    if (b39Field) {
+      if (missingB39.length > 0) {
+        b39Field.status = "needsReview";
+        b39Field.value = null;
+        b39Field.reason = `Waiting on ${missingB39.join(", ")}.`;
+        b39Field.rule = null;
+      } else {
+        const totalResult = totalEnteredValue([totalCentsExact], config.totalEnteredValueMode);
+        if (!totalResult.ok) {
+          b39Field.status = "needsReview";
+          b39Field.value = null;
+          b39Field.reason = totalResult.reason;
+          b39Field.rule = null;
+        } else {
+          b39Field.status = "computed";
+          b39Field.value = String(totalResult.value);
+          b39Field.reason = null;
+          b39Field.rule = "P5";
+        }
+      }
+    }
+
+    // FEE.MPF (depends on B39)
+    const mpfField = allFieldsList.find((f) => f.id === "FEE.MPF");
+    if (mpfField && b39Field) {
+      if (!b39Field.value || b39Field.status === "needsReview") {
+        mpfField.status = "needsReview";
+        mpfField.value = null;
+        mpfField.reason = `Waiting on B39.`;
+        mpfField.rule = null;
+      } else {
+        const b39Dollars = parseInt(b39Field.value, 10);
+        const b39Cents = b39Dollars * 100;
+        const mpfResult = computeMPF(b39Cents);
+        if (!mpfResult.ok) {
+          mpfField.status = "needsReview";
+          mpfField.value = null;
+          mpfField.reason = mpfResult.reason;
+          mpfField.rule = null;
+        } else {
+          mpfField.status = "computed";
+          mpfField.value = formatCents(mpfResult.value);
+          mpfField.rule = "P8";
+          const baseAmount = (b39Cents * config.mpfRate) / 1000000;
+          const baseFormatted = formatCents(Math.round(baseAmount));
+          let note = `0.3464% of ${b39Field.value} = ${baseFormatted}`;
+          if (mpfResult.value === config.mpfMinimumCents) {
+            note += ` (minimum applied: $${formatCents(config.mpfMinimumCents)})`;
+          } else if (mpfResult.value === config.mpfMaximumCents) {
+            note += ` (maximum applied: $${formatCents(config.mpfMaximumCents)})`;
+          }
+          mpfField.note = note;
+          mpfField.reason = null;
+        }
+      }
+    }
+
+    // B41
+    const dutyIds: string[] = [];
+    for (const line of draftLines) {
+      const dutyField = line.fields.find((f) => f.id.endsWith(".38"));
+      if (dutyField) dutyIds.push(dutyField.id);
+    }
+    for (const line of draftLines) {
+      const ch99Field = line.fields.find((f) => f.id.endsWith(".ch99"));
+      if (ch99Field) dutyIds.push(ch99Field.id);
+    }
+
+    const missingB41: string[] = [];
+    let totalDutyCents = 0;
+
+    for (const dutyId of dutyIds) {
+      const field = allFieldsList.find((f) => f.id === dutyId);
+      if (!field || !field.value) {
+        missingB41.push(dutyId);
+      } else {
+        const dutyResult = parseMoneyToCents(field.value);
+        if (dutyResult.ok) {
+          totalDutyCents += dutyResult.value;
+        } else {
+          missingB41.push(dutyId);
+        }
+      }
+    }
+
+    const b41Field = totalFieldsMap.get("B41");
+    if (b41Field) {
+      if (missingB41.length > 0) {
+        b41Field.status = "needsReview";
+        b41Field.value = null;
+        b41Field.reason = `Waiting on ${missingB41.join(", ")}.`;
+        b41Field.rule = null;
+      } else {
+        b41Field.status = "computed";
+        b41Field.value = formatCents(totalDutyCents);
+        b41Field.reason = null;
+        b41Field.rule = "7501 p.20";
+      }
+    }
+
+    // B43 (depends on FEE.MPF and FEE.HMF)
+    const hmfField = allFieldsList.find((f) => f.id === "FEE.HMF");
+    const b43Field = totalFieldsMap.get("B43");
+    if (b43Field && mpfField && hmfField) {
+      if (!mpfField.value || mpfField.status === "needsReview" || !hmfField.value) {
+        b43Field.status = "needsReview";
+        b43Field.value = null;
+        b43Field.reason = "Waiting on FEE.MPF or FEE.HMF.";
+        b43Field.rule = null;
+      } else {
+        const mpfResult = parseMoneyToCents(mpfField.value);
+        const hmfResult = parseMoneyToCents(hmfField.value);
+        if (!mpfResult.ok || !hmfResult.ok) {
+          b43Field.status = "needsReview";
+          b43Field.value = null;
+          b43Field.reason = "Could not parse fee values.";
+          b43Field.rule = null;
+        } else {
+          b43Field.status = "computed";
+          b43Field.value = formatCents(mpfResult.value + hmfResult.value);
+          b43Field.reason = null;
+          b43Field.rule = "7501 p.20";
+        }
+      }
+    }
+
+    // B44 (depends on B41, B42, B43)
+    const b42Field = totalFieldsMap.get("B42");
+    const b44Field = totalFieldsMap.get("B44");
+    if (b44Field && b41Field && b42Field && b43Field) {
+      if (!b41Field.value || b41Field.status === "needsReview" || !b42Field.value || !b43Field.value || b43Field.status === "needsReview") {
+        b44Field.status = "needsReview";
+        b44Field.value = null;
+        b44Field.reason = "Waiting on B41, B42, or B43.";
+        b44Field.rule = null;
+      } else {
+        const b41Result = parseMoneyToCents(b41Field.value);
+        const b42Result = parseMoneyToCents(b42Field.value);
+        const b43Result = parseMoneyToCents(b43Field.value);
+        if (!b41Result.ok || !b42Result.ok || !b43Result.ok) {
+          b44Field.status = "needsReview";
+          b44Field.value = null;
+          b44Field.reason = "Could not parse total inputs.";
+          b44Field.rule = null;
+        } else {
+          b44Field.status = "computed";
+          b44Field.value = formatCents(b41Result.value + b42Result.value + b43Result.value);
+          b44Field.reason = null;
+          b44Field.rule = "P10";
+        }
+      }
+    }
+  };
+
+  recomputeTotals();
+
+  // Collect needsReview and personInput lists
+  const needsReviewList: ReviewItem[] = [];
+  const personInputList: ReviewItem[] = [];
+
+  for (const field of allFieldsList) {
+    if (field.status === "needsReview" && field.reason) {
+      needsReviewList.push({
+        fieldId: field.id,
+        label: field.label,
+        status: "needsReview",
+        reason: field.reason,
+      });
+    } else if (field.status === "personInput") {
+      personInputList.push({
+        fieldId: field.id,
+        label: field.label,
+        status: "personInput",
+        reason: field.reason || "Required data entry by filer.",
+      });
+    }
+  }
+
   return {
     notice: DRAFT_NOTICE,
     bundle,
@@ -1767,11 +2727,11 @@ export function buildDraft(input: {
     htsRevisionTitle: hts.revisionTitle,
     header: headerFields,
     lines: draftLines,
-    totals: [],
+    totals: totalFields,
     checks,
     rejectedReadings,
-    needsReview: [],
-    personInput: [],
+    needsReview: needsReviewList,
+    personInput: personInputList,
   };
 }
 
