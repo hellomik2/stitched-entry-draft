@@ -60,7 +60,7 @@ This implementation plan breaks down the Entry Math Calculator feature into mana
     - Call `validateConfig()` at module load
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10, 12.11_
 
-- [ ] 3. Entered Value Rounding — P4
+- [x] 3. Entered Value Rounding — P4
   - [x] 3.1 Implement src/rules/rounding.ts with roundEnteredValue()
     - Accept cents (integer) and optional RoundingMode
     - Return NeedsReview if cents is negative
@@ -72,7 +72,7 @@ This implementation plan breaks down the Entry Math Calculator feature into mana
     - Support other modes: halfDown, halfEven, truncate
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-  - [ ] 3.2 Write property tests for rounding in src/rules/rounding.property.test.ts
+  - [x] 3.2 Write property tests for rounding in src/rules/rounding.property.test.ts
     - **Property 1: Half-up rounds 50 cents up**
     - **Property 2: Rounding bounds difference**
     - **Property 3: Negative cents rejected**
