@@ -73,6 +73,7 @@ export default function StitchBoard({
   const [error, setError] = useState<string | null>(null)
   const [documents, setDocuments] = useState<LoadedDocument[]>([])
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
+  const [activePage, setActivePage] = useState(1)
   const [selectedField, setSelectedField] = useState<string | null>(null)
   const [upload, setUpload] = useState<UploadResult | null>(null)
   const [showUpload, setShowUpload] = useState(false)
@@ -193,6 +194,7 @@ export default function StitchBoard({
 
         setDocuments(loaded)
         setActiveDocId(loaded[0]?.docId || null)
+        setActivePage(1)
         setLoadState('ready')
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
@@ -247,6 +249,7 @@ export default function StitchBoard({
 
         setDocuments(loaded)
         setActiveDocId(loaded[0]?.docId || null)
+        setActivePage(1)
         setSelectedField(null)
         setOverrides([])
         setLoadState('ready')
@@ -275,7 +278,8 @@ export default function StitchBoard({
     if (loadState !== 'ready' || !documentsPaneRef.current) return
     const pane = documentsPaneRef.current
     const activeDoc = documents.find((d) => d.docId === activeDocId)
-    const pageWidth = activeDoc?.documentText.pages[0]?.width || 612
+    const activePageText = activeDoc?.documentText.pages.find((p) => p.page === activePage) ?? activeDoc?.documentText.pages[0]
+    const pageWidth = activePageText?.width || 612
     const fit = () => {
       // page-view has a 1rem margin on each side and a vertical scrollbar (about 16 px)
       const margins = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2
@@ -287,7 +291,7 @@ export default function StitchBoard({
     const observer = new ResizeObserver(fit)
     observer.observe(pane)
     return () => observer.disconnect()
-  }, [loadState, activeDocId, documents])
+  }, [loadState, activeDocId, activePage, documents])
 
   // Helper: draw threads when a field is selected.
   // A thread leaves a value through the gap just left of it and runs along the gap above its table row
@@ -343,7 +347,7 @@ export default function StitchBoard({
 
     // Doc threads: up to the gap above the value's row, left to the edge of the draft pane, then a curve to the box
     for (const source of field.sources) {
-      if (source.kind === 'document' && source.doc === activeDocId) {
+      if (source.kind === 'document' && source.doc === activeDocId && source.page === activePage) {
         const box = pageView.querySelector<HTMLDivElement>(`[data-reading="${source.readingField}"]`)
         if (box) {
           const b = toLocal(box.getBoundingClientRect())
@@ -373,7 +377,7 @@ export default function StitchBoard({
     }
 
     setThreads(newThreads)
-  }, [selectedField, fieldMap, activeDocId])
+  }, [selectedField, fieldMap, activeDocId, activePage])
 
   // When a field is selected and its first source is a document, switch to that document
   useEffect(() => {
@@ -383,6 +387,7 @@ export default function StitchBoard({
     const first = field.sources[0]
     if (first && first.kind === 'document') {
       setActiveDocId(first.doc)
+      setActivePage(first.page)
     }
   }, [selectedField, draft, fieldMap])
 
@@ -406,9 +411,9 @@ export default function StitchBoard({
       return
     }
 
-    // Scroll first doc source into view
+    // Scroll first doc source on the active page into view
     const firstDocSource = field.sources.find(
-      (s) => s.kind === 'document' && s.doc === activeDocId
+      (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage
     )
     if (firstDocSource && firstDocSource.kind === 'document') {
       const box = pageViewRef.current.querySelector<HTMLDivElement>(
@@ -436,7 +441,7 @@ export default function StitchBoard({
     return () => {
       clearTimeout(timeoutCanvas)
     }
-  }, [selectedField, activeDocId, loadState, fieldMap, redrawThreads, pageScale])
+  }, [selectedField, activeDocId, activePage, loadState, fieldMap, redrawThreads, pageScale])
 
   // Update SVG dimensions when threads change or container resizes
   useEffect(() => {
@@ -495,7 +500,7 @@ export default function StitchBoard({
 
       if (activeDoc.pdf) {
         // PDF page rendering
-        const pdfPage = await activeDoc.pdf.getPage(1)
+        const pdfPage = await activeDoc.pdf.getPage(activePage)
         const viewport = pdfPage.getViewport({ scale: pageScale * window.devicePixelRatio })
 
         // Create new canvas for this render
@@ -536,8 +541,9 @@ export default function StitchBoard({
         }
       } else if (activeDoc.image) {
         // Image page rendering
-        const pageWidth = activeDoc.documentText.pages[0]?.width || 612
-        const pageHeight = activeDoc.documentText.pages[0]?.height || 792
+        const activePageText = activeDoc.documentText.pages.find((p) => p.page === activePage) ?? activeDoc.documentText.pages[0]
+        const pageWidth = activePageText?.width || 612
+        const pageHeight = activePageText?.height || 792
 
         const canvas = document.createElement('canvas')
         canvas.width = pageWidth * pageScale * window.devicePixelRatio
@@ -573,7 +579,7 @@ export default function StitchBoard({
         taskRef.current.cancel()
       }
     }
-  }, [loadState, activeDocId, documents, pageScale])
+  }, [loadState, activeDocId, activePage, documents, pageScale])
 
   // Generate CSV URL when draft changes
   useEffect(() => {
@@ -605,16 +611,18 @@ export default function StitchBoard({
     )
   }
 
-  // Get readings for active document, page 1 only
+  // Get readings for active document, active page only
   const activeReadings = verified.filter(
-    (r): r is Extract<VerifiedReading, { status: 'accepted' }> => r.doc === activeDocId && r.page === 1 && r.status === 'accepted'
+    (r): r is Extract<VerifiedReading, { status: 'accepted' }> => r.doc === activeDocId && r.page === activePage && r.status === 'accepted'
   )
-  const rejectedReadings = verified.filter((r): r is Extract<VerifiedReading, { status: 'rejected' }> => r.doc === activeDocId && r.page === 1 && r.status === 'rejected')
+  const rejectedReadings = verified.filter((r): r is Extract<VerifiedReading, { status: 'rejected' }> => r.doc === activeDocId && r.page === activePage && r.status === 'rejected')
 
   // Get page dimensions for canvas
   const activeDoc = documents.find((d) => d.docId === activeDocId)
-  const pageWidth = activeDoc?.documentText.pages[0]?.width || 612
-  const pageHeight = activeDoc?.documentText.pages[0]?.height || 792
+  const activePageText = activeDoc?.documentText.pages.find((p) => p.page === activePage) ?? activeDoc?.documentText.pages[0]
+  const pageCount = activeDoc?.documentText.pages.length ?? 1
+  const pageWidth = activePageText?.width || 612
+  const pageHeight = activePageText?.height || 792
 
   return (
     <div data-testid="stitch-board" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -711,12 +719,21 @@ export default function StitchBoard({
                 data-testid={`tab-${doc.docId}`}
                 role="tab"
                 aria-selected={activeDocId === doc.docId}
-                onClick={() => setActiveDocId(doc.docId)}
+                onClick={() => { setActiveDocId(doc.docId); setActivePage(1) }}
               >
                 {doc.label}
               </button>
             ))}
           </div>
+
+          {/* Page navigation */}
+          {pageCount > 1 && (
+            <div data-testid="page-nav" className="page-nav">
+              <button data-testid="page-prev" type="button" disabled={activePage <= 1} onClick={() => setActivePage((p) => Math.max(1, p - 1))}>Previous page</button>
+              <span data-testid="page-indicator">Page {activePage} of {pageCount}</span>
+              <button data-testid="page-next" type="button" disabled={activePage >= pageCount} onClick={() => setActivePage((p) => Math.min(pageCount, p + 1))}>Next page</button>
+            </div>
+          )}
 
           {/* Page view */}
           <div
@@ -745,7 +762,7 @@ export default function StitchBoard({
                   data-testid={`box-${reading.field}`}
                   data-reading={reading.field}
                   data-selected={selectedField && fieldMap.get(selectedField)?.sources.some(
-                    (s) => s.kind === 'document' && s.doc === activeDocId && s.readingField === reading.field
+                    (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
                   ) ? 'true' : 'false'}
                   style={{
                     position: 'absolute',
