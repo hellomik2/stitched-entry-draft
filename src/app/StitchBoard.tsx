@@ -601,6 +601,7 @@ export default function StitchBoard({
             {rejectedReadings.map((reading) => (
               <div key={reading.field}>
                 <span className="field-name">{reading.field}</span>
+                <span className="rejected-tag">rejected, not used in the draft</span>
                 <span className="reason">{reading.status === 'rejected' ? reading.message : ''}</span>
               </div>
             ))}
@@ -652,18 +653,11 @@ export default function StitchBoard({
                       <button
                         key={item.fieldId}
                         data-testid={`review-${item.fieldId}`}
+                        className={selectedField === item.fieldId ? 'review-item is-selected' : 'review-item'}
                         onClick={() => setSelectedField(item.fieldId)}
-                        style={{
-                          padding: '0.5rem',
-                          background: '#fff',
-                          border: '1px solid #ddd',
-                          borderRadius: '4px',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                        }}
                       >
-                        <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{fieldTitle(fieldMap.get(item.fieldId), item.label)}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#666' }}>{tidyText(item.reason)}</div>
+                        <div className="review-item-title">{fieldTitle(fieldMap.get(item.fieldId), item.label)}</div>
+                        <div className="review-item-reason">{tidyText(item.reason)}</div>
                       </button>
                     ))}
                   </div>
@@ -707,7 +701,7 @@ export default function StitchBoard({
 
               {/* 3. Lines Table */}
               <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>Line Items</h3>
+                <h3 className="section-title">Line items</h3>
                 <table data-testid="lines-table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #ddd' }}>
@@ -732,7 +726,7 @@ export default function StitchBoard({
                         <tr key={line.lineNumber} data-testid={`line-${line.lineNumber}`} style={{ borderBottom: '1px solid #eee' }}>
                           <td style={{ padding: '0.375rem 0.25rem', fontWeight: 500 }}>
                             {line.lineNumber}
-                            <div style={{ fontSize: '0.65rem', color: '#666' }}>inv {line.invoiceLines.join('+')}</div>
+                            <div className="cell-tag">inv {line.invoiceLines.join('+')}</div>
                           </td>
                           {columns.map((col) => {
                             const field = fieldMap.get(col)
@@ -748,6 +742,7 @@ export default function StitchBoard({
                                     />
                                     {col === '38' && ch99Field && (
                                       <div style={{ marginTop: '0.25rem' }}>
+                                        <div className="cell-tag">Ch. 99</div>
                                         <DraftFieldButton
                                           field={ch99Field}
                                           selected={selectedField === ch99Field.id}
@@ -770,7 +765,7 @@ export default function StitchBoard({
 
               {/* 4. Totals Cards */}
               <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>Totals</h3>
+                <h3 className="section-title">Totals</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
                   {draft.totals.map((field) => (
                     <div key={field.id} className="field-card"><div className="field-card-label">{field.id.startsWith('FEE.') ? `Part of ${field.block} · ${field.label}` : `${field.block}. ${field.label}`}</div><DraftFieldButton
@@ -1020,10 +1015,11 @@ function DraftFieldButton({
     padding: compact ? '0.25rem 0.375rem' : '0.5rem',
     borderRadius: '4px',
     cursor: 'pointer',
-    fontSize: compact ? '0.7rem' : '0.75rem',
+    fontSize: compact ? 'var(--fs-dense)' : 'var(--fs-small)',
+    fontVariantNumeric: 'tabular-nums',
     textAlign: 'left' as const,
     ...statusStyles[field.status],
-    ...(selected && { boxShadow: '0 0 4px rgba(0,0,0,0.3)' }),
+    ...(selected && { boxShadow: '0 0 0 2px #fff, 0 0 0 4px #1e3a8a' }),
   }
 
   const displayText = field.value || (field.status === 'needsReview' ? 'needs review' : 'person fills')
@@ -1081,24 +1077,24 @@ function SourceStrip({
         position: 'relative',
         zIndex: 10,
         flex: '0 0 auto',
-        minHeight: '9rem',
+        minHeight: field ? '9rem' : undefined,
         background: '#fff',
         borderTop: '1px solid #ddd',
         padding: '0.75rem 1rem',
-        fontSize: '0.75rem',
+        fontSize: 'var(--fs-small)',
         maxHeight: '12rem',
         overflowY: 'auto',
         lineHeight: 1.4,
       }}
     >
       {!field ? (
-        <div style={{ color: '#999', minHeight: '7rem', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+        <div style={{ color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
           Click any value in the draft to see where it came from: the document line, the tariff row, or the values it was computed from.
         </div>
       ) : (
         <>
           {/* Header: Block and label */}
-          <div style={{ marginBottom: '0.5rem', fontWeight: 500 }}>
+          <div style={{ marginBottom: '0.5rem', fontWeight: 600, fontSize: 'var(--fs-body)', color: 'var(--ink)' }}>
             {fieldTitle(field, field.label)}
           </div>
 
@@ -1106,7 +1102,7 @@ function SourceStrip({
             <div>
               {/* Status, with the value form or the Undo button on the same row */}
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
-                <span data-testid="strip-status" style={{ color: '#666' }}>{statusWords[field.status]}</span>
+                <span data-testid="strip-status" style={{ color: 'var(--muted)', fontWeight: 500 }}>{statusWords[field.status]}</span>
 
               {/* Override form for needsReview or personInput */}
               {(field.status === 'needsReview' || field.status === 'personInput') && (
@@ -1149,7 +1145,7 @@ function SourceStrip({
 
               {/* Reason */}
               {field.reason && (
-                <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
+                <div style={{ marginBottom: '0.5rem', color: '#b91c1c' }} data-testid="strip-reason">
                   Reason: {tidyText(field.reason)}
                 </div>
               )}
@@ -1166,14 +1162,14 @@ function SourceStrip({
 
               {/* Rule */}
               {field.rule && (
-                <div style={{ marginBottom: '0.5rem', color: '#555' }}>
+                <div style={{ marginBottom: '0.5rem', color: 'var(--muted)' }}>
                   Rule: <em>{field.rule}</em>
                 </div>
               )}
 
               {/* Note */}
               {field.note && (
-                <div style={{ marginBottom: '0.5rem', color: '#555' }}>
+                <div style={{ marginBottom: '0.5rem', color: 'var(--muted)' }}>
                   Note: {field.note}
                 </div>
               )}
@@ -1186,7 +1182,12 @@ function SourceStrip({
                     <div
                       key={idx}
                       data-testid="strip-source"
-                      style={{ marginBottom: '0.25rem', color: '#333' }}
+                      style={{
+                        marginBottom: '0.25rem',
+                        paddingLeft: '0.5rem',
+                        borderLeft: `3px solid ${source.kind === 'document' ? THREAD_DOC_COLOR : '#9ca3af'}`,
+                        color: 'var(--ink)',
+                      }}
                     >
                       {source.kind === 'document'
                         ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`
