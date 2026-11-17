@@ -24,7 +24,7 @@ async function getFakeReader(): Promise<IntakeReader | null> {
     return cachedFakeReader;
   }
 
-  const recordingsPath = path.join(process.cwd(), "samples", "upload-test", "recordings");
+  const recordingsPath = path.join(/*turbopackIgnore: true*/ process.cwd(), "samples", "upload-test", "recordings");
   const recordings = await loadRecordings(recordingsPath);
 
   if (recordings.length === 0) {
@@ -113,7 +113,7 @@ export async function POST(request: Request): Promise<Response> {
   // Set up stores
   let store: UsageStore | null = null;
   if (setup.mode === "claude" && setup.store === "file") {
-    store = createFileUsageStore(path.join(process.cwd(), setup.storeDir));
+    store = createFileUsageStore(path.join(/*turbopackIgnore: true*/ process.cwd(), setup.storeDir));
   }
 
   const fakeStore = getMemoryFakeStore();

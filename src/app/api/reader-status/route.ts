@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<Response> {
   // Set up store (only needed for claude mode)
   let store: UsageStore | null = null;
   if (setup.mode === "claude" && setup.store === "file") {
-    store = createFileUsageStore(path.join(process.cwd(), setup.storeDir));
+    store = createFileUsageStore(path.join(/*turbopackIgnore: true*/ process.cwd(), setup.storeDir));
   }
 
   // Call the service

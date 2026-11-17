@@ -132,7 +132,7 @@ export async function loadRecordings(dir: string): Promise<Recording[]> {
     recordings.push({
       name: obj.name,
       filesSha256: obj.filesSha256 as string[],
-      output: parsed as ReaderOutput,
+      output: output as unknown as ReaderOutput,
     });
   }
 

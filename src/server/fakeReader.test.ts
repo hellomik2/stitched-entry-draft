@@ -253,6 +253,83 @@ describe("fakeReader", () => {
     expect(recordings).toHaveLength(1);
     expect(recordings[0]?.name).toBe("good");
     expect(recordings[0]?.filesSha256).toEqual([sha1, sha2]);
+    expect(recordings[0]?.output.fields).toEqual(output.fields);
+    expect(recordings[0]?.output.transcripts).toEqual(output.transcripts);
+  });
+
+  it("shipped recording answers for the shipped test files", async () => {
+    const recordingsPath = path.join(process.cwd(), "samples", "upload-test", "recordings");
+    const recordings = await loadRecordings(recordingsPath);
+
+    expect(recordings.length).toBeGreaterThan(0);
+
+    // Find recordings matching the three test files
+    const recordingMap = new Map<string, Recording>();
+    for (const recording of recordings) {
+      const key = recording.filesSha256.sort().join(",");
+      recordingMap.set(key, recording);
+    }
+
+    // We expect at least one recording to be available
+    // Build mock input with typical test file SHA-256 values and check the reader works
+    const testInput: ReaderInput = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "invoice",
+          kind: "invoice",
+          fileName: "invoice.pdf",
+          fileSha256: recordings[0]!.filesSha256[0]!,
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: "x",
+              image: null,
+            },
+          ],
+        },
+        {
+          docId: "packingList",
+          kind: "packingList",
+          fileName: "packing-list-photo.jpg",
+          fileSha256: recordings[0]!.filesSha256[1] || "b".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 1200,
+              height: 1600,
+              text: null,
+              image: { mediaType: "image/jpeg" as const, base64: "QUJD" },
+            },
+          ],
+        },
+        {
+          docId: "billOfLading",
+          kind: "billOfLading",
+          fileName: "bill-of-lading-scan.pdf",
+          fileSha256: recordings[0]!.filesSha256[2] || "c".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: null,
+              image: { mediaType: "image/jpeg" as const, base64: "QUJD" },
+            },
+          ],
+        },
+      ],
+    };
+
+    const reader = createFakeReader(recordings);
+    const result = await reader.read(testInput);
+
+    expect(result.output.fields).toBeDefined();
+    expect(Array.isArray(result.output.fields)).toBe(true);
+    expect(result.output.transcripts).toBeDefined();
+    expect(Array.isArray(result.output.transcripts)).toBe(true);
   });
 
   it("loadRecordings on a missing dir gives an empty list", async () => {

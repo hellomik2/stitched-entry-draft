@@ -18,7 +18,10 @@ import {
   validateReadingAnswer,
   allFields,
   draftToCsv,
+  readerOutputToAnswer,
+  composeDocumentTexts,
 } from '../core'
+import UploadPanel, { type UploadResult } from './intake/UploadPanel'
 import { APP_NAME, BOARD_TITLE } from './appTitle'
 
 export interface BundleJson {
@@ -41,7 +44,8 @@ interface StitchBoardProps {
 
 interface LoadedDocument {
   docId: string
-  pdf: PDFDocumentProxy
+  pdf: PDFDocumentProxy | null
+  image: HTMLImageElement | null
   documentText: DocumentText
 }
 
@@ -52,6 +56,12 @@ const THREAD_DOC_COLOR = '#2563eb'
 const THREAD_CALC_COLOR = '#b8860b'
 /** Cross stitches drawn over every thread (and later in the legend): short bars across the line. */
 const STITCH = { width: 5, dash: '1.5 5', opacity: 0.8 }
+
+const KIND_LABEL = {
+  invoice: 'Commercial invoice',
+  packingList: 'Packing list',
+  billOfLading: 'Bill of lading',
+}
 
 export default function StitchBoard({
   bundle,
@@ -64,6 +74,8 @@ export default function StitchBoard({
   const [documents, setDocuments] = useState<LoadedDocument[]>([])
   const [activeDocId, setActiveDocId] = useState<string | null>(null)
   const [selectedField, setSelectedField] = useState<string | null>(null)
+  const [upload, setUpload] = useState<UploadResult | null>(null)
+  const [showUpload, setShowUpload] = useState(false)
 
   const pageViewRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -82,6 +94,11 @@ export default function StitchBoard({
   const [csvUrl, setCsvUrl] = useState<string | null>(null)
   const readingAnswer = useMemo(() => {
     try {
+      if (upload) {
+        // Upload mode: build answer from upload
+        return readerOutputToAnswer(upload.prepared.input, upload.output)
+      }
+      // Sample mode: use the provided reading data
       const validation = validateReadingAnswer(readingData)
       if (!validation.ok) {
         throw new Error(`Invalid reading answer: ${validation.reason}`)
@@ -90,7 +107,7 @@ export default function StitchBoard({
     } catch (e) {
       throw new Error(`Failed to parse reading.json: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [readingData])
+  }, [readingData, upload])
 
   // Parse overrides
   const overridesList = useMemo(() => {
@@ -105,6 +122,20 @@ export default function StitchBoard({
     }
   }, [overridesData])
 
+  // Determine the active bundle (sample or uploaded)
+  const activeBundle: BundleJson = upload
+    ? {
+        bundle: 'uploaded',
+        title: 'Your uploaded documents (not stored)',
+        documents: upload.prepared.views.map((v) => ({
+          docId: v.docId,
+          kind: v.kind,
+          file: v.fileName,
+          label: `${KIND_LABEL[v.kind]}: ${v.fileName}`,
+        })),
+      }
+    : bundle
+
   // Verify readings and build draft
   const { verified, draft } = useMemo(() => {
     if (documents.length === 0) {
@@ -114,7 +145,7 @@ export default function StitchBoard({
       const documentTexts = documents.map((d) => d.documentText)
       const verified = verifyReadings(readingAnswer, documentTexts)
       const draft = buildDraft({
-        bundle: bundle.bundle,
+        bundle: activeBundle.bundle,
         reader: readingAnswer.reader,
         readings: verified,
         hts,
@@ -124,10 +155,15 @@ export default function StitchBoard({
     } catch (e) {
       throw new Error(`Failed to build draft: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [documents, readingAnswer, bundle.bundle, hts, overrides])
+  }, [documents, readingAnswer, activeBundle.bundle, hts, overrides])
 
-  // Load all PDF documents
+  // Load all PDF documents (sample mode only)
   useEffect(() => {
+    if (upload !== null) {
+      // Upload mode: skip sample loading
+      return
+    }
+
     const loadDocuments = async () => {
       try {
         const pdfjs = await import('pdfjs-dist')
@@ -150,6 +186,7 @@ export default function StitchBoard({
           loaded.push({
             docId: docConfig.docId,
             pdf: pdfDoc,
+            image: null,
             documentText,
           })
         }
@@ -165,7 +202,63 @@ export default function StitchBoard({
     }
 
     loadDocuments()
-  }, [bundle])
+  }, [bundle, upload])
+
+  // Load uploaded documents (upload mode)
+  useEffect(() => {
+    if (!upload) {
+      return
+    }
+
+    const loadUploadedDocuments = async () => {
+      try {
+        // Compose document texts from prepared data and reader output
+        const texts = composeDocumentTexts(
+          upload.prepared.textDocs,
+          upload.prepared.input,
+          upload.output
+        )
+
+        const loaded: LoadedDocument[] = []
+
+        for (const view of upload.prepared.views) {
+          const documentText = texts.find((t) => t.docId === view.docId)
+          if (!documentText) {
+            throw new Error(`Text document ${view.docId} not found`)
+          }
+
+          let image: HTMLImageElement | null = null
+
+          // For image pages, create an HTMLImageElement from the image URL
+          if (view.imageUrl) {
+            const img = new Image()
+            img.src = view.imageUrl
+            await img.decode()
+            image = img
+          }
+
+          loaded.push({
+            docId: view.docId,
+            pdf: view.pdf,
+            image,
+            documentText,
+          })
+        }
+
+        setDocuments(loaded)
+        setActiveDocId(loaded[0]?.docId || null)
+        setSelectedField(null)
+        setOverrides([])
+        setLoadState('ready')
+      } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        setError(message)
+        setLoadState('error')
+      }
+    }
+
+    loadUploadedDocuments()
+  }, [upload])
 
   // Build map of all draft fields by id
   const fieldMap = useMemo(() => {
@@ -400,43 +493,74 @@ export default function StitchBoard({
       const activeDoc = documents.find((d) => d.docId === activeDocId)
       if (!activeDoc) return
 
-      const pdfPage = await activeDoc.pdf.getPage(1)
-      const viewport = pdfPage.getViewport({ scale: pageScale * window.devicePixelRatio })
+      if (activeDoc.pdf) {
+        // PDF page rendering
+        const pdfPage = await activeDoc.pdf.getPage(1)
+        const viewport = pdfPage.getViewport({ scale: pageScale * window.devicePixelRatio })
 
-      // Create new canvas for this render
-      const canvas = document.createElement('canvas')
-      canvas.width = viewport.width
-      canvas.height = viewport.height
-      canvas.style.width = `${viewport.width / window.devicePixelRatio}px`
-      canvas.style.height = `${viewport.height / window.devicePixelRatio}px`
+        // Create new canvas for this render
+        const canvas = document.createElement('canvas')
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        canvas.style.width = `${viewport.width / window.devicePixelRatio}px`
+        canvas.style.height = `${viewport.height / window.devicePixelRatio}px`
 
-      const task = pdfPage.render({
-        canvas,
-        canvasContext: canvas.getContext('2d')!,
-        viewport,
-      })
+        const task = pdfPage.render({
+          canvas,
+          canvasContext: canvas.getContext('2d')!,
+          viewport,
+        })
 
-      taskRef.current = {
-        promise: task.promise,
-        cancel: () => task.cancel(),
-      }
-
-      try {
-        await task.promise
-
-        // Only swap canvas if not cancelled
-        if (!cancelledRef.current && pageViewRef.current) {
-          // Remove old canvas
-          if (canvasRef.current) {
-            canvasRef.current.remove()
-          }
-          canvasRef.current = canvas
-          canvas.style.display = 'block'
-          pageViewRef.current.insertBefore(canvas, pageViewRef.current.firstChild)
+        taskRef.current = {
+          promise: task.promise,
+          cancel: () => task.cancel(),
         }
-      } catch (e) {
-        if ((e as Error).name !== 'RenderingCancelledException') {
-          console.error('PDF render error:', e)
+
+        try {
+          await task.promise
+
+          // Only swap canvas if not cancelled
+          if (!cancelledRef.current && pageViewRef.current) {
+            // Remove old canvas
+            if (canvasRef.current) {
+              canvasRef.current.remove()
+            }
+            canvasRef.current = canvas
+            canvas.style.display = 'block'
+            pageViewRef.current.insertBefore(canvas, pageViewRef.current.firstChild)
+          }
+        } catch (e) {
+          if ((e as Error).name !== 'RenderingCancelledException') {
+            console.error('PDF render error:', e)
+          }
+        }
+      } else if (activeDoc.image) {
+        // Image page rendering
+        const pageWidth = activeDoc.documentText.pages[0]?.width || 612
+        const pageHeight = activeDoc.documentText.pages[0]?.height || 792
+
+        const canvas = document.createElement('canvas')
+        canvas.width = pageWidth * pageScale * window.devicePixelRatio
+        canvas.height = pageHeight * pageScale * window.devicePixelRatio
+        canvas.style.width = `${pageWidth * pageScale}px`
+        canvas.style.height = `${pageHeight * pageScale}px`
+
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          try {
+            ctx.drawImage(activeDoc.image, 0, 0, canvas.width, canvas.height)
+
+            if (!cancelledRef.current && pageViewRef.current) {
+              if (canvasRef.current) {
+                canvasRef.current.remove()
+              }
+              canvasRef.current = canvas
+              canvas.style.display = 'block'
+              pageViewRef.current.insertBefore(canvas, pageViewRef.current.firstChild)
+            }
+          } catch (e) {
+            console.error('Image render error:', e)
+          }
         }
       }
     }
@@ -505,23 +629,51 @@ export default function StitchBoard({
             <div data-testid="draft-notice">{draft?.notice || 'DRAFT, NOT FOR FILING'}</div>
           </div>
           <div className="board-meta">
-            <span>Shipment: {bundle.title}</span>
+            <span>Shipment: {activeBundle.title}</span>
             <span data-testid="hts-revision">
               Checked against {draft?.htsRevisionTitle || 'HTS Revision (loading)'}
             </span>
-            <span data-testid="reader-mode">Pre-read sample: no AI call</span>
+            <span data-testid="reader-mode">
+              {upload
+                ? upload.mode === 'fake'
+                  ? 'Test mode: recorded answers, no AI call'
+                  : 'Read by the AI reader (claude-haiku-5-5). Check every value.'
+                : 'Pre-read sample: no AI call'}
+            </span>
           </div>
         </div>
-        {csvUrl && (
-          <a
-            data-testid="download-csv"
-            className="btn btn-primary"
-            href={csvUrl}
-            download={`${bundle.bundle}-7501-draft.csv`}
-          >
-            Download CSV
-          </a>
-        )}
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {upload ? (
+            <button
+              data-testid="back-to-sample"
+              className="btn"
+              onClick={() => {
+                setUpload(null)
+                setShowUpload(false)
+              }}
+            >
+              Back to sample
+            </button>
+          ) : (
+            <button
+              data-testid="open-upload"
+              className="btn"
+              onClick={() => setShowUpload(true)}
+            >
+              Upload documents
+            </button>
+          )}
+          {csvUrl && (
+            <a
+              data-testid="download-csv"
+              className="btn btn-primary"
+              href={csvUrl}
+              download={upload ? 'uploaded-7501-draft.csv' : `${activeBundle.bundle}-7501-draft.csv`}
+            >
+              Download CSV
+            </a>
+          )}
+        </div>
       </header>
 
       {/* Legend: what the thread colours and the value outlines mean */}
@@ -540,9 +692,20 @@ export default function StitchBoard({
       >
         {/* Left pane - documents */}
         <div ref={documentsPaneRef} data-testid="documents-pane" style={{ display: 'flex', flexDirection: 'column', width: '45%' }}>
+          {/* Upload panel */}
+          {showUpload && (
+            <UploadPanel
+              onLoaded={(r) => {
+                setUpload(r)
+                setShowUpload(false)
+              }}
+              onClose={() => setShowUpload(false)}
+            />
+          )}
+
           {/* Document tabs */}
           <div data-testid="document-tabs">
-            {bundle.documents.map((doc) => (
+            {activeBundle.documents.map((doc) => (
               <button
                 key={doc.docId}
                 data-testid={`tab-${doc.docId}`}
@@ -629,22 +792,26 @@ export default function StitchBoard({
                     <span data-testid="needs-review-count" className="count-pill">{draft.needsReview.length}</span>
                   </h3>
                   <span className="review-sub">person fills {draft.personInput.length}</span>
-                  {overrides.length === 0 ? (
-                    <button
-                      data-testid="apply-demo-answers"
-                      className="btn btn-small"
-                      onClick={() => setOverrides(overridesList)}
-                    >
-                      Use test answers for this demo
-                    </button>
-                  ) : (
-                    <button
-                      data-testid="reset-answers"
-                      className="btn btn-small btn-danger"
-                      onClick={() => setOverrides([])}
-                    >
-                      Clear person answers ({overrides.length})
-                    </button>
+                  {!upload && (
+                    <>
+                      {overrides.length === 0 ? (
+                        <button
+                          data-testid="apply-demo-answers"
+                          className="btn btn-small"
+                          onClick={() => setOverrides(overridesList)}
+                        >
+                          Use test answers for this demo
+                        </button>
+                      ) : (
+                        <button
+                          data-testid="reset-answers"
+                          className="btn btn-small btn-danger"
+                          onClick={() => setOverrides([])}
+                        >
+                          Clear person answers ({overrides.length})
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
                 {draft.needsReview.length > 0 && (
@@ -856,7 +1023,7 @@ export default function StitchBoard({
         selectedField={selectedField} 
         fieldMap={fieldMap} 
         draft={draft}
-        documents={bundle.documents}
+        documents={activeBundle.documents}
         onApply={(fieldId, value) => {
           setOverrides((prev) => [...prev.filter((o) => o.fieldId !== fieldId), { fieldId, value }])
         }}
@@ -1190,7 +1357,7 @@ function SourceStrip({
                       }}
                     >
                       {source.kind === 'document'
-                        ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`
+                        ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"${source.origin === 'imageTranscript' ? ' (read from an image by the AI reader)' : ''}`
                         : `Tariff schedule ${source.revision}, row ${source.htsno}`}
                     </div>
                   ))}

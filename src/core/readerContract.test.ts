@@ -439,4 +439,46 @@ describe("readerContract: composeDocumentTexts", () => {
 
     expect(() => composeDocumentTexts(textDocs, input, output)).toThrow();
   });
+
+  it("composes an image-only document without textDocs entry", () => {
+    const textDocs: DocumentText[] = []; // No entry needed for image-only
+
+    const input: ReaderInput = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "photo1",
+          kind: "invoice",
+          fileName: "invoice.jpg",
+          fileSha256: "0".repeat(64),
+          pages: [
+            { page: 1, width: 200, height: 150, text: null, image: { mediaType: "image/jpeg", base64: "QUJD" } },
+          ],
+        },
+      ],
+    };
+
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "photo1",
+          page: 1,
+          lines: [
+            { text: "Page text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.1 } },
+          ],
+        },
+      ],
+    };
+
+    const result = composeDocumentTexts(textDocs, input, output);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].docId).toBe("photo1");
+    expect(result[0].pages).toHaveLength(1);
+    expect(result[0].pages[0].origin).toBe("imageTranscript");
+    expect(result[0].pages[0].items).toHaveLength(1);
+    expect(result[0].pages[0].items[0].str).toBe("Page text");
+  });
 });

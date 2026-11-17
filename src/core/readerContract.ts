@@ -571,17 +571,17 @@ export function composeDocumentTexts(
 
   for (const inputDoc of input.documents) {
     const docId = inputDoc.docId;
-    const textDoc = textDocMap.get(docId);
 
-    if (!textDoc) {
-      throw new Error(`Programmer error: text document "${docId}" not found`);
-    }
-
-    const pages: typeof textDoc.pages = [];
+    const pages: DocumentText["pages"] = [];
 
     for (const inputPage of inputDoc.pages) {
       if (inputPage.text !== null) {
         // Text page: take from textDocs
+        const textDoc = textDocMap.get(docId);
+        if (!textDoc) {
+          throw new Error(`Programmer error: text document "${docId}" not found`);
+        }
+
         const matchingPage = textDoc.pages.find((p) => p.page === inputPage.page);
         if (!matchingPage) {
           throw new Error(
