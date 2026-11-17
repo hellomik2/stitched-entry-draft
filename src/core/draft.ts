@@ -946,6 +946,10 @@ export function buildDraft(input: {
 
   // Group invoice lines by HTS and origin
   for (let n = 1; n <= 8; n++) {
+    // An invoice line with no reading at all is not on the documents, so it gets no 7501 line.
+    // A line whose readings were all rejected still gets one, so a person sees it.
+    if (!verified.some((r) => r.field.startsWith(`invoice.lines.${n}.`))) continue;
+
     const htsReading = accepted.get(`invoice.lines.${n}.hts`);
     const originReading = accepted.get(`invoice.lines.${n}.origin`);
     const descReading = accepted.get(`invoice.lines.${n}.description`);
@@ -1230,8 +1234,9 @@ export function buildDraft(input: {
           const itemNo = normalizeSpace(itemReading.value);
 
           if (invQtyResult.ok) {
-            const packingLines = packingByItemNo2.get(itemNo) || [];
-            const packingQty = packingLines.reduce((sum, pl) => sum + pl.quantity, 0);
+            // The quantity check needs only the item number and the quantity of each packing list line.
+            // A rejected gross weight must not hide the line here; the weight allocation (34A) deals with it.
+            const packingQty = (packingByItemNo.get(itemNo) || []).reduce((sum, q) => sum + q, 0);
 
             if (packingQty !== invQtyResult.value) {
               quantityMismatchReason = `says ${invQtyResult.value} PCS, the packing list says ${packingQty} PCS. A person decides.`;
