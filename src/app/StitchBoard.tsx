@@ -19,6 +19,7 @@ import {
   allFields,
   draftToCsv,
 } from '../core'
+import { APP_NAME, BOARD_TITLE } from './appTitle'
 
 export interface BundleJson {
   bundle: string
@@ -493,24 +494,38 @@ export default function StitchBoard({
 
   return (
     <div data-testid="stitch-board" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      {/* Top bar */}
-      <div data-testid="top-bar">
-        <div data-testid="draft-notice">{draft?.notice || 'DRAFT, NOT FOR FILING'}</div>
-        <div data-testid="hts-revision">
-          Checked against {draft?.htsRevisionTitle || 'HTS Revision (loading)'}
+      {/* Top bar: what this screen is, the DRAFT notice, what it was checked against, the CSV hand-off */}
+      <header data-testid="top-bar">
+        <div className="board-heading">
+          <div className="board-title-row">
+            <h1 className="board-title">
+              {APP_NAME && <span className="app-name">{APP_NAME}</span>}
+              {BOARD_TITLE}
+            </h1>
+            <div data-testid="draft-notice">{draft?.notice || 'DRAFT, NOT FOR FILING'}</div>
+          </div>
+          <div className="board-meta">
+            <span>Shipment: {bundle.title}</span>
+            <span data-testid="hts-revision">
+              Checked against {draft?.htsRevisionTitle || 'HTS Revision (loading)'}
+            </span>
+            <span data-testid="reader-mode">Pre-read sample: no AI call</span>
+          </div>
         </div>
-        <div data-testid="reader-mode">Pre-read sample: no AI call</div>
         {csvUrl && (
           <a
             data-testid="download-csv"
+            className="btn btn-primary"
             href={csvUrl}
             download={`${bundle.bundle}-7501-draft.csv`}
-            style={{ marginLeft: 'auto', paddingRight: '1rem' }}
           >
             Download CSV
           </a>
         )}
-      </div>
+      </header>
+
+      {/* Legend: what the thread colours and the value outlines mean */}
+      <Legend />
 
       {/* Main layout */}
       <div
@@ -607,45 +622,30 @@ export default function StitchBoard({
             <>
               {/* 1. Needs Review Section */}
               <div data-testid="needs-review" style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
-                  Needs review <span data-testid="needs-review-count">{draft.needsReview.length}</span>
-                </h3>
-                {overrides.length === 0 ? (
-                  <button
-                    data-testid="apply-demo-answers"
-                    onClick={() => setOverrides(overridesList)}
-                    style={{
-                      marginBottom: '0.75rem',
-                      padding: '0.5rem',
-                      background: '#e8f5e9',
-                      border: '1px solid #4caf50',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Use test answers for this demo
-                  </button>
-                ) : (
-                  <button
-                    data-testid="reset-answers"
-                    onClick={() => setOverrides([])}
-                    style={{
-                      marginBottom: '0.75rem',
-                      padding: '0.5rem',
-                      background: '#ffebee',
-                      border: '1px solid #f44336',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem',
-                    }}
-                  >
-                    Clear person answers ({overrides.length})
-                  </button>
-                )}
-                <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.75rem' }}>
-                  person fills {draft.personInput.length}
-                </p>
+                <div className="review-head">
+                  <h3 className="section-title">
+                    Needs review{' '}
+                    <span data-testid="needs-review-count" className="count-pill">{draft.needsReview.length}</span>
+                  </h3>
+                  <span className="review-sub">person fills {draft.personInput.length}</span>
+                  {overrides.length === 0 ? (
+                    <button
+                      data-testid="apply-demo-answers"
+                      className="btn btn-small"
+                      onClick={() => setOverrides(overridesList)}
+                    >
+                      Use test answers for this demo
+                    </button>
+                  ) : (
+                    <button
+                      data-testid="reset-answers"
+                      className="btn btn-small btn-danger"
+                      onClick={() => setOverrides([])}
+                    >
+                      Clear person answers ({overrides.length})
+                    </button>
+                  )}
+                </div>
                 {draft.needsReview.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {draft.needsReview.map((item) => (
@@ -875,6 +875,57 @@ export default function StitchBoard({
 }
 
 /**
+ * Legend: one row under the top bar that says what the thread colours and the value outlines mean.
+ * The swatches reuse the thread colours, the stitch pattern and the value outlines.
+ */
+function Legend() {
+  return (
+    <div data-testid="legend" className="legend">
+      <span className="legend-group">Threads</span>
+      <span className="legend-item">
+        <ThreadSwatch color={THREAD_DOC_COLOR} />
+        read from a document line
+      </span>
+      <span className="legend-item">
+        <ThreadSwatch color={THREAD_CALC_COLOR} />
+        computed from other values
+      </span>
+      <span className="legend-group">Values</span>
+      <span className="legend-item">
+        <span className="swatch swatch-copied" />
+        copied
+      </span>
+      <span className="legend-item">
+        <span className="swatch swatch-computed" />
+        computed
+      </span>
+      <span className="legend-item">
+        <span className="swatch swatch-needsReview" />
+        needs review
+      </span>
+      <span className="legend-item">
+        <span className="swatch swatch-personInput" />
+        a person fills
+      </span>
+      <span className="legend-item">
+        <span className="swatch swatch-personEdited" />
+        entered by a person
+      </span>
+    </div>
+  )
+}
+
+/** A short piece of thread with its cross stitches, drawn like the threads on the board. */
+function ThreadSwatch({ color }: { color: string }) {
+  return (
+    <svg className="thread-swatch" width="28" height="10" viewBox="0 0 28 10" aria-hidden="true">
+      <path d="M 2 5 H 26" fill="none" stroke={color} strokeWidth={STITCH.width} strokeDasharray={STITCH.dash} opacity={STITCH.opacity} />
+      <path d="M 2 5 H 26" fill="none" stroke={color} strokeWidth={1.75} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+/**
  * Where a draft field sits on the 7501, for labels:
  * "Line 004 · 38 Duty (USD)", "Block 41 · Duty (USD)", or
  * "Part of block 43 · Merchandise processing fee (USD)" for the fee fields (FEE.*) that add up into Block 43.
@@ -1072,26 +1123,12 @@ function SourceStrip({
                     name="value"
                     data-testid="override-input"
                     placeholder="Value decided by a person"
-                    style={{
-                      padding: '0.5rem',
-                      marginRight: '0.5rem',
-                      borderRadius: '4px',
-                      border: '1px solid #ddd',
-                      fontSize: '0.75rem',
-                    }}
+                    className="text-input"
                   />
                   <button
                     type="submit"
                     data-testid="override-apply"
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: '#2196f3',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                    }}
+                    className="btn btn-small"
                   >
                     Use this value
                   </button>
@@ -1103,15 +1140,7 @@ function SourceStrip({
                 <button
                   data-testid="override-undo"
                   onClick={() => onUndo(field.id)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    background: '#ff9800',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '4px',
-                    cursor: 'pointer',
-                    fontSize: '0.75rem',
-                  }}
+                  className="btn btn-small"
                 >
                   Undo
                 </button>
@@ -1169,24 +1198,14 @@ function SourceStrip({
 
               {/* Input links */}
               {field.inputs.length > 0 && (
-                <div style={{ fontSize: '0.7rem', color: '#0070f3' }}>
-                  Inputs: {field.inputs.map((id) => (
-                    <button
-                      key={id}
-                      onClick={() => onSelect(id)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#0070f3',
-                        textDecoration: 'underline',
-                        cursor: 'pointer',
-                        padding: 0,
-                        marginRight: '0.75rem',
-                      }}
-                    >
+                <div className="input-links">
+                  <span className="input-links-label">Inputs:</span>
+                  {field.inputs.map((id) => (
+                    <button key={id} className="link-btn" onClick={() => onSelect(id)}>
                       {[id, fieldMap.get(id)?.label].filter(Boolean).join(' ')}
                     </button>
-                  ))}</div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
