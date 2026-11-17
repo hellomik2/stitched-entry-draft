@@ -5,13 +5,14 @@ export * from "./parse";
 export * from "./draft";
 export * from "./csv";
 
-import type { DocumentText, DocumentReader } from "./index.js";
-import { verifyReadings, validateReadingAnswer, frozenReader } from "./reading.js";
-import type { ReadingAnswer, VerifiedReading } from "./reading.js";
-import { buildDraft } from "./draft.js";
-import { draftToCsv } from "./csv.js";
-import type { HtsTable } from "./hts.js";
-import type { Draft, Override } from "./draft.js";
+import type { DocumentText } from "./pdfText";
+import type { DocumentReader } from "./reading";
+import { verifyReadings } from "./reading";
+import type { ReadingAnswer, VerifiedReading } from "./reading";
+import { buildDraft } from "./draft";
+import { draftToCsv } from "./csv";
+import type { HtsTable } from "./hts";
+import type { Draft, Override } from "./draft";
 
 export async function runPipeline(args: {
   bundle: string;

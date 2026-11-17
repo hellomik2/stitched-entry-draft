@@ -1,9 +1,18 @@
+import StitchBoard, { type BundleJson } from './StitchBoard'
+
+// Import data
+import bundleJson from '../../samples/lantern-hollow/bundle.json'
+import readingJson from '../../samples/lantern-hollow/reading.json'
+import overridesJson from '../../samples/lantern-hollow/overrides-demo.json'
+import htsJson from '../../data/hts/2026HTSRev23-subset.json'
+
 export default function Home() {
   return (
-    <main>
-      <h1>7501 Draft Helper</h1>
-      <p>The draft is not for filing.</p>
-      <p>The tool is under construction.</p>
-    </main>
+    <StitchBoard
+      bundle={bundleJson as BundleJson}
+      reading={readingJson}
+      overrides={overridesJson}
+      hts={htsJson}
+    />
   )
 }
