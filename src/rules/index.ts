@@ -25,6 +25,15 @@ export { totalEnteredValue, summarizeTotals } from "./totals";
 // Re-export charges functions (P6)
 export { formatCharges } from "./charges";
 
+// Re-export duty functions (P7)
+export { computeDuty } from "./duty";
+
+// Re-export fees functions (P8)
+export { computeMPF } from "./fees";
+
+// Re-export weights functions (P11)
+export { allocateGrossWeight } from "./weights";
+
 // Re-export config and validation
 export {
   mpfConfig,

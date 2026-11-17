@@ -122,49 +122,48 @@ This implementation plan breaks down the Entry Math Calculator feature into mana
     - Test pattern matching for various dollar amounts
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 6. Duty Computation — P7
-  - [ ] 6.1 Implement src/rules/duty.ts with computeDuty()
-    - Accept rateStr, dutiableValue (cents), optional baseMode
-    - Handle "Free" (case-insensitive) → return OkResult(0)
-    - Parse percentage rates matching `^\d+(\.\d+)?%$` → convert to PPM
-    - If baseMode is "roundedEnteredValue": apply P4 to dutiableValue first
-    - Compute duty_cents = ppm * dutiableValue / 1_000_000
-    - Round using config.dutyCentsRounding (default halfUp)
-    - Return OkResult(duty_cents)
-    - Return NeedsReview for unrecognized rate format
-    - Return NeedsReview if dutiableValue is unavailable
+- [x] 6. Duty Computation — P7
+  - [x] 6.1 Implement src/rules/duty.ts with computeDuty()
+    - Signature: computeDuty(rateStr: string, dutiableValueCents: number, baseMode: "roundedEnteredValue" | "exactEnteredValue" = config.dutyBase): RuleResult<number>
+    - "Free" (any case) → ok(0)
+    - Only rates matching regex ^\d+(\.\d{1,4})?%$ are valid; convert to integer ppm
+    - Anything else ("2.5¢/kg", compound text, "6.12345%") → NeedsReview
+    - With "roundedEnteredValue" first round the value with roundEnteredValue (P4) and use dollars*100 as the base
+    - duty = ppm * base / 1_000_000, rounded with config.dutyCentsRounding (halfUp), integer math only
+    - Examples: ("6.6%", 42000) -> 2772; ("5.3%", 48600) -> 2576; ("30%", 28500) -> 8550; ("6%", 43520) -> 2610; ("6%", 43520, "exactEnteredValue") -> 2611; ("Free", 43520) -> 0
+    - Export computeDuty from src/rules/index.ts
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [ ] 6.2 Write property tests for duty in src/rules/duty.property.test.ts
+  - [x] 6.2 Write property tests for duty in src/rules/duty.property.test.ts
     - **Property 15: Free rate yields zero duty**
     - **Property 16: Ad valorem computation correct**
     - **Property 17: Non-negativity for non-negative inputs**
     - **Property 18: Monotonic in value**
     - **Property 19: Monotonic in rate**
-    - Use fast-check to generate positive cents and percentage rates (0% to 100%)
-    - Test with both baseMode options
-    - Verify monotonicity exhaustively
+    - Use the same fast-check call shape as src/rules/totals.property.test.ts: fc.assert(fc.property(arb1, arb2, (a, b) => { ... }))
+    - Example-based tests go in <name>.test.ts, property tests in <name>.property.test.ts
+    - The maintainer runs the tests; do not ask to run shell commands
     - _Requirements: 4.1, 4.2, 4.6, 4.7, 4.8_
 
-- [ ] 7. Merchandise Processing Fee — P8
-  - [ ] 7.1 Implement src/rules/fees.ts with computeMPF()
-    - Accept totalDutiableValue (cents) and optional ftaExemptValues array
-    - Return NeedsReview if totalDutiableValue is negative
-    - If ftaExemptValues provided: subtract sum from totalDutiableValue (floor at 0)
-    - Compute MPF_cents = config.mpfRate * base / 1_000_000
-    - Round using config.mpfCentsRounding (default halfUp)
-    - Clamp to [config.mpfMinimum, config.mpfMaximum]
-    - Return OkResult(clamped_mpf)
+- [x] 7. Merchandise Processing Fee — P8
+  - [x] 7.1 Implement src/rules/fees.ts with computeMPF()
+    - Signature: computeMPF(totalDutiableValueCents: number, ftaExemptValues: number[] = []): RuleResult<number>
+    - Negative or non-integer total → NeedsReview
+    - base = max(0, total - sum(exempt))
+    - raw = 3464 * base / 1_000_000 rounded halfUp (config.mpfCentsRounding)
+    - Clamp to [3458, 67086]
+    - Examples: 330600 -> 3458; 2000000 -> 6928; 50000000 -> 67086; -1 -> NeedsReview
+    - Export computeMPF from src/rules/index.ts
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-  - [ ] 7.2 Write property tests for MPF in src/rules/fees.property.test.ts
+  - [x] 7.2 Write property tests for MPF in src/rules/fees.property.test.ts
     - **Property 20: Result within [3458, 67086] cents**
     - **Property 21: Monotonic in base value**
     - **Property 22: Unclamped computation equals direct calculation when in range**
     - **Property 23: Negative base rejected**
-    - Use fast-check to generate non-negative dutiable values
-    - Test clamping behavior for low and high values
-    - Test FTA exemption calculations
+    - Use the same fast-check call shape as src/rules/totals.property.test.ts: fc.assert(fc.property(arb1, arb2, (a, b) => { ... }))
+    - Example-based tests go in <name>.test.ts, property tests in <name>.property.test.ts
+    - The maintainer runs the tests; do not ask to run shell commands
     - _Requirements: 5.1, 5.3, 5.5, 5.6, 5.7_
 
 - [ ] 8. Summary Totals — P10
@@ -187,29 +186,31 @@ This implementation plan breaks down the Entry Math Calculator feature into mana
     - Verify arithmetic exhaustively
     - _Requirements: 6.1, 6.4, 6.5_
 
-- [ ] 9. Gross Weight Allocation — P11
-  - [ ] 9.1 Implement src/rules/weights.ts with allocateGrossWeight()
-    - Accept totalKg (non-negative), lineBasis array, optional decimals
-    - Return NeedsReview if lineBasis is empty
-    - Return NeedsReview if all lineBasis are 0
-    - Implement largest remainder method:
-      - Calculate proportional weight for each line
-      - Allocate integer parts
-      - Distribute remainder kilograms to lines with largest fractional parts
-    - Round each allocated value to config.grossWeightDecimals decimal places
-    - Return OkResult array of AllocatedWeight objects with estimated=true
+- [x] 9. Gross Weight Allocation — P11
+  - [x] 9.1 Implement src/rules/weights.ts with allocateGrossWeight()
+    - Signature: allocateGrossWeight(totalKg: number, lineBasis: number[], decimals: number = config.grossWeightDecimals): RuleResult<AllocatedWeight[]>, AllocatedWeight = { kilograms: number; estimated: boolean }
+    - NeedsReview when: lineBasis is empty, every basis is 0, a basis is negative or not an integer, or totalKg is negative or has more than `decimals` decimals
+    - units = round(totalKg * 10^decimals) (an integer)
+    - sum = sum(lineBasis)
+    - floor_i = floor(units * basis_i / sum), remainder_i = units * basis_i - floor_i * sum (integers)
+    - Give the leftover units (units - sum(floor_i)) one by one to the largest remainders; ties go to the earlier line
+    - kilograms_i = units_i / 10^decimals, estimated = true
+    - The results always add up to totalKg exactly
+    - Examples: allocateGrossWeight(286, [886, 472, 131, 528, 336, 194, 315], 0) -> kilograms [89, 47, 13, 53, 34, 19, 31]; allocateGrossWeight(10, [0, 0], 0) -> NeedsReview; allocateGrossWeight(10, [], 0) -> NeedsReview
+    - Replace the old AllocatedWeight { kg, lineIndex, estimated } in src/rules/types.ts with { kilograms: number; estimated: boolean }
+    - Export allocateGrossWeight and the type AllocatedWeight from src/rules/index.ts
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9_
 
-  - [ ] 9.2 Write property tests for gross weight in src/rules/weights.property.test.ts
+  - [x] 9.2 Write property tests for gross weight in src/rules/weights.property.test.ts
     - **Property 27: Sum exactness: allocated sum equals total**
     - **Property 28: Non-negativity and decimal places**
     - **Property 29: Zero-basis allocation is zero**
     - **Property 30: All-zero basis rejected**
     - **Property 31: Order preservation: swapping lines swaps allocations**
     - **Property 32: Empty list rejected**
-    - Use fast-check to generate totals and basis arrays
-    - Test largest remainder method correctness
-    - Verify decimal places for all outputs
+    - Use the same fast-check call shape as src/rules/totals.property.test.ts: fc.assert(fc.property(arb1, arb2, (a, b) => { ... }))
+    - Example-based tests go in <name>.test.ts, property tests in <name>.property.test.ts
+    - The maintainer runs the tests; do not ask to run shell commands
     - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.7, 7.9_
 
 - [ ] 10. Entry Number Check Digit — P13

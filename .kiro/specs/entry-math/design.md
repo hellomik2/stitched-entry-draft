@@ -186,22 +186,29 @@ function formatCharges(
 **Public Interface**:
 ```typescript
 function computeDuty(
-  rateStr: string,              // "Free", "4%", "16.5%", etc.
-  dutiableValue: number,        // cents
+  rateStr: string,
+  dutiableValueCents: number,
   baseMode?: "roundedEnteredValue" | "exactEnteredValue"
-): RuleResult<number>           // cents
+): RuleResult<number>
 ```
 
 **Algorithm**:
-1. If rateStr is "Free" (case-insensitive), return OkResult(0)
-2. If rateStr matches `^\d+(\.\d+)?%$`:
-   - Parse percentage to PPM (e.g., 16.5% = 165_000 ppm)
-   - If baseMode is "roundedEnteredValue", apply P4 to dutiableValue first
-   - Compute duty_cents = ppm * dutiableValue_cents / 1_000_000
-   - Round using config.dutyCentsRounding (default halfUp)
-   - Return OkResult(duty_cents)
-3. Otherwise, return NeedsReview(unrecognized format)
-4. If dutiableValue is unavailable, return NeedsReview
+1. "Free" (any case) → OkResult(0)
+2. Only rates matching regex `^\d+(\.\d{1,4})?%$` are valid (e.g., "6.6%", "5.3%", "30%")
+   - Convert percentage to integer PPM: 6.6% = 66000 ppm; 5.3% = 53000 ppm
+   - Anything else ("2.5¢/kg", "6.12345%", compound text) → NeedsReview
+3. With "roundedEnteredValue" mode: first apply roundEnteredValue (P4) to the value, then multiply by 100 to get dollars as cents
+4. With "exactEnteredValue" mode: use dutiableValueCents directly
+5. Compute: duty = ppm × base / 1_000_000, rounded with config.dutyCentsRounding (halfUp by default), integer math only
+6. Return OkResult(duty in cents)
+
+**Examples**:
+- computeDuty("6.6%", 42000) → OkResult(2772)
+- computeDuty("5.3%", 48600) → OkResult(2576)
+- computeDuty("30%", 28500) → OkResult(8550)
+- computeDuty("6%", 43520) → OkResult(2610)
+- computeDuty("6%", 43520, "exactEnteredValue") → OkResult(2611)
+- computeDuty("Free", 43520) → OkResult(0)
 
 **Guarantees**:
 - Duty ≥ 0 for non-negative value and rate
@@ -217,9 +224,9 @@ function computeDuty(
 **Public Interface**:
 ```typescript
 function computeMPF(
-  totalDutiableValue: number,   // cents
-  ftaExemptValues?: number[]    // cents per line
-): RuleResult<number>           // cents
+  totalDutiableValueCents: number,
+  ftaExemptValues?: number[]
+): RuleResult<number>
 ```
 
 **Configuration** (src/rules/config.ts):
@@ -233,12 +240,17 @@ const mpfConfig = {
 ```
 
 **Algorithm**:
-1. If totalDutiableValue < 0, return NeedsReview
-2. If ftaExemptValues provided, subtract their sum from totalDutiableValue (floor at 0)
-3. Compute MPF_cents = rate_ppm * base_cents / 1_000_000
-4. Round using config.mpfCentsRounding (default halfUp)
-5. Clamp to [minimumCents, maximumCents]
-6. Return OkResult(clamped_mpf)
+1. If totalDutiableValueCents < 0 or is not an integer → NeedsReview
+2. base = max(0, totalDutiableValueCents - sum(ftaExemptValues or []))
+3. raw = 3464 × base / 1_000_000, rounded halfUp (config.mpfCentsRounding)
+4. Clamp result to [3458, 67086]
+5. Return OkResult(clamped result)
+
+**Examples**:
+- computeMPF(330600) → OkResult(3458)
+- computeMPF(2000000) → OkResult(6928)
+- computeMPF(50000000) → OkResult(67086)
+- computeMPF(-1) → NeedsReview
 
 **Guarantees**:
 - Result is always within [3458, 67086] cents
@@ -259,31 +271,39 @@ interface AllocatedWeight {
 }
 
 function allocateGrossWeight(
-  totalKg: number,              // non-negative integer or decimal
-  lineBasis: number[],          // non-negative numeric basis per line
-  decimals?: number             // 0–6, default from config
+  totalKg: number,
+  lineBasis: number[],
+  decimals?: number
 ): RuleResult<AllocatedWeight[]>
 ```
 
 **Algorithm** (Largest Remainder):
-1. If all lineBasis are 0, return NeedsReview
-2. If lineBasis is empty, return NeedsReview
-3. Compute total basis = sum(lineBasis)
-4. For each line i:
-   - Compute proportional weight = totalKg * (lineBasis[i] / totalBasis)
-   - Integer part = floor(proportionalWeight)
-   - Fractional part = proportionalWeight - integerPart
-5. Allocate integer parts to each line
-6. Sum remaining = totalKg - sum(integer parts)
-7. Sort lines by fractional part descending
-8. Award remaining kilograms to lines with largest fractions (one each)
-9. Round each allocated value to config.grossWeightDecimals decimal places
-10. Return OkResult array with estimated=true for all values
+1. NeedsReview cases:
+   - lineBasis is empty
+   - All lineBasis are 0
+   - Any lineBasis is negative or not an integer
+   - totalKg is negative or has more than `decimals` decimal places
+2. Convert totalKg to units: units = round(totalKg × 10^decimals) (an integer)
+3. Compute total basis: sum = sum(lineBasis)
+4. For each line i, compute:
+   - floor_i = floor(units × basis_i / sum) (integer part to allocate)
+   - remainder_i = units × basis_i - floor_i × sum (fractional part for tie-breaking)
+5. Allocate integer parts to each line: units_i = floor_i
+6. Compute leftover: leftover = units - sum(floor_i)
+7. Distribute leftover kilograms one by one to lines with largest remainder_i; ties go to the earlier line
+8. Convert back: kilograms_i = units_i / 10^decimals
+9. Mark all as estimated = true
+10. Return OkResult(array of AllocatedWeight)
+
+**Examples**:
+- allocateGrossWeight(286, [886, 472, 131, 528, 336, 194, 315], 0) → [89, 47, 13, 53, 34, 19, 31]
+- allocateGrossWeight(10, [0, 0], 0) → NeedsReview
+- allocateGrossWeight(10, [], 0) → NeedsReview
 
 **Guarantees**:
 - sum(allocated) = totalKg exactly
 - Each allocated weight is non-negative
-- Each allocated weight has exactly config.grossWeightDecimals decimal places
+- Each allocated weight has exactly `decimals` decimal places
 - Swapping lines i and j swaps their allocations
 - Zero-basis line gets 0 kg (when other lines have positive basis)
 

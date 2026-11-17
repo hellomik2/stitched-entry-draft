@@ -211,6 +211,16 @@
         "executionId": "92786111-7a82-44d8-b117-499093e33685",
         "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
         "timestamp": 1794880328635
+      },
+      {
+        "executionId": "f228a2dd-df25-4f0d-a237-8f11bba24e31",
+        "chatSessionId": "sess_26299315-c977-492a-a930-a6d3d5720ba3",
+        "timestamp": 1794888351685
+      },
+      {
+        "executionId": "f228a2dd-df25-4f0d-a237-8f11bba24e31",
+        "chatSessionId": "sess_26299315-c977-492a-a930-a6d3d5720ba3",
+        "timestamp": 1794888479466
       }
     ],
     "7.1 Implement src/rules/fees.ts with computeMPF()": [
@@ -218,6 +228,16 @@
         "executionId": "92786111-7a82-44d8-b117-499093e33685",
         "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
         "timestamp": 1794880328702
+      },
+      {
+        "executionId": "7ac62973-3a6d-456b-aaa3-c8a46c1174ac",
+        "chatSessionId": "sess_c860a0ac-3162-4d00-aa6f-55150324cef5",
+        "timestamp": 1794887092194
+      },
+      {
+        "executionId": "7ac62973-3a6d-456b-aaa3-c8a46c1174ac",
+        "chatSessionId": "sess_c860a0ac-3162-4d00-aa6f-55150324cef5",
+        "timestamp": 1794887178054
       }
     ],
     "7.2 Write property tests for MPF in src/rules/fees.property.test.ts": [
@@ -225,6 +245,16 @@
         "executionId": "92786111-7a82-44d8-b117-499093e33685",
         "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
         "timestamp": 1794880328770
+      },
+      {
+        "executionId": "7ac62973-3a6d-456b-aaa3-c8a46c1174ac",
+        "chatSessionId": "sess_c860a0ac-3162-4d00-aa6f-55150324cef5",
+        "timestamp": 1794887092426
+      },
+      {
+        "executionId": "7ac62973-3a6d-456b-aaa3-c8a46c1174ac",
+        "chatSessionId": "sess_c860a0ac-3162-4d00-aa6f-55150324cef5",
+        "timestamp": 1794887179722
       }
     ],
     "8.1 Implement src/rules/totals.ts with summarizeTotals()": [
@@ -246,6 +276,16 @@
         "executionId": "92786111-7a82-44d8-b117-499093e33685",
         "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
         "timestamp": 1794880329049
+      },
+      {
+        "executionId": "bf190fb2-eaac-4701-9cb4-afa581957aed",
+        "chatSessionId": "sess_81ad58fd-fe97-40c7-a682-81ecbf51a342",
+        "timestamp": 1794887254354
+      },
+      {
+        "executionId": "bf190fb2-eaac-4701-9cb4-afa581957aed",
+        "chatSessionId": "sess_81ad58fd-fe97-40c7-a682-81ecbf51a342",
+        "timestamp": 1794887391749
       }
     ],
     "9.2 Write property tests for gross weight in src/rules/weights.property.test.ts": [
@@ -253,6 +293,11 @@
         "executionId": "92786111-7a82-44d8-b117-499093e33685",
         "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
         "timestamp": 1794880329153
+      },
+      {
+        "executionId": "bf190fb2-eaac-4701-9cb4-afa581957aed",
+        "chatSessionId": "sess_81ad58fd-fe97-40c7-a682-81ecbf51a342",
+        "timestamp": 1794887392027
       }
     ],
     "10.1 Implement src/rules/checkDigit.ts with computeCheckDigit() and formatEntryNumber()": [
@@ -351,6 +396,32 @@
         "executionId": "92786111-7a82-44d8-b117-499093e33685",
         "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
         "timestamp": 1794880977129
+      }
+    ],
+    "6. Duty Computation — P7": [
+      {
+        "executionId": "f4316c31-8dca-4c43-b5bd-e8892d4725d9",
+        "chatSessionId": "sess_70e1a903-7fca-4f29-bdff-c642fd337551",
+        "timestamp": 1794886145878
+      },
+      {
+        "executionId": "f4316c31-8dca-4c43-b5bd-e8892d4725d9",
+        "chatSessionId": "sess_70e1a903-7fca-4f29-bdff-c642fd337551",
+        "timestamp": 1794886277099
+      }
+    ],
+    "7. Merchandise Processing Fee — P8": [
+      {
+        "executionId": "7ac62973-3a6d-456b-aaa3-c8a46c1174ac",
+        "chatSessionId": "sess_c860a0ac-3162-4d00-aa6f-55150324cef5",
+        "timestamp": 1794887179840
+      }
+    ],
+    "9. Gross Weight Allocation — P11": [
+      {
+        "executionId": "bf190fb2-eaac-4701-9cb4-afa581957aed",
+        "chatSessionId": "sess_81ad58fd-fe97-40c7-a682-81ecbf51a342",
+        "timestamp": 1794887392209
       }
     ]
   }
