@@ -1,6 +1,6 @@
 import { normalizeSpace, Box } from "./pdfText";
 import { VerifiedReading } from "./reading";
-import { HtsTable } from "./hts";
+import { HtsTable, lookupHts } from "./hts";
 import {
   parseMoneyToCents,
   parseCount,
@@ -8,7 +8,9 @@ import {
   parsePackages,
   parseUsDate,
   countryCode,
+  formatCents,
 } from "./parse";
+import { roundEnteredValue, computeDuty, allocateGrossWeight, config } from "../rules";
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
@@ -86,27 +88,6 @@ export type Draft = {
   needsReview: ReviewItem[];
   personInput: ReviewItem[];
 };
-
-/**
- * Helper: create a DraftField with common defaults.
- */
-function field(overrides: Partial<DraftField>): DraftField {
-  return {
-    id: "",
-    block: "",
-    line: null,
-    label: "",
-    value: null,
-    unit: null,
-    status: "personInput",
-    rule: null,
-    note: null,
-    reason: null,
-    sources: [],
-    inputs: [],
-    ...overrides,
-  };
-}
 
 /**
  * Helper: extract a normalized value from accepted readings by field name.
@@ -509,7 +490,7 @@ export function buildDraft(input: {
 
   // B1: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B1",
       block: "1",
       label: "Filer code / entry number",
@@ -520,7 +501,7 @@ export function buildDraft(input: {
 
   // B2: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B2",
       block: "2",
       label: "Entry type",
@@ -531,7 +512,7 @@ export function buildDraft(input: {
 
   // B3: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B3",
       block: "3",
       label: "Summary date",
@@ -542,7 +523,7 @@ export function buildDraft(input: {
 
   // B4: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B4",
       block: "4",
       label: "Surety number",
@@ -553,7 +534,7 @@ export function buildDraft(input: {
 
   // B5: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B5",
       block: "5",
       label: "Bond type",
@@ -564,7 +545,7 @@ export function buildDraft(input: {
 
   // B6: needsReview
   headerFields.push(
-    field({
+    field_helper({
       id: "B6",
       block: "6",
       label: "Port code",
@@ -575,7 +556,7 @@ export function buildDraft(input: {
 
   // B7: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B7",
       block: "7",
       label: "Entry date",
@@ -589,7 +570,7 @@ export function buildDraft(input: {
   if (vesselReading && vesselReading.value) {
     const vesselValue = normalizeSpace(vesselReading.value);
     headerFields.push(
-      field({
+      field_helper({
         id: "B8",
         block: "8",
         label: "Importing carrier (vessel)",
@@ -600,7 +581,7 @@ export function buildDraft(input: {
     );
   } else {
     headerFields.push(
-      field({
+      field_helper({
         id: "B8",
         block: "8",
         label: "Importing carrier (vessel)",
@@ -614,7 +595,7 @@ export function buildDraft(input: {
   const containerReading = accepted.get("billOfLading.containerNo");
   const b9Sources = containerReading ? [docSource(containerReading)] : [];
   headerFields.push(
-    field({
+    field_helper({
       id: "B9",
       block: "9",
       label: "Mode of transport",
@@ -628,7 +609,7 @@ export function buildDraft(input: {
 
   // B11: needsReview
   headerFields.push(
-    field({
+    field_helper({
       id: "B11",
       block: "11",
       label: "Import date",
@@ -643,7 +624,7 @@ export function buildDraft(input: {
     const blValue = normalizeSpace(blReading.value);
     if (isValidBlNumber(blValue)) {
       headerFields.push(
-        field({
+        field_helper({
           id: "B12",
           block: "12",
           label: "B/L number",
@@ -654,7 +635,7 @@ export function buildDraft(input: {
       );
     } else {
       headerFields.push(
-        field({
+        field_helper({
           id: "B12",
           block: "12",
           label: "B/L number",
@@ -665,7 +646,7 @@ export function buildDraft(input: {
     }
   } else {
     headerFields.push(
-      field({
+      field_helper({
         id: "B12",
         block: "12",
         label: "B/L number",
@@ -677,7 +658,7 @@ export function buildDraft(input: {
 
   // B13: needsReview
   headerFields.push(
-    field({
+    field_helper({
       id: "B13",
       block: "13",
       label: "Manufacturer ID (MID)",
@@ -692,7 +673,7 @@ export function buildDraft(input: {
     const codeResult = countryCode(normalizeSpace(exportCountryReading.value));
     if (codeResult.ok) {
       headerFields.push(
-        field({
+        field_helper({
           id: "B14",
           block: "14",
           label: "Exporting country",
@@ -703,7 +684,7 @@ export function buildDraft(input: {
       );
     } else {
       headerFields.push(
-        field({
+        field_helper({
           id: "B14",
           block: "14",
           label: "Exporting country",
@@ -714,7 +695,7 @@ export function buildDraft(input: {
     }
   } else {
     headerFields.push(
-      field({
+      field_helper({
         id: "B14",
         block: "14",
         label: "Exporting country",
@@ -730,7 +711,7 @@ export function buildDraft(input: {
     const dateResult = parseUsDate(normalizeSpace(onBoardReading.value));
     if (dateResult.ok) {
       headerFields.push(
-        field({
+        field_helper({
           id: "B15",
           block: "15",
           label: "Export date",
@@ -741,7 +722,7 @@ export function buildDraft(input: {
       );
     } else {
       headerFields.push(
-        field({
+        field_helper({
           id: "B15",
           block: "15",
           label: "Export date",
@@ -752,7 +733,7 @@ export function buildDraft(input: {
     }
   } else {
     headerFields.push(
-      field({
+      field_helper({
         id: "B15",
         block: "15",
         label: "Export date",
@@ -764,7 +745,7 @@ export function buildDraft(input: {
 
   // B19: needsReview
   headerFields.push(
-    field({
+    field_helper({
       id: "B19",
       block: "19",
       label: "Foreign port of lading",
@@ -775,7 +756,7 @@ export function buildDraft(input: {
 
   // B20: needsReview
   headerFields.push(
-    field({
+    field_helper({
       id: "B20",
       block: "20",
       label: "U.S. port of unlading",
@@ -786,7 +767,7 @@ export function buildDraft(input: {
 
   // B25: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B25",
       block: "25",
       label: "Location of goods / G.O. number",
@@ -797,7 +778,7 @@ export function buildDraft(input: {
 
   // B26: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B26",
       block: "26",
       label: "Consignee number",
@@ -808,7 +789,7 @@ export function buildDraft(input: {
 
   // B27: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B27",
       block: "27",
       label: "Importer number",
@@ -819,7 +800,7 @@ export function buildDraft(input: {
 
   // B28: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B28",
       block: "28",
       label: "Reference number",
@@ -834,7 +815,7 @@ export function buildDraft(input: {
   if (shipToNameReading && shipToNameReading.value && shipToAddressReading && shipToAddressReading.value) {
     const shipToValue = combine(normalizeSpace(shipToNameReading.value), normalizeSpace(shipToAddressReading.value));
     headerFields.push(
-      field({
+      field_helper({
         id: "B29",
         block: "29",
         label: "Ultimate consignee",
@@ -845,7 +826,7 @@ export function buildDraft(input: {
     );
   } else {
     headerFields.push(
-      field({
+      field_helper({
         id: "B29",
         block: "29",
         label: "Ultimate consignee",
@@ -861,7 +842,7 @@ export function buildDraft(input: {
   if (buyerNameReading && buyerNameReading.value && buyerAddressReading && buyerAddressReading.value) {
     const buyerValue = combine(normalizeSpace(buyerNameReading.value), normalizeSpace(buyerAddressReading.value));
     headerFields.push(
-      field({
+      field_helper({
         id: "B30",
         block: "30",
         label: "Importer of record",
@@ -872,7 +853,7 @@ export function buildDraft(input: {
     );
   } else {
     headerFields.push(
-      field({
+      field_helper({
         id: "B30",
         block: "30",
         label: "Importer of record",
@@ -884,7 +865,7 @@ export function buildDraft(input: {
 
   // B36C: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B36C",
       block: "36C",
       label: "Relationship (related party Y/N)",
@@ -895,7 +876,7 @@ export function buildDraft(input: {
 
   // B40: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B40",
       block: "40",
       label: "Declaration (importer or agent)",
@@ -906,7 +887,7 @@ export function buildDraft(input: {
 
   // B45: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B45",
       block: "45",
       label: "Declarant name, title, signature, date",
@@ -917,7 +898,7 @@ export function buildDraft(input: {
 
   // B46: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B46",
       block: "46",
       label: "Broker / filer information",
@@ -928,7 +909,7 @@ export function buildDraft(input: {
 
   // B47: personInput
   headerFields.push(
-    field({
+    field_helper({
       id: "B47",
       block: "47",
       label: "Broker / importer file number",
@@ -937,6 +918,847 @@ export function buildDraft(input: {
     })
   );
 
+  // Build 7501 lines by grouping invoice lines
+  // Key = "${hts_digits or "raw:" + printed}|${origin or "unknown-origin-" + n}"
+  // Each group becomes one 7501 line
+
+  interface LineGroup {
+    key: string;
+    htsRaw: string | null; // printed HTS from invoice
+    origin: string | null; // origin code or null
+    invoiceLines: number[]; // invoice line numbers in group (1-indexed)
+    descriptions: string[]; // descriptions in group
+    amountsCents: (number | null)[]; // amounts in cents (some may be null if P1 failed)
+  }
+
+  const lineGroups = new Map<string, LineGroup>();
+
+  // Group invoice lines by HTS and origin
+  for (let n = 1; n <= 8; n++) {
+    const htsReading = accepted.get(`invoice.lines.${n}.hts`);
+    const originReading = accepted.get(`invoice.lines.${n}.origin`);
+    const descReading = accepted.get(`invoice.lines.${n}.description`);
+    const amountReading = accepted.get(`invoice.lines.${n}.amount`);
+
+    const htsRaw = htsReading && htsReading.value ? normalizeSpace(htsReading.value) : null;
+    const origin = originReading && originReading.value ? normalizeSpace(originReading.value) : null;
+    const desc = descReading && descReading.value ? normalizeSpace(descReading.value) : null;
+
+    // Parse amount
+    let amountCents: number | null = null;
+    if (amountReading && amountReading.value) {
+      const amtResult = parseMoneyToCents(normalizeSpace(amountReading.value));
+      if (amtResult.ok) amountCents = amtResult.value;
+    }
+
+    // Try to parse origin to country code
+    let originCode: string | null = null;
+    if (origin) {
+      const originResult = countryCode(origin);
+      if (originResult.ok) {
+        originCode = originResult.value;
+      }
+    }
+
+    // Build group key
+    const htsKey = htsRaw || `raw:${n}`;
+    let groupKey: string;
+    if (originCode) {
+      groupKey = `${htsKey}|${originCode}`;
+    } else if (origin) {
+      // Origin rejected; give each rejected origin its own group
+      groupKey = `${htsKey}|unknown-origin-${n}`;
+    } else {
+      // No origin at all
+      groupKey = `${htsKey}|unknown-origin-${n}`;
+    }
+
+    if (!lineGroups.has(groupKey)) {
+      lineGroups.set(groupKey, {
+        key: groupKey,
+        htsRaw,
+        origin: originCode,
+        invoiceLines: [],
+        descriptions: [],
+        amountsCents: [],
+      });
+    }
+
+    const group = lineGroups.get(groupKey)!;
+    group.invoiceLines.push(n);
+    if (desc) group.descriptions.push(desc);
+    group.amountsCents.push(amountCents);
+  }
+
+  const draftLines: DraftLine[] = [];
+  let lineNumber = 1;
+  const allOrigins: string[] = []; // For B10
+
+  // Parse packing list by item for allocation: build map of itemNo -> [{carton, quantity, grossKg, reading}]
+  // Also collect gross kg tenths and readings for each item
+  const packingByItemNo2 = new Map<
+    string,
+    Array<{
+      carton: number;
+      quantity: number;
+      grossKg: number;
+      grossKgReading: VerifiedReading;
+    }>
+  >();
+  for (let n = 1; n <= 8; n++) {
+    const itemField = `packingList.lines.${n}.itemNo`;
+    const qtyField = `packingList.lines.${n}.quantity`;
+    const grossField = `packingList.lines.${n}.grossKg`;
+
+    const itemReading = accepted.get(itemField);
+    const qtyReading = accepted.get(qtyField);
+    const grossReading = accepted.get(grossField);
+
+    if (itemReading && itemReading.value && qtyReading && qtyReading.value && grossReading && grossReading.value) {
+      const itemNo = normalizeSpace(itemReading.value);
+      const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+      const grossResult = parseKgToTenths(normalizeSpace(grossReading.value));
+
+      if (qtyResult.ok && grossResult.ok) {
+        if (!packingByItemNo2.has(itemNo)) {
+          packingByItemNo2.set(itemNo, []);
+        }
+        packingByItemNo2.get(itemNo)!.push({
+          carton: n,
+          quantity: qtyResult.value,
+          grossKg: grossResult.value,
+          grossKgReading: grossReading,
+        });
+      }
+    }
+  }
+
+  // Process each group
+  for (const group of lineGroups.values()) {
+    const lineNum = String(lineNumber).padStart(3, "0");
+    const lineFields: DraftField[] = [];
+
+    // L<nnn>.10: country of origin
+    {
+      const id = `L${lineNum}.10`;
+      let field: DraftField;
+
+      if (group.origin) {
+        // All have accepted origin
+        const sources = group.invoiceLines
+          .map((n) => {
+            const r = accepted.get(`invoice.lines.${n}.origin`);
+            return r ? docSource(r) : null;
+          })
+          .filter((s): s is DocSource => s !== null);
+
+        field = field_helper({
+          id,
+          block: "10",
+          line: lineNum,
+          label: "Country of origin",
+          value: group.origin,
+          status: "copied",
+          sources,
+        });
+      } else {
+        // No accepted origin
+        const reasons: string[] = [];
+        for (const n of group.invoiceLines) {
+          const r = accepted.get(`invoice.lines.${n}.origin`);
+          if (r && r.value) {
+            const originStr = normalizeSpace(r.value);
+            const codeResult = countryCode(originStr);
+            if (!codeResult.ok) {
+              reasons.push(`Line ${n}: reader suggested "${originStr}" but its quote is not on the page.`);
+            }
+          } else {
+            reasons.push(`Line ${n}: no origin reading.`);
+          }
+        }
+
+        field = field_helper({
+          id,
+          block: "10",
+          line: lineNum,
+          label: "Country of origin",
+          status: "needsReview",
+          reason: reasons.length > 0 ? reasons.join(" ") : "Country of origin missing.",
+        });
+      }
+
+      lineFields.push(field);
+      if (group.origin) {
+        allOrigins.push(group.origin);
+      }
+    }
+
+    // L<nnn>.32: description
+    {
+      const id = `L${lineNum}.32`;
+      const desc = group.descriptions.join("; ");
+
+      const sources = group.invoiceLines
+        .map((n) => {
+          const r = accepted.get(`invoice.lines.${n}.description`);
+          return r ? docSource(r) : null;
+        })
+        .filter((s): s is DocSource => s !== null);
+
+      lineFields.push(
+        field_helper({
+          id,
+          block: "32",
+          line: lineNum,
+          label: "Description of merchandise",
+          value: desc,
+          status: "copied",
+          sources,
+        })
+      );
+    }
+
+    // Lookup HTS once for use in multiple fields (.33A, .35, .37A, .ch99)
+    const htsLookup = lookupHts(hts, group.htsRaw || "");
+
+    // L<nnn>.33A: HTS number
+    {
+      const id = `L${lineNum}.33A`;
+
+      const htsReadingSources = group.invoiceLines
+        .map((n) => {
+          const r = accepted.get(`invoice.lines.${n}.hts`);
+          return r ? docSource(r) : null;
+        })
+        .filter((s): s is DocSource => s !== null);
+
+      let field: DraftField;
+      if (htsLookup.found) {
+        const htsSource: HtsSource = {
+          kind: "hts",
+          revision: hts.revision,
+          htsno: htsLookup.row.htsno,
+        };
+        field = field_helper({
+          id,
+          block: "33A",
+          line: lineNum,
+          label: "HTS number",
+          value: htsLookup.number.entry,
+          status: "copied",
+          rule: "P15",
+          sources: [...htsReadingSources, htsSource],
+        });
+      } else {
+        field = field_helper({
+          id,
+          block: "33A",
+          line: lineNum,
+          label: "HTS number",
+          status: "needsReview",
+          rule: "P15",
+          reason: `${htsLookup.reason} The app does not choose a number.`,
+          sources: htsReadingSources,
+        });
+      }
+
+      lineFields.push(field);
+    }
+
+    // L<nnn>.34A: gross weight (kg) — allocated after all lines built
+
+    // L<nnn>.35: net quantity
+    {
+      const id = `L${lineNum}.35`;
+
+      // Get HTS unit
+      let htsUnit: string | null = null;
+      if (htsLookup.found) {
+        htsUnit = htsLookup.unit;
+      }
+
+      // Check for P3 quantity mismatch
+      let quantityMismatchReason: string | null = null;
+      for (const n of group.invoiceLines) {
+        const invQtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+        const itemReading = accepted.get(`invoice.lines.${n}.itemNo`);
+
+        if (invQtyReading && invQtyReading.value && itemReading && itemReading.value) {
+          const invQtyResult = parseCount(normalizeSpace(invQtyReading.value));
+          const itemNo = normalizeSpace(itemReading.value);
+
+          if (invQtyResult.ok) {
+            const packingLines = packingByItemNo2.get(itemNo) || [];
+            const packingQty = packingLines.reduce((sum, pl) => sum + pl.quantity, 0);
+
+            if (packingQty !== invQtyResult.value) {
+              quantityMismatchReason = `says ${invQtyResult.value} PCS, the packing list says ${packingQty} PCS. A person decides.`;
+              break;
+            }
+          }
+        }
+      }
+
+      if (quantityMismatchReason) {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "35",
+            line: lineNum,
+            label: "Net quantity in HTS units",
+            status: "needsReview",
+            unit: htsUnit,
+            reason: quantityMismatchReason,
+          })
+        );
+      } else if (!htsLookup.found) {
+        // HTS not found, can't get unit or compute
+        lineFields.push(
+          field_helper({
+            id,
+            block: "35",
+            line: lineNum,
+            label: "Net quantity in HTS units",
+            status: "needsReview",
+            inputs: [`L${lineNum}.33A`],
+            reason: "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.",
+          })
+        );
+      } else {
+        // Parse quantities from invoice lines and convert to HTS unit
+        let totalQuantity: number | null = null;
+        const quantityReadingSources: DocSource[] = [];
+
+        for (let i = 0; i < group.invoiceLines.length; i++) {
+          const n = group.invoiceLines[i];
+          const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+          const unitReading = accepted.get(`invoice.lines.${n}.unit`);
+
+          if (qtyReading && qtyReading.value && unitReading && unitReading.value) {
+            const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+            const invoiceUnit = normalizeSpace(unitReading.value).toUpperCase();
+
+            if (qtyResult.ok) {
+              let convertedQty: number | null = null;
+
+              if (invoiceUnit === "PCS" || invoiceUnit === "PC" || invoiceUnit === "EA" || invoiceUnit === "PIECES") {
+                convertedQty = qtyResult.value;
+              } else if (invoiceUnit === "NO.") {
+                convertedQty = qtyResult.value;
+              } else if (invoiceUnit === "DZ PCS" || invoiceUnit === "DOZ." || invoiceUnit === "DZ.") {
+                // Dozens to individual pieces: divide by 12 (only show decimals if fractional)
+                const quotient = qtyResult.value / 12;
+                // Format with two decimals only if there's a fractional part
+                if (qtyResult.value % 12 === 0) {
+                  convertedQty = quotient;
+                } else {
+                  // Has fractional part; keep as whole number pieces, will convert at display
+                  convertedQty = qtyResult.value;
+                }
+              } else if (invoiceUnit === "KG") {
+                // Use as net kg with one decimal
+                convertedQty = qtyResult.value;
+              } else {
+                // Unknown unit, can't convert
+                convertedQty = null;
+              }
+
+              if (convertedQty !== null) {
+                if (totalQuantity === null) totalQuantity = 0;
+                totalQuantity += convertedQty;
+              }
+
+              quantityReadingSources.push(docSource(qtyReading));
+            }
+          }
+        }
+
+        if (totalQuantity !== null) {
+          // Format quantity: for "Dz Pcs" unit, show as whole number or with 2 decimals
+          let displayValue = String(totalQuantity);
+          if (htsUnit && htsUnit.toUpperCase() === "DZ PCS") {
+            // Convert from pieces to dozens
+            const dozenCount = totalQuantity / 12;
+            if (dozenCount === Math.floor(dozenCount)) {
+              displayValue = String(Math.floor(dozenCount));
+            } else {
+              displayValue = dozenCount.toFixed(2);
+            }
+          }
+
+          lineFields.push(
+            field_helper({
+              id,
+              block: "35",
+              line: lineNum,
+              label: "Net quantity in HTS units",
+              value: displayValue,
+              unit: htsUnit,
+              status: "computed",
+              rule: "P12",
+              sources: quantityReadingSources,
+            })
+          );
+        } else {
+          lineFields.push(
+            field_helper({
+              id,
+              block: "35",
+              line: lineNum,
+              label: "Net quantity in HTS units",
+              status: "needsReview",
+              unit: htsUnit,
+              reason: "Could not parse quantities from invoice lines.",
+            })
+          );
+        }
+      }
+    }
+
+    // L<nnn>.36A: entered value (whole dollars)
+    {
+      const id = `L${lineNum}.36A`;
+
+      // Check P1: any P1 mismatch in group?
+      let p1MismatchReason: string | null = null;
+      for (const n of group.invoiceLines) {
+        const p1Check = checks.find((c) => c.id === `P1.invoice.line.${n}`);
+        if (p1Check && !p1Check.ok) {
+          p1MismatchReason = p1Check.detail;
+          break;
+        }
+      }
+
+      // Check currency
+      const currencyReading = accepted.get("invoice.currency");
+      let isCurrencyOk = true;
+      if (currencyReading && currencyReading.value) {
+        const curr = normalizeSpace(currencyReading.value).toUpperCase();
+        if (curr !== "USD") {
+          isCurrencyOk = false;
+        }
+      }
+
+      if (!isCurrencyOk) {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "36A",
+            line: lineNum,
+            label: "Entered value (USD)",
+            status: "needsReview",
+            reason: "Currency is not USD.",
+          })
+        );
+      } else if (p1MismatchReason) {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "36A",
+            line: lineNum,
+            label: "Entered value (USD)",
+            status: "needsReview",
+            reason: `P1 mismatch: ${p1MismatchReason} A person decides.`,
+            sources: group.invoiceLines
+              .map((n) => {
+                const r = accepted.get(`invoice.lines.${n}.amount`);
+                return r ? docSource(r) : null;
+              })
+              .filter((s): s is DocSource => s !== null),
+          })
+        );
+      } else {
+        // Sum amounts in cents, round to whole dollars
+        let totalCents = 0;
+        const amountSources: DocSource[] = [];
+
+        for (let i = 0; i < group.invoiceLines.length; i++) {
+          const n = group.invoiceLines[i];
+          const amountCents = group.amountsCents[i];
+
+          if (amountCents !== null) {
+            totalCents += amountCents;
+          }
+
+          const r = accepted.get(`invoice.lines.${n}.amount`);
+          if (r) amountSources.push(docSource(r));
+        }
+
+        const roundedValue = roundEnteredValue(totalCents);
+        if (!roundedValue.ok) {
+          lineFields.push(
+            field_helper({
+              id,
+              block: "36A",
+              line: lineNum,
+              label: "Entered value (USD)",
+              status: "needsReview",
+              reason: roundedValue.reason,
+              sources: amountSources,
+            })
+          );
+        } else {
+          lineFields.push(
+            field_helper({
+              id,
+              block: "36A",
+              line: lineNum,
+              label: "Entered value (USD)",
+              value: String(roundedValue.value),
+              status: "computed",
+              rule: "P4",
+              note: "Nothing was deducted. A person confirms the entered value.",
+              sources: amountSources,
+            })
+          );
+        }
+      }
+    }
+
+    // L<nnn>.37A: HTS rate
+    {
+      const id = `L${lineNum}.37A`;
+
+      if (!htsLookup.found) {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "37A",
+            line: lineNum,
+            label: "HTS rate",
+            status: "needsReview",
+            inputs: [`L${lineNum}.33A`],
+            reason: "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.",
+          })
+        );
+      } else if (!group.origin) {
+        // Origin unknown
+        const generalRate = htsLookup.rateText || "unknown";
+        lineFields.push(
+          field_helper({
+            id,
+            block: "37A",
+            line: lineNum,
+            label: "HTS rate",
+            status: "needsReview",
+            inputs: [`L${lineNum}.10`],
+            reason: `Origin unknown. General rate would be: ${generalRate}`,
+          })
+        );
+      } else if (config.column2Countries.includes(group.origin)) {
+        // Column 2 country (embargo)
+        lineFields.push(
+          field_helper({
+            id,
+            block: "37A",
+            line: lineNum,
+            label: "HTS rate",
+            status: "needsReview",
+            reason: `Origin ${group.origin} is a Column 2 country. Rate lookup not built.`,
+          })
+        );
+      } else {
+        // Check if rate is computable (Free or percentage)
+        const dutyTest = computeDuty(htsLookup.rateText, 0);
+        if (!dutyTest.ok) {
+          lineFields.push(
+            field_helper({
+              id,
+              block: "37A",
+              line: lineNum,
+              label: "HTS rate",
+              status: "needsReview",
+              reason: `Rate "${htsLookup.rateText}" is not Free or a simple percentage. A person decides.`,
+            })
+          );
+        } else {
+          const rateSource: HtsSource = {
+            kind: "hts",
+            revision: hts.revision,
+            htsno: htsLookup.rateFrom,
+          };
+          const rule = htsLookup.rateFrom !== htsLookup.row.htsno ? "P16" : null;
+
+          lineFields.push(
+            field_helper({
+              id,
+              block: "37A",
+              line: lineNum,
+              label: "HTS rate",
+              value: htsLookup.rateText,
+              status: "copied",
+              rule,
+              sources: [rateSource],
+            })
+          );
+        }
+      }
+    }
+
+    // L<nnn>.38: duty
+    {
+      const id = `L${lineNum}.38`;
+
+      const enteredValueField = lineFields.find((f) => f.id === `L${lineNum}.36A`);
+      const rateField = lineFields.find((f) => f.id === `L${lineNum}.37A`);
+
+      if (!enteredValueField || enteredValueField.status === "needsReview" || !enteredValueField.value) {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "38",
+            line: lineNum,
+            label: "Duty (USD)",
+            status: "needsReview",
+            inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+            reason: `Waiting on L${lineNum}.36A.`,
+          })
+        );
+      } else if (!rateField || rateField.status === "needsReview" || !rateField.value) {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "38",
+            line: lineNum,
+            label: "Duty (USD)",
+            status: "needsReview",
+            inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+            reason: `Waiting on L${lineNum}.37A.`,
+          })
+        );
+      } else {
+        // Both value and rate are available, compute duty
+        const enteredDollars = parseInt(enteredValueField.value, 10);
+        const dutyResult = computeDuty(rateField.value, enteredDollars * 100);
+
+        if (!dutyResult.ok) {
+          lineFields.push(
+            field_helper({
+              id,
+              block: "38",
+              line: lineNum,
+              label: "Duty (USD)",
+              status: "needsReview",
+              inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+              reason: dutyResult.reason,
+            })
+          );
+        } else {
+          const dutyFormatted = formatCents(dutyResult.value);
+          lineFields.push(
+            field_helper({
+              id,
+              block: "38",
+              line: lineNum,
+              label: "Duty (USD)",
+              value: dutyFormatted,
+              status: "computed",
+              rule: "P7",
+              inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+            })
+          );
+        }
+      }
+    }
+
+    // L<nnn>.ch99: Chapter 99 additional duty (if applicable)
+    if (htsLookup.found && htsLookup.chapter99.length > 0) {
+      const id = `L${lineNum}.ch99`;
+      const footnoteText = htsLookup.chapter99.join("; ");
+
+      const htsSource: HtsSource = {
+        kind: "hts",
+        revision: hts.revision,
+        htsno: htsLookup.row.htsno,
+      };
+
+      lineFields.push(
+        field_helper({
+          id,
+          block: "38",
+          line: lineNum,
+          label: "Chapter 99 additional duty (USD)",
+          unit: null,
+          status: "needsReview",
+          reason: `See ${footnoteText}. A person enters the additional duty (0.00 if none).`,
+          sources: [htsSource],
+        })
+      );
+    }
+
+    // Add placeholder for L<nnn>.34A (will be populated after all lines)
+    const grossWeightField = field_helper({
+      id: `L${lineNum}.34A`,
+      block: "34A",
+      line: lineNum,
+      label: "Gross weight (kg)",
+      unit: "kg",
+      status: "computed",
+      rule: "P11",
+    });
+    lineFields.unshift(grossWeightField); // Insert after origin but we'll fix later
+
+    // Reorder: .10, .32, .33A, .34A, .35, .36A, .37A, .38, .ch99
+    const reordered: DraftField[] = [];
+    const fieldsByBlock: Record<string, DraftField> = {};
+    for (const f of lineFields) {
+      fieldsByBlock[`${f.block}|${f.id}`] = f;
+    }
+
+    const blockOrder = ["10", "32", "33A", "34A", "35", "36A", "37A", "38"];
+    for (const block of blockOrder) {
+      const key = Object.keys(fieldsByBlock).find((k) => k.startsWith(`${block}|`));
+      if (key) {
+        reordered.push(fieldsByBlock[key]);
+        delete fieldsByBlock[key];
+      }
+    }
+    // Add any .ch99 at the end
+    for (const key in fieldsByBlock) {
+      if (key.includes(".ch99")) {
+        reordered.push(fieldsByBlock[key]);
+        delete fieldsByBlock[key];
+      }
+    }
+
+    draftLines.push({
+      lineNumber: lineNum,
+      invoiceLines: group.invoiceLines,
+      fields: reordered,
+    });
+
+    lineNumber++;
+  }
+
+  // Now populate L<nnn>.34A with allocated gross weights
+  {
+    const totalGrossReading = accepted.get("packingList.totalGrossKg");
+    if (totalGrossReading && totalGrossReading.value) {
+      const totalGrossResult = parseKgToTenths(normalizeSpace(totalGrossReading.value));
+
+      if (totalGrossResult.ok) {
+        // Build basis for each 7501 line: sum of packing list gross kg for its items
+        // Also collect the individual packing list readings for sources
+        const basis: number[] = [];
+        const grossKgSources: DocSource[][] = [];
+
+        for (const draftLine of draftLines) {
+          let lineBasis = 0;
+          const lineSources: DocSource[] = [];
+
+          for (const invoiceN of draftLine.invoiceLines) {
+            const itemReading = accepted.get(`invoice.lines.${invoiceN}.itemNo`);
+            if (itemReading && itemReading.value) {
+              const itemNo = normalizeSpace(itemReading.value);
+              const packingLines = packingByItemNo2.get(itemNo) || [];
+              for (const pLine of packingLines) {
+                lineBasis += pLine.grossKg;
+                lineSources.push(docSource(pLine.grossKgReading));
+              }
+            }
+          }
+          basis.push(lineBasis);
+          grossKgSources.push(lineSources);
+        }
+
+        const basisSum = basis.reduce((a, b) => a + b, 0);
+
+        // Check if basis sum matches total gross
+        if (basisSum !== totalGrossResult.value) {
+          // Mismatch
+          for (const draftLine of draftLines) {
+            const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+            if (grossField) {
+              grossField.status = "needsReview";
+              grossField.reason = `Gross weight basis sum (${(basisSum / 10).toFixed(1)} kg) differs from packing list total (${(totalGrossResult.value / 10).toFixed(1)} kg).`;
+              grossField.sources = [docSource(totalGrossReading)];
+            }
+          }
+        } else {
+          // Allocate using largest remainder
+          const totalGrossKg = Math.floor((totalGrossResult.value + 5) / 10); // tenths to whole kg, half up
+          const allocResult = allocateGrossWeight(totalGrossKg, basis, 0);
+
+          if (allocResult.ok) {
+            for (let i = 0; i < draftLines.length; i++) {
+              const allocated = allocResult.value[i];
+              const grossField = draftLines[i].fields.find((f) => f.id.endsWith(".34A"));
+              if (grossField) {
+                grossField.value = String(allocated.kilograms);
+                if (allocated.estimated) {
+                  grossField.note = "Estimated";
+                }
+                // Use the individual packing list readings for this line's sources
+                grossField.sources = grossKgSources[i].length > 0 ? grossKgSources[i] : [docSource(totalGrossReading)];
+              }
+            }
+          } else {
+            // Allocation failed (e.g., all basis zero)
+            for (const draftLine of draftLines) {
+              const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+              if (grossField) {
+                grossField.status = "needsReview";
+                grossField.reason = allocResult.reason;
+                grossField.sources = [docSource(totalGrossReading)];
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Build B10: country of origin block
+  const b10Field = (() => {
+    // Collect all L<nnn>.10 field IDs in order
+    const lineOriginIds: string[] = [];
+    for (const draftLine of draftLines) {
+      lineOriginIds.push(`L${draftLine.lineNumber}.10`);
+    }
+
+    if (allOrigins.length === 0) {
+      return field_helper({
+        id: "B10",
+        block: "10",
+        label: "Country of origin",
+        status: "needsReview",
+        inputs: lineOriginIds,
+        reason: "No accepted origins from lines.",
+      });
+    }
+
+    const uniqueOrigins = [...new Set(allOrigins)];
+    if (uniqueOrigins.length > 1) {
+      return field_helper({
+        id: "B10",
+        block: "10",
+        label: "Country of origin",
+        value: "MULTI",
+        status: "computed",
+        rule: "7501 p.8",
+        inputs: lineOriginIds,
+      });
+    } else {
+      return field_helper({
+        id: "B10",
+        block: "10",
+        label: "Country of origin",
+        value: uniqueOrigins[0],
+        status: "computed",
+        rule: "7501 p.8",
+        inputs: lineOriginIds,
+      });
+    }
+  })();
+
+  // Insert B10 after B9
+  const b9Index = headerFields.findIndex((f) => f.id === "B9");
+  if (b9Index >= 0) {
+    headerFields.splice(b9Index + 1, 0, b10Field);
+  } else {
+    headerFields.push(b10Field);
+  }
+
   return {
     notice: DRAFT_NOTICE,
     bundle,
@@ -944,12 +1766,33 @@ export function buildDraft(input: {
     htsRevision: hts.revision,
     htsRevisionTitle: hts.revisionTitle,
     header: headerFields,
-    lines: [],
+    lines: draftLines,
     totals: [],
     checks,
     rejectedReadings,
     needsReview: [],
     personInput: [],
+  };
+}
+
+/**
+ * Helper: create a DraftField with common defaults, renamed to avoid conflict.
+ */
+function field_helper(overrides: Partial<DraftField>): DraftField {
+  return {
+    id: "",
+    block: "",
+    line: null,
+    label: "",
+    value: null,
+    unit: null,
+    status: "personInput",
+    rule: null,
+    note: null,
+    reason: null,
+    sources: [],
+    inputs: [],
+    ...overrides,
   };
 }
 

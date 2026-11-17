@@ -97,6 +97,8 @@ export interface Config {
   readonly grossWeightDecimals: number;
   /** Maximum line number allowed (P18) */
   readonly maxLineNumber: number;
+  /** Column 2 country codes (embargo) that trigger needs review for rates */
+  readonly column2Countries: readonly string[];
 }
 
 /**
@@ -116,6 +118,7 @@ export const config: Config = {
   mpfCentsRounding,
   grossWeightDecimals,
   maxLineNumber,
+  column2Countries: ["CU", "KP", "RU", "BY"],
 };
 
 /**

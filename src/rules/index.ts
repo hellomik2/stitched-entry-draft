@@ -45,4 +45,5 @@ export {
   grossWeightDecimals,
   maxLineNumber,
   validateConfig,
+  config,
 } from "./config";
