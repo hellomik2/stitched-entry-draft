@@ -7,6 +7,7 @@ export type FieldReading = {
   quote: string;
   doc: string;
   page: number;
+  confidence?: "high" | "low";
 };
 
 export type ReadingAnswer = {
@@ -36,11 +37,12 @@ export type RejectReason =
   | "empty_quote"
   | "quote_not_found"
   | "quote_not_unique"
-  | "value_not_in_quote";
+  | "value_not_in_quote"
+  | "low_confidence";
 
 export type VerifiedReading = FieldReading &
   (
-    | { status: "accepted"; box: Box; itemIds: string[] }
+    | { status: "accepted"; box: Box; itemIds: string[]; origin?: "imageTranscript" }
     | { status: "rejected"; reason: RejectReason; message: string }
   );
 
@@ -118,6 +120,10 @@ export function validateReadingAnswer(json: unknown): RuleResult<ReadingAnswer> 
     if (!Number.isInteger(fieldObj.page) || (fieldObj.page as number) < 1) {
       return { ok: false, reason: `fields[${i}].page must be a positive integer` };
     }
+
+    if (fieldObj.confidence !== undefined && !["high", "low"].includes(fieldObj.confidence as string)) {
+      return { ok: false, reason: `fields[${i}].confidence must be "high" or "low"` };
+    }
   }
 
   return { ok: true, value: obj as ReadingAnswer };
@@ -130,6 +136,16 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
   }
 
   return answer.fields.map((field) => {
+    // 0. Check low confidence (first check before document check)
+    if (field.confidence === "low") {
+      return {
+        ...field,
+        status: "rejected" as const,
+        reason: "low_confidence" as const,
+        message: "The reader marked this value as uncertain.",
+      };
+    }
+
     // 1. Check document exists
     if (!docMap.has(field.doc)) {
       return {
@@ -277,11 +293,18 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
       }
     }
 
-    return {
+    const accepted: VerifiedReading = {
       ...field,
       status: "accepted" as const,
       box: unionBox || { x: 0, y: 0, w: 0, h: 0 },
       itemIds: selectedItems.map((item) => item.id),
     };
+
+    // Add origin if page has imageTranscript origin
+    if (page.origin === "imageTranscript") {
+      (accepted as any).origin = "imageTranscript" as const;
+    }
+
+    return accepted;
   });
 }

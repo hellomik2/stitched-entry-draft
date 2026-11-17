@@ -23,6 +23,7 @@ export type DocSource = {
   quote: string;
   box: Box;
   readingField: string;
+  origin?: "imageTranscript";
 };
 
 export type HtsSource = {
@@ -104,7 +105,7 @@ function getValue(readings: Map<string, VerifiedReading>, fieldName: string): st
  */
 function docSource(reading: VerifiedReading): DocSource {
   if (reading.status !== "accepted") throw new Error("Cannot create DocSource from rejected reading");
-  return {
+  const source: DocSource = {
     kind: "document",
     doc: reading.doc,
     page: reading.page,
@@ -112,6 +113,10 @@ function docSource(reading: VerifiedReading): DocSource {
     box: reading.box,
     readingField: reading.field,
   };
+  if (reading.origin === "imageTranscript") {
+    source.origin = "imageTranscript";
+  }
+  return source;
 }
 
 /**
@@ -1122,8 +1127,13 @@ export function buildDraft(input: {
         })
         .filter((s): s is DocSource => s !== null);
 
-      lineFields.push(
-        field_helper({
+      // Find invoice lines whose description reading was not accepted
+      const missing = group.invoiceLines.filter((n) => !accepted.get(`invoice.lines.${n}.description`));
+
+      let field: DraftField;
+      if (missing.length === 0) {
+        // All descriptions accepted
+        field = field_helper({
           id,
           block: "32",
           line: lineNum,
@@ -1131,8 +1141,21 @@ export function buildDraft(input: {
           value: desc,
           status: "copied",
           sources,
-        })
-      );
+        });
+      } else {
+        // Some descriptions were not accepted
+        field = field_helper({
+          id,
+          block: "32",
+          line: lineNum,
+          label: "Description of merchandise",
+          status: "needsReview",
+          reason: `The description of invoice line ${missing.join(", ")} was not accepted from the reading, so it is left empty. A person reads it on the invoice.`,
+          sources,
+        });
+      }
+
+      lineFields.push(field);
     }
 
     // Lookup HTS once for use in multiple fields (.33A, .35, .37A, .ch99)
