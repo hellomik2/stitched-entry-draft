@@ -7,6 +7,8 @@ export * from "./csv";
 export * from "./intakeConfig";
 export * from "./fieldCatalog";
 export * from "./transcript";
+export * from "./readerContract";
+export * from "./budget";
 
 import type { DocumentText } from "./pdfText";
 import type { DocumentReader } from "./reading";
