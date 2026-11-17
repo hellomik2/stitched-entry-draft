@@ -2,17 +2,24 @@
   "name": "entry-draft-helper",
   "private": true,
   "version": "0.1.0",
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "test": "vitest --run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "samples": "tsx scripts/make-samples.ts",
+    "draft": "tsx scripts/draft-cli.ts",
+    "copy-worker": "node scripts/copy-pdf-worker.mjs",
+    "predev": "node scripts/copy-pdf-worker.mjs",
+    "prebuild": "node scripts/copy-pdf-worker.mjs"
   },
   "dependencies": {
     "next": "^16.4.6",
     "react": "^19.3.1",
-    "react-dom": "^19.3.1"
+    "react-dom": "^19.3.1",
+    "pdfjs-dist": "^5.6.205"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -20,6 +27,8 @@
     "@types/react-dom": "^19.3.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7",
-    "fast-check": "^3.23.2"
+    "fast-check": "^3.23.2",
+    "pdf-lib": "^1.17.1",
+    "tsx": "^4.23.15"
   }
 }

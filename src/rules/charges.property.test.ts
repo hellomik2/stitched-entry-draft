@@ -125,7 +125,7 @@ describe("formatCharges() - Property Tests", () => {
         (cents, mode) => {
           const result1 = formatCharges(cents, undefined, mode as any);
           const result2 = formatCharges(cents, undefined, mode as any);
-          return result1.ok === result2.ok && result1.value === result2.value;
+          return result1.ok === result2.ok && (!result1.ok || (result2.ok && result1.value === result2.value));
         }
       )
     );

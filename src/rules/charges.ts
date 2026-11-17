@@ -31,7 +31,7 @@ export function formatCharges(
 
   // Type check: must be integer (delegated to roundEnteredValue)
   // This will throw if cents is not an integer
-  const roundResult = roundEnteredValue(cents, mode);
+  const roundResult = roundEnteredValue(cents, mode ?? config.chargesRounding);
 
   // If rounding failed (e.g., negative cents), return the error
   if (!roundResult.ok) {
