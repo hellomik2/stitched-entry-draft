@@ -1,0 +1,9 @@
+{
+  "bundle": "lantern-hollow",
+  "title": "Lantern Hollow Trading Co. to Bramble Hollow Party Goods (DEMO / FICTITIOUS)",
+  "documents": [
+    { "docId": "invoice", "kind": "invoice", "file": "invoice.pdf", "label": "Commercial invoice" },
+    { "docId": "packingList", "kind": "packingList", "file": "packing-list.pdf", "label": "Packing list" },
+    { "docId": "billOfLading", "kind": "billOfLading", "file": "bill-of-lading.pdf", "label": "Bill of lading" }
+  ]
+}

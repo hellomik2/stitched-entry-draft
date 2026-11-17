@@ -1,0 +1,29 @@
+{
+  "note": "Test answers a person might give in the review screen. Used only by tests and the demo button. Not real decisions.",
+  "overrides": [
+    {
+      "fieldId": "L003.35",
+      "value": "240"
+    },
+    {
+      "fieldId": "L004.36A",
+      "value": "480"
+    },
+    {
+      "fieldId": "L005.ch99",
+      "value": "0.00"
+    },
+    {
+      "fieldId": "L006.33A",
+      "value": "7013.99.5090"
+    },
+    {
+      "fieldId": "L007.10",
+      "value": "VN"
+    },
+    {
+      "fieldId": "FEE.HMF",
+      "value": "4.13"
+    }
+  ]
+}

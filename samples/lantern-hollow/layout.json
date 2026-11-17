@@ -1,0 +1,1929 @@
+{
+ "bundle": "lantern-hollow",
+ "note": "DEMO / FICTITIOUS bundle. Coordinates are PDF points, origin bottom-left, y is the text baseline. Fonts are the PDF standard fonts.",
+ "pageSize": [
+  612,
+  792
+ ],
+ "documents": [
+  {
+   "docId": "invoice",
+   "kind": "invoice",
+   "file": "invoice.pdf",
+   "pages": [
+    {
+     "runs": [
+      {
+       "t": "text",
+       "x": 470,
+       "y": 760,
+       "size": 10,
+       "font": "Helvetica-Bold",
+       "text": "DEMO / FICTITIOUS",
+       "color": [
+        0.75,
+        0.1,
+        0.1
+       ]
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 36,
+       "size": 7,
+       "font": "Helvetica",
+       "text": "DEMO / FICTITIOUS. Invented company, people and addresses. Not a real shipment. Made for a software demo.",
+       "color": [
+        0.75,
+        0.1,
+        0.1
+       ]
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 745,
+       "size": 16,
+       "font": "Helvetica-Bold",
+       "text": "COMMERCIAL INVOICE"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Seller / Exporter:"
+      },
+      {
+       "t": "text",
+       "x": 116.21,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Lantern Hollow Trading Co."
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 703,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "13 Moonlit Quay Road, Haiphong, Vietnam"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 692,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Tel +1 555-0142  lantern-hollow@example.com"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Invoice No.:"
+      },
+      {
+       "t": "text",
+       "x": 394.38,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "LH-2611-0042"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 703,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Invoice Date:"
+      },
+      {
+       "t": "text",
+       "x": 399.39,
+       "y": 703,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "10/24/2026"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 691,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Terms of Sale:"
+      },
+      {
+       "t": "text",
+       "x": 405.48,
+       "y": 691,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "FOB Haiphong"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 679,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Currency:"
+      },
+      {
+       "t": "text",
+       "x": 386.42,
+       "y": 679,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "USD"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 667,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Country of Export:"
+      },
+      {
+       "t": "text",
+       "x": 423.77,
+       "y": 667,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Vietnam"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 645,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Buyer / Importer of Record:"
+      },
+      {
+       "t": "text",
+       "x": 160.93,
+       "y": 645,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Bramble Hollow Party Goods LLC"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 633,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "42 Pumpkin Patch Way, Portland, OR 97200, USA"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 622,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Importer No.: DEMO-0000"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 645,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Ship To:"
+      },
+      {
+       "t": "text",
+       "x": 378.38,
+       "y": 645,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Bramble Hollow Party Goods LLC"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 633,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Warehouse 9, 7 Cobweb Court, Portland, OR 97200, USA"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Item No."
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Description"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "HTS No."
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Origin"
+      },
+      {
+       "t": "text",
+       "x": 338.66,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Qty"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Unit"
+      },
+      {
+       "t": "text",
+       "x": 386.22,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Unit Price (USD)"
+      },
+      {
+       "t": "text",
+       "x": 505.34,
+       "y": 600,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Amount (USD)"
+      },
+      {
+       "t": "line",
+       "x1": 40,
+       "y1": 596,
+       "x2": 565,
+       "y2": 596,
+       "width": 0.6
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-101"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Ceramic pumpkin figurine, 12 cm"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "6913.90.5000"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PT"
+      },
+      {
+       "t": "text",
+       "x": 338.66,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "120"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "4.50"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 584,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "540.00"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-102"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Glass votive candle holder, grey"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "7013.99.3500"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "CZ"
+      },
+      {
+       "t": "text",
+       "x": 338.66,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "200"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "2.10"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 569,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "420.00"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-103"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Paper streamers, orange/black, 10 m"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "9505.90.4000"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "VN"
+      },
+      {
+       "t": "text",
+       "x": 338.66,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "240"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "1.25"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 554,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "300.00"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-104"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Tin candle lantern, non-electric"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "9405.50.4000"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "VN"
+      },
+      {
+       "t": "text",
+       "x": 338.66,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "150"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3.20"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "468.00"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-105"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Foam tombstone decoration, 60 cm"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "9505.90.6000"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "CN"
+      },
+      {
+       "t": "text",
+       "x": 343.1,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "64"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "6.80"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 524,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "435.20"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-106"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Glass witch-hat ornament, 8 cm"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "7013.99.9500"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "CZ"
+      },
+      {
+       "t": "text",
+       "x": 338.66,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "300"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "0.95"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 509,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "285.00"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-107"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Resin raven figurine, 18 cm"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3926.40.0090"
+      },
+      {
+       "t": "text",
+       "x": 343.1,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "90"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "5.40"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 494,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "486.00"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-108"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Ceramic ghost figurine, 10 cm"
+      },
+      {
+       "t": "text",
+       "x": 236,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "6913.90.5000"
+      },
+      {
+       "t": "text",
+       "x": 298,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PT"
+      },
+      {
+       "t": "text",
+       "x": 343.1,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "96"
+      },
+      {
+       "t": "text",
+       "x": 358,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "PCS"
+      },
+      {
+       "t": "text",
+       "x": 432.43,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3.75"
+      },
+      {
+       "t": "text",
+       "x": 535.54,
+       "y": 479,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "360.00"
+      },
+      {
+       "t": "line",
+       "x1": 40,
+       "y1": 470,
+       "x2": 565,
+       "y2": 470,
+       "width": 0.6
+      },
+      {
+       "t": "text",
+       "x": 391.56,
+       "y": 456,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Subtotal (USD)"
+      },
+      {
+       "t": "text",
+       "x": 528.86,
+       "y": 456,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3,294.20"
+      },
+      {
+       "t": "text",
+       "x": 399.72,
+       "y": 442,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Total (USD)"
+      },
+      {
+       "t": "text",
+       "x": 524.97,
+       "y": 442,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "3,294.20"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 400,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "We certify that this invoice is true and correct and shows the actual price of the goods."
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 386,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Signed: Mira Gloaming, Export Clerk (invented person)"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "docId": "packingList",
+   "kind": "packingList",
+   "file": "packing-list.pdf",
+   "pages": [
+    {
+     "runs": [
+      {
+       "t": "text",
+       "x": 470,
+       "y": 760,
+       "size": 10,
+       "font": "Helvetica-Bold",
+       "text": "DEMO / FICTITIOUS",
+       "color": [
+        0.75,
+        0.1,
+        0.1
+       ]
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 36,
+       "size": 7,
+       "font": "Helvetica",
+       "text": "DEMO / FICTITIOUS. Invented company, people and addresses. Not a real shipment. Made for a software demo.",
+       "color": [
+        0.75,
+        0.1,
+        0.1
+       ]
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 745,
+       "size": 16,
+       "font": "Helvetica-Bold",
+       "text": "PACKING LIST"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Shipper:"
+      },
+      {
+       "t": "text",
+       "x": 80.5,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Lantern Hollow Trading Co."
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 703,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "13 Moonlit Quay Road, Haiphong, Vietnam"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 685,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Consignee:"
+      },
+      {
+       "t": "text",
+       "x": 93.00999999999999,
+       "y": 685,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Bramble Hollow Party Goods LLC"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 673,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "42 Pumpkin Patch Way, Portland, OR 97200, USA"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Packing List No.:"
+      },
+      {
+       "t": "text",
+       "x": 416.57,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "PL-2611-0042"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 703,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Invoice Ref.:"
+      },
+      {
+       "t": "text",
+       "x": 396.79,
+       "y": 703,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "LH-2611-0042"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 691,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Date:"
+      },
+      {
+       "t": "text",
+       "x": 366.5,
+       "y": 691,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "10/27/2026"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 679,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "B/L No.:"
+      },
+      {
+       "t": "text",
+       "x": 378.5,
+       "y": 679,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "XDMO2611HPH042"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Item No."
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Description"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Carton Nos."
+      },
+      {
+       "t": "text",
+       "x": 269.62,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Cartons"
+      },
+      {
+       "t": "text",
+       "x": 322.66,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Qty (PCS)"
+      },
+      {
+       "t": "text",
+       "x": 400.22,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Net (kg)"
+      },
+      {
+       "t": "text",
+       "x": 460.15,
+       "y": 640,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Gross (kg)"
+      },
+      {
+       "t": "line",
+       "x1": 40,
+       "y1": 636,
+       "x2": 520,
+       "y2": 636,
+       "width": 0.6
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-101"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Ceramic pumpkin figurine"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "1-5"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "5"
+      },
+      {
+       "t": "text",
+       "x": 346.66,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "120"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "48.0"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 624,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "55.5"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-102"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Glass votive candle holder"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "6-10"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "5"
+      },
+      {
+       "t": "text",
+       "x": 346.66,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "200"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "40.0"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 609,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "47.2"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-103"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Paper streamers"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "11-13"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3"
+      },
+      {
+       "t": "text",
+       "x": 346.66,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "216"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "10.8"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 594,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "13.1"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-104"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Tin candle lantern"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "14-19"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "6"
+      },
+      {
+       "t": "text",
+       "x": 346.66,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "150"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "45.0"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 579,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "52.8"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-105"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Foam tombstone decoration"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "20-27"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "8"
+      },
+      {
+       "t": "text",
+       "x": 351.1,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "64"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "19.2"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 564,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "33.6"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-106"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Glass witch-hat ornament"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "28-31"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "4"
+      },
+      {
+       "t": "text",
+       "x": 346.66,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "300"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "15.0"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 549,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "19.4"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-107"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Resin raven figurine"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "32-34"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3"
+      },
+      {
+       "t": "text",
+       "x": 351.1,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "90"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "27.0"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 534,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "31.5"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "LH-108"
+      },
+      {
+       "t": "text",
+       "x": 82,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Ceramic ghost figurine"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "35-37"
+      },
+      {
+       "t": "text",
+       "x": 295.55,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "3"
+      },
+      {
+       "t": "text",
+       "x": 351.1,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "96"
+      },
+      {
+       "t": "text",
+       "x": 414.43,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "28.8"
+      },
+      {
+       "t": "text",
+       "x": 484.43,
+       "y": 519,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "33.1"
+      },
+      {
+       "t": "line",
+       "x1": 40,
+       "y1": 510,
+       "x2": 520,
+       "y2": 510,
+       "width": 0.6
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 496,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "TOTAL"
+      },
+      {
+       "t": "text",
+       "x": 291.1,
+       "y": 496,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "37"
+      },
+      {
+       "t": "text",
+       "x": 339.98,
+       "y": 496,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "1,236"
+      },
+      {
+       "t": "text",
+       "x": 409.98,
+       "y": 496,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "233.8"
+      },
+      {
+       "t": "text",
+       "x": 479.98,
+       "y": 496,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "286.2"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 466,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Marks: BHPG PORTLAND / C/NO. 1-37"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "docId": "billOfLading",
+   "kind": "billOfLading",
+   "file": "bill-of-lading.pdf",
+   "pages": [
+    {
+     "runs": [
+      {
+       "t": "text",
+       "x": 470,
+       "y": 760,
+       "size": 10,
+       "font": "Helvetica-Bold",
+       "text": "DEMO / FICTITIOUS",
+       "color": [
+        0.75,
+        0.1,
+        0.1
+       ]
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 36,
+       "size": 7,
+       "font": "Helvetica",
+       "text": "DEMO / FICTITIOUS. Invented company, people and addresses. Not a real shipment. Made for a software demo.",
+       "color": [
+        0.75,
+        0.1,
+        0.1
+       ]
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 745,
+       "size": 16,
+       "font": "Helvetica-Bold",
+       "text": "BILL OF LADING"
+      },
+      {
+       "t": "text",
+       "x": 200,
+       "y": 745,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "(non-negotiable copy)"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "B/L No.:"
+      },
+      {
+       "t": "text",
+       "x": 378.5,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "XDMO2611HPH042"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 703,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Carrier:"
+      },
+      {
+       "t": "text",
+       "x": 376.51,
+       "y": 703,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Midnight Tide Shipping Line (DEMO)"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Shipper:"
+      },
+      {
+       "t": "text",
+       "x": 80.5,
+       "y": 715,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Lantern Hollow Trading Co."
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 703,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "13 Moonlit Quay Road, Haiphong, Vietnam"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 685,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Consignee:"
+      },
+      {
+       "t": "text",
+       "x": 93.00999999999999,
+       "y": 685,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Bramble Hollow Party Goods LLC"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 673,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "42 Pumpkin Patch Way, Portland, OR 97200, USA"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 655,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Notify Party:"
+      },
+      {
+       "t": "text",
+       "x": 97.42,
+       "y": 655,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Same as consignee"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 630,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Vessel:"
+      },
+      {
+       "t": "text",
+       "x": 75.07,
+       "y": 630,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "MV GLOAMING LANTERN"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 630,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Voyage:"
+      },
+      {
+       "t": "text",
+       "x": 377.75,
+       "y": 630,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "013E"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 615,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Port of Loading:"
+      },
+      {
+       "t": "text",
+       "x": 113.32,
+       "y": 615,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Haiphong, Vietnam"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 615,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Port of Discharge:"
+      },
+      {
+       "t": "text",
+       "x": 421.7,
+       "y": 615,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Los Angeles, CA, USA"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 600,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Shipped on Board:"
+      },
+      {
+       "t": "text",
+       "x": 124.32,
+       "y": 600,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "10/28/2026"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 600,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Freight:"
+      },
+      {
+       "t": "text",
+       "x": 377.5,
+       "y": 600,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "Collect"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 585,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Container No.:"
+      },
+      {
+       "t": "text",
+       "x": 106,
+       "y": 585,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "DEMU 2601173"
+      },
+      {
+       "t": "text",
+       "x": 340,
+       "y": 585,
+       "size": 9,
+       "font": "Helvetica-Bold",
+       "text": "Seal No.:"
+      },
+      {
+       "t": "text",
+       "x": 382.51,
+       "y": 585,
+       "size": 9,
+       "font": "Helvetica",
+       "text": "DEMO-0000"
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 555,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Marks"
+      },
+      {
+       "t": "text",
+       "x": 150,
+       "y": 555,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Packages"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 555,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Description of Goods"
+      },
+      {
+       "t": "text",
+       "x": 492.18,
+       "y": 555,
+       "size": 8,
+       "font": "Helvetica-Bold",
+       "text": "Gross Weight (kg)"
+      },
+      {
+       "t": "line",
+       "x1": 40,
+       "y1": 551,
+       "x2": 565,
+       "y2": 551,
+       "width": 0.6
+      },
+      {
+       "t": "text",
+       "x": 40,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "BHPG PORTLAND"
+      },
+      {
+       "t": "text",
+       "x": 150,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "37 CTNS"
+      },
+      {
+       "t": "text",
+       "x": 220,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "Halloween decorations, see invoice LH-2611-0042"
+      },
+      {
+       "t": "text",
+       "x": 539.98,
+       "y": 539,
+       "size": 8,
+       "font": "Helvetica",
+       "text": "286.2"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

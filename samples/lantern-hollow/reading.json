@@ -1,0 +1,967 @@
+{
+  "schemaVersion": 1,
+  "bundle": "lantern-hollow",
+  "reader": "frozen-sample",
+  "note": "Hand-made stand-in for the AI answer. One reading (invoice.lines.7.origin) is a deliberate fabricated quote that must be rejected.",
+  "documents": [
+    {
+      "docId": "invoice",
+      "kind": "invoice"
+    },
+    {
+      "docId": "packingList",
+      "kind": "packingList"
+    },
+    {
+      "docId": "billOfLading",
+      "kind": "billOfLading"
+    }
+  ],
+  "fields": [
+    {
+      "field": "invoice.number",
+      "value": "LH-2611-0042",
+      "quote": "Invoice No.: LH-2611-0042",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.date",
+      "value": "10/24/2026",
+      "quote": "Invoice Date: 10/24/2026",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.terms",
+      "value": "FOB Haiphong",
+      "quote": "Terms of Sale: FOB Haiphong",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.currency",
+      "value": "USD",
+      "quote": "Currency: USD",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.countryOfExport",
+      "value": "Vietnam",
+      "quote": "Country of Export: Vietnam",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.seller.name",
+      "value": "Lantern Hollow Trading Co.",
+      "quote": "Seller / Exporter: Lantern Hollow Trading Co.",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.seller.address",
+      "value": "13 Moonlit Quay Road, Haiphong, Vietnam",
+      "quote": "13 Moonlit Quay Road, Haiphong, Vietnam",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.buyer.name",
+      "value": "Bramble Hollow Party Goods LLC",
+      "quote": "Buyer / Importer of Record: Bramble Hollow Party Goods LLC",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.buyer.address",
+      "value": "42 Pumpkin Patch Way, Portland, OR 97200, USA",
+      "quote": "42 Pumpkin Patch Way, Portland, OR 97200, USA",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.shipTo.name",
+      "value": "Bramble Hollow Party Goods LLC",
+      "quote": "Ship To: Bramble Hollow Party Goods LLC",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.shipTo.address",
+      "value": "Warehouse 9, 7 Cobweb Court, Portland, OR 97200, USA",
+      "quote": "Warehouse 9, 7 Cobweb Court, Portland, OR 97200, USA",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.itemNo",
+      "value": "LH-101",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.description",
+      "value": "Ceramic pumpkin figurine, 12 cm",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.hts",
+      "value": "6913.90.5000",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.origin",
+      "value": "PT",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.quantity",
+      "value": "120",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.unit",
+      "value": "PCS",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.unitPrice",
+      "value": "4.50",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.1.amount",
+      "value": "540.00",
+      "quote": "LH-101 Ceramic pumpkin figurine, 12 cm 6913.90.5000 PT 120 PCS 4.50 540.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.itemNo",
+      "value": "LH-102",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.description",
+      "value": "Glass votive candle holder, grey",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.hts",
+      "value": "7013.99.3500",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.origin",
+      "value": "CZ",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.quantity",
+      "value": "200",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.unit",
+      "value": "PCS",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.unitPrice",
+      "value": "2.10",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.2.amount",
+      "value": "420.00",
+      "quote": "LH-102 Glass votive candle holder, grey 7013.99.3500 CZ 200 PCS 2.10 420.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.itemNo",
+      "value": "LH-103",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.description",
+      "value": "Paper streamers, orange/black, 10 m",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.hts",
+      "value": "9505.90.4000",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.origin",
+      "value": "VN",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.quantity",
+      "value": "240",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.unit",
+      "value": "PCS",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.unitPrice",
+      "value": "1.25",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.3.amount",
+      "value": "300.00",
+      "quote": "LH-103 Paper streamers, orange/black, 10 m 9505.90.4000 VN 240 PCS 1.25 300.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.itemNo",
+      "value": "LH-104",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.description",
+      "value": "Tin candle lantern, non-electric",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.hts",
+      "value": "9405.50.4000",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.origin",
+      "value": "VN",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.quantity",
+      "value": "150",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.unit",
+      "value": "PCS",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.unitPrice",
+      "value": "3.20",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.4.amount",
+      "value": "468.00",
+      "quote": "LH-104 Tin candle lantern, non-electric 9405.50.4000 VN 150 PCS 3.20 468.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.itemNo",
+      "value": "LH-105",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.description",
+      "value": "Foam tombstone decoration, 60 cm",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.hts",
+      "value": "9505.90.6000",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.origin",
+      "value": "CN",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.quantity",
+      "value": "64",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.unit",
+      "value": "PCS",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.unitPrice",
+      "value": "6.80",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.5.amount",
+      "value": "435.20",
+      "quote": "LH-105 Foam tombstone decoration, 60 cm 9505.90.6000 CN 64 PCS 6.80 435.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.itemNo",
+      "value": "LH-106",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.description",
+      "value": "Glass witch-hat ornament, 8 cm",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.hts",
+      "value": "7013.99.9500",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.origin",
+      "value": "CZ",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.quantity",
+      "value": "300",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.unit",
+      "value": "PCS",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.unitPrice",
+      "value": "0.95",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.6.amount",
+      "value": "285.00",
+      "quote": "LH-106 Glass witch-hat ornament, 8 cm 7013.99.9500 CZ 300 PCS 0.95 285.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.itemNo",
+      "value": "LH-107",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.description",
+      "value": "Resin raven figurine, 18 cm",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.hts",
+      "value": "3926.40.0090",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.origin",
+      "value": "CN",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 CN 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.quantity",
+      "value": "90",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.unit",
+      "value": "PCS",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.unitPrice",
+      "value": "5.40",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.7.amount",
+      "value": "486.00",
+      "quote": "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.itemNo",
+      "value": "LH-108",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.description",
+      "value": "Ceramic ghost figurine, 10 cm",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.hts",
+      "value": "6913.90.5000",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.origin",
+      "value": "PT",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.quantity",
+      "value": "96",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.unit",
+      "value": "PCS",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.unitPrice",
+      "value": "3.75",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.lines.8.amount",
+      "value": "360.00",
+      "quote": "LH-108 Ceramic ghost figurine, 10 cm 6913.90.5000 PT 96 PCS 3.75 360.00",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.subtotal",
+      "value": "3,294.20",
+      "quote": "Subtotal (USD) 3,294.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "invoice.total",
+      "value": "3,294.20",
+      "quote": "Total (USD) 3,294.20",
+      "doc": "invoice",
+      "page": 1
+    },
+    {
+      "field": "packingList.number",
+      "value": "PL-2611-0042",
+      "quote": "Packing List No.: PL-2611-0042",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.invoiceRef",
+      "value": "LH-2611-0042",
+      "quote": "Invoice Ref.: LH-2611-0042",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.blNumber",
+      "value": "XDMO2611HPH042",
+      "quote": "B/L No.: XDMO2611HPH042",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.1.itemNo",
+      "value": "LH-101",
+      "quote": "LH-101 Ceramic pumpkin figurine 1-5 5 120 48.0 55.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.1.cartons",
+      "value": "5",
+      "quote": "LH-101 Ceramic pumpkin figurine 1-5 5 120 48.0 55.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.1.quantity",
+      "value": "120",
+      "quote": "LH-101 Ceramic pumpkin figurine 1-5 5 120 48.0 55.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.1.netKg",
+      "value": "48.0",
+      "quote": "LH-101 Ceramic pumpkin figurine 1-5 5 120 48.0 55.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.1.grossKg",
+      "value": "55.5",
+      "quote": "LH-101 Ceramic pumpkin figurine 1-5 5 120 48.0 55.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.2.itemNo",
+      "value": "LH-102",
+      "quote": "LH-102 Glass votive candle holder 6-10 5 200 40.0 47.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.2.cartons",
+      "value": "5",
+      "quote": "LH-102 Glass votive candle holder 6-10 5 200 40.0 47.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.2.quantity",
+      "value": "200",
+      "quote": "LH-102 Glass votive candle holder 6-10 5 200 40.0 47.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.2.netKg",
+      "value": "40.0",
+      "quote": "LH-102 Glass votive candle holder 6-10 5 200 40.0 47.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.2.grossKg",
+      "value": "47.2",
+      "quote": "LH-102 Glass votive candle holder 6-10 5 200 40.0 47.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.3.itemNo",
+      "value": "LH-103",
+      "quote": "LH-103 Paper streamers 11-13 3 216 10.8 13.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.3.cartons",
+      "value": "3",
+      "quote": "LH-103 Paper streamers 11-13 3 216 10.8 13.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.3.quantity",
+      "value": "216",
+      "quote": "LH-103 Paper streamers 11-13 3 216 10.8 13.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.3.netKg",
+      "value": "10.8",
+      "quote": "LH-103 Paper streamers 11-13 3 216 10.8 13.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.3.grossKg",
+      "value": "13.1",
+      "quote": "LH-103 Paper streamers 11-13 3 216 10.8 13.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.4.itemNo",
+      "value": "LH-104",
+      "quote": "LH-104 Tin candle lantern 14-19 6 150 45.0 52.8",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.4.cartons",
+      "value": "6",
+      "quote": "LH-104 Tin candle lantern 14-19 6 150 45.0 52.8",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.4.quantity",
+      "value": "150",
+      "quote": "LH-104 Tin candle lantern 14-19 6 150 45.0 52.8",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.4.netKg",
+      "value": "45.0",
+      "quote": "LH-104 Tin candle lantern 14-19 6 150 45.0 52.8",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.4.grossKg",
+      "value": "52.8",
+      "quote": "LH-104 Tin candle lantern 14-19 6 150 45.0 52.8",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.5.itemNo",
+      "value": "LH-105",
+      "quote": "LH-105 Foam tombstone decoration 20-27 8 64 19.2 33.6",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.5.cartons",
+      "value": "8",
+      "quote": "LH-105 Foam tombstone decoration 20-27 8 64 19.2 33.6",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.5.quantity",
+      "value": "64",
+      "quote": "LH-105 Foam tombstone decoration 20-27 8 64 19.2 33.6",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.5.netKg",
+      "value": "19.2",
+      "quote": "LH-105 Foam tombstone decoration 20-27 8 64 19.2 33.6",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.5.grossKg",
+      "value": "33.6",
+      "quote": "LH-105 Foam tombstone decoration 20-27 8 64 19.2 33.6",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.6.itemNo",
+      "value": "LH-106",
+      "quote": "LH-106 Glass witch-hat ornament 28-31 4 300 15.0 19.4",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.6.cartons",
+      "value": "4",
+      "quote": "LH-106 Glass witch-hat ornament 28-31 4 300 15.0 19.4",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.6.quantity",
+      "value": "300",
+      "quote": "LH-106 Glass witch-hat ornament 28-31 4 300 15.0 19.4",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.6.netKg",
+      "value": "15.0",
+      "quote": "LH-106 Glass witch-hat ornament 28-31 4 300 15.0 19.4",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.6.grossKg",
+      "value": "19.4",
+      "quote": "LH-106 Glass witch-hat ornament 28-31 4 300 15.0 19.4",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.7.itemNo",
+      "value": "LH-107",
+      "quote": "LH-107 Resin raven figurine 32-34 3 90 27.0 31.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.7.cartons",
+      "value": "3",
+      "quote": "LH-107 Resin raven figurine 32-34 3 90 27.0 31.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.7.quantity",
+      "value": "90",
+      "quote": "LH-107 Resin raven figurine 32-34 3 90 27.0 31.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.7.netKg",
+      "value": "27.0",
+      "quote": "LH-107 Resin raven figurine 32-34 3 90 27.0 31.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.7.grossKg",
+      "value": "31.5",
+      "quote": "LH-107 Resin raven figurine 32-34 3 90 27.0 31.5",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.8.itemNo",
+      "value": "LH-108",
+      "quote": "LH-108 Ceramic ghost figurine 35-37 3 96 28.8 33.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.8.cartons",
+      "value": "3",
+      "quote": "LH-108 Ceramic ghost figurine 35-37 3 96 28.8 33.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.8.quantity",
+      "value": "96",
+      "quote": "LH-108 Ceramic ghost figurine 35-37 3 96 28.8 33.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.8.netKg",
+      "value": "28.8",
+      "quote": "LH-108 Ceramic ghost figurine 35-37 3 96 28.8 33.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.lines.8.grossKg",
+      "value": "33.1",
+      "quote": "LH-108 Ceramic ghost figurine 35-37 3 96 28.8 33.1",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.totalCartons",
+      "value": "37",
+      "quote": "TOTAL 37 1,236 233.8 286.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.totalQuantity",
+      "value": "1,236",
+      "quote": "TOTAL 37 1,236 233.8 286.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.totalNetKg",
+      "value": "233.8",
+      "quote": "TOTAL 37 1,236 233.8 286.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "packingList.totalGrossKg",
+      "value": "286.2",
+      "quote": "TOTAL 37 1,236 233.8 286.2",
+      "doc": "packingList",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.number",
+      "value": "XDMO2611HPH042",
+      "quote": "B/L No.: XDMO2611HPH042",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.carrier",
+      "value": "Midnight Tide Shipping Line (DEMO)",
+      "quote": "Carrier: Midnight Tide Shipping Line (DEMO)",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.consignee.name",
+      "value": "Bramble Hollow Party Goods LLC",
+      "quote": "Consignee: Bramble Hollow Party Goods LLC",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.vessel",
+      "value": "MV GLOAMING LANTERN",
+      "quote": "Vessel: MV GLOAMING LANTERN",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.voyage",
+      "value": "013E",
+      "quote": "Voyage: 013E",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.portOfLoading",
+      "value": "Haiphong, Vietnam",
+      "quote": "Port of Loading: Haiphong, Vietnam",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.portOfDischarge",
+      "value": "Los Angeles, CA, USA",
+      "quote": "Port of Discharge: Los Angeles, CA, USA",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.onBoardDate",
+      "value": "10/28/2026",
+      "quote": "Shipped on Board: 10/28/2026",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.containerNo",
+      "value": "DEMU 2601173",
+      "quote": "Container No.: DEMU 2601173",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.packages",
+      "value": "37 CTNS",
+      "quote": "BHPG PORTLAND 37 CTNS Halloween decorations, see invoice LH-2611-0042 286.2",
+      "doc": "billOfLading",
+      "page": 1
+    },
+    {
+      "field": "billOfLading.grossKg",
+      "value": "286.2",
+      "quote": "BHPG PORTLAND 37 CTNS Halloween decorations, see invoice LH-2611-0042 286.2",
+      "doc": "billOfLading",
+      "page": 1
+    }
+  ]
+}
