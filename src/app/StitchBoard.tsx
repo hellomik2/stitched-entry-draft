@@ -1170,7 +1170,7 @@ function SourceStrip({
               {/* Note */}
               {field.note && (
                 <div style={{ marginBottom: '0.5rem', color: 'var(--muted)' }}>
-                  Note: {field.note}
+                  Note: {tidyText(field.note)}
                 </div>
               )}
             </div>
