@@ -17,6 +17,7 @@ import {
   buildDraft,
   validateReadingAnswer,
   allFields,
+  draftToCsv,
 } from '../core'
 
 export interface BundleJson {
@@ -67,8 +68,8 @@ export default function StitchBoard({
 
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 })
   const [threads, setThreads] = useState<Array<{ kind: 'doc' | 'calc'; d: string }>>([])
-
-  // Parse and validate reading data
+  const [overrides, setOverrides] = useState<Override[]>([])
+  const [csvUrl, setCsvUrl] = useState<string | null>(null)
   const readingAnswer = useMemo(() => {
     try {
       const validation = validateReadingAnswer(readingData)
@@ -107,13 +108,13 @@ export default function StitchBoard({
         reader: readingAnswer.reader,
         readings: verified,
         hts,
-        overrides: [],
+        overrides,
       })
       return { verified, draft }
     } catch (e) {
       throw new Error(`Failed to build draft: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [documents, readingAnswer, bundle.bundle, hts, overridesList])
+  }, [documents, readingAnswer, bundle.bundle, hts, overrides])
 
   // Load all PDF documents
   useEffect(() => {
@@ -396,6 +397,23 @@ export default function StitchBoard({
     }
   }, [loadState, activeDocId, documents])
 
+  // Generate CSV URL when draft changes
+  useEffect(() => {
+    if (!draft) {
+      setCsvUrl(null)
+      return
+    }
+
+    const csv = draftToCsv(draft)
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    setCsvUrl(url)
+
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [draft])
+
   if (loadState === 'loading') {
     return <div data-testid="loading">Loading documents...</div>
   }
@@ -429,6 +447,16 @@ export default function StitchBoard({
           Checked against {draft?.htsRevisionTitle || 'HTS Revision (loading)'}
         </div>
         <div data-testid="reader-mode">Pre-read sample: no AI call</div>
+        {csvUrl && (
+          <a
+            data-testid="download-csv"
+            href={csvUrl}
+            download={`${bundle.bundle}-7501-draft.csv`}
+            style={{ marginLeft: 'auto', paddingRight: '1rem' }}
+          >
+            Download CSV
+          </a>
+        )}
       </div>
 
       {/* Main layout */}
@@ -528,6 +556,39 @@ export default function StitchBoard({
                 <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
                   Needs review <span data-testid="needs-review-count">{draft.needsReview.length}</span>
                 </h3>
+                {overrides.length === 0 ? (
+                  <button
+                    data-testid="apply-demo-answers"
+                    onClick={() => setOverrides(overridesList)}
+                    style={{
+                      marginBottom: '0.75rem',
+                      padding: '0.5rem',
+                      background: '#e8f5e9',
+                      border: '1px solid #4caf50',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Use test answers for this demo
+                  </button>
+                ) : (
+                  <button
+                    data-testid="reset-answers"
+                    onClick={() => setOverrides([])}
+                    style={{
+                      marginBottom: '0.75rem',
+                      padding: '0.5rem',
+                      background: '#ffebee',
+                      border: '1px solid #f44336',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                    }}
+                  >
+                    Clear person answers ({overrides.length})
+                  </button>
+                )}
                 <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.75rem' }}>
                   person fills {draft.personInput.length}
                 </p>
@@ -733,6 +794,13 @@ export default function StitchBoard({
         fieldMap={fieldMap} 
         draft={draft}
         documents={bundle.documents}
+        onApply={(fieldId, value) => {
+          setOverrides((prev) => [...prev.filter((o) => o.fieldId !== fieldId), { fieldId, value }])
+        }}
+        onUndo={(fieldId) => {
+          setOverrides((prev) => prev.filter((o) => o.fieldId !== fieldId))
+        }}
+        onSelect={setSelectedField}
       />
     </div>
   )
@@ -795,11 +863,17 @@ function SourceStrip({
   fieldMap,
   draft,
   documents,
+  onApply,
+  onUndo,
+  onSelect,
 }: {
   selectedField: string | null
   fieldMap: Map<string, DraftField>
   draft: Draft | null
   documents: Array<{ docId: string; label: string }>
+  onApply: (fieldId: string, value: string) => void
+  onUndo: (fieldId: string) => void
+  onSelect: (fieldId: string) => void
 }) {
   const field = selectedField && fieldMap ? fieldMap.get(selectedField) : null
   const docMap = new Map(documents.map((d) => [d.docId, d.label]))
@@ -846,6 +920,74 @@ function SourceStrip({
             <span data-testid="strip-status">{statusWords[field.status]}</span>
           </div>
 
+          {/* Override form for needsReview or personInput */}
+          {(field.status === 'needsReview' || field.status === 'personInput') && (
+            <form
+              key={field.id}
+              onSubmit={(e) => {
+                e.preventDefault()
+                const v = String(new FormData(e.currentTarget).get('value') ?? '').trim()
+                if (v) onApply(field.id, v)
+              }}
+              style={{ marginBottom: '0.5rem' }}
+            >
+              <input
+                name="value"
+                data-testid="override-input"
+                placeholder="Value decided by a person"
+                style={{
+                  padding: '0.5rem',
+                  marginRight: '0.5rem',
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '0.75rem',
+                }}
+              />
+              <button
+                type="submit"
+                data-testid="override-apply"
+                style={{
+                  padding: '0.5rem 1rem',
+                  background: '#2196f3',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                }}
+              >
+                Use this value
+              </button>
+            </form>
+          )}
+
+          {/* Undo button for personEdited */}
+          {field.status === 'personEdited' && (
+            <button
+              data-testid="override-undo"
+              onClick={() => onUndo(field.id)}
+              style={{
+                marginBottom: '0.5rem',
+                padding: '0.5rem 1rem',
+                background: '#ff9800',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+              }}
+            >
+              Undo
+            </button>
+          )}
+
+          {/* Reason */}
+          {field.reason && (
+            <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
+              Reason: {field.reason}
+            </div>
+          )}
+
           {/* Value */}
           {field.value && (
             <div style={{ marginBottom: '0.5rem' }}>
@@ -867,13 +1009,6 @@ function SourceStrip({
           {field.note && (
             <div style={{ marginBottom: '0.5rem', color: '#555' }}>
               Note: {field.note}
-            </div>
-          )}
-
-          {/* Reason */}
-          {field.reason && (
-            <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
-              Reason: {field.reason}
             </div>
           )}
 
@@ -900,9 +1035,7 @@ function SourceStrip({
               Inputs: {field.inputs.map((id) => (
                 <button
                   key={id}
-                  onClick={() => {
-                    // Selection will be handled elsewhere
-                  }}
+                  onClick={() => onSelect(id)}
                   style={{
                     background: 'none',
                     border: 'none',
