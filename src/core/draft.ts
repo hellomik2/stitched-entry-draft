@@ -603,6 +603,7 @@ export function buildDraft(input: {
       unit: null,
       status: "computed",
       rule: "7501 p.8",
+      note: "Vessel, containerized: the B/L lists a container.",
       sources: b9Sources,
     })
   );
@@ -623,6 +624,7 @@ export function buildDraft(input: {
   if (blReading && blReading.value) {
     const blValue = normalizeSpace(blReading.value);
     if (isValidBlNumber(blValue)) {
+      const carrierCode = blValue.substring(0, 4);
       headerFields.push(
         field_helper({
           id: "B12",
@@ -630,6 +632,7 @@ export function buildDraft(input: {
           label: "B/L number",
           value: blValue,
           status: "copied",
+          note: `Carrier code ${carrierCode}`,
           sources: [docSource(blReading)],
         })
       );
@@ -672,6 +675,7 @@ export function buildDraft(input: {
   if (exportCountryReading && exportCountryReading.value) {
     const codeResult = countryCode(normalizeSpace(exportCountryReading.value));
     if (codeResult.ok) {
+      const countryText = normalizeSpace(exportCountryReading.value);
       headerFields.push(
         field_helper({
           id: "B14",
@@ -679,6 +683,7 @@ export function buildDraft(input: {
           label: "Exporting country",
           value: codeResult.value,
           status: "copied",
+          note: countryText,
           sources: [docSource(exportCountryReading)],
         })
       );
@@ -717,6 +722,7 @@ export function buildDraft(input: {
           label: "Export date",
           value: dateResult.value,
           status: "copied",
+          note: "Shipped on board date",
           sources: [docSource(onBoardReading)],
         })
       );
@@ -1150,6 +1156,7 @@ export function buildDraft(input: {
           revision: hts.revision,
           htsno: htsLookup.row.htsno,
         };
+        const rowDesc = htsLookup.row.description || "";
         field = field_helper({
           id,
           block: "33A",
@@ -1158,6 +1165,7 @@ export function buildDraft(input: {
           value: htsLookup.number.entry,
           status: "copied",
           rule: "P15",
+          note: `Found in ${hts.revisionTitle}: ${rowDesc}`,
           sources: [...htsReadingSources, htsSource],
         });
       } else {
@@ -1297,6 +1305,27 @@ export function buildDraft(input: {
             }
           }
 
+          // Build arithmetic note for computed quantity
+          let arithmeticNote = "";
+          if (group.invoiceLines.length === 1) {
+            // Single line: just show the quantity
+            arithmeticNote = `${displayValue} ${htsUnit || ""}`.trim();
+          } else {
+            // Multiple lines: show the addition
+            const parts: string[] = [];
+            for (let i = 0; i < group.invoiceLines.length; i++) {
+              const n = group.invoiceLines[i];
+              const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+              if (qtyReading && qtyReading.value) {
+                const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+                if (qtyResult.ok) {
+                  parts.push(String(qtyResult.value));
+                }
+              }
+            }
+            arithmeticNote = `${parts.join(" + ")} ${htsUnit || ""}`.trim();
+          }
+
           lineFields.push(
             field_helper({
               id,
@@ -1307,6 +1336,7 @@ export function buildDraft(input: {
               unit: htsUnit,
               status: "computed",
               rule: "P12",
+              note: arithmeticNote,
               sources: quantityReadingSources,
             })
           );
@@ -1499,6 +1529,7 @@ export function buildDraft(input: {
               value: htsLookup.rateText,
               status: "copied",
               rule,
+              note: `General rate of ${htsLookup.rateFrom}.`,
               sources: [rateSource],
             })
           );
@@ -1556,6 +1587,9 @@ export function buildDraft(input: {
           );
         } else {
           const dutyFormatted = formatCents(dutyResult.value);
+          const rateValue = rateField.value || "0%";
+          const enteredValueStr = enteredValueField.value || "0";
+          const note = `${rateValue} x ${enteredValueStr} = ${dutyFormatted}`;
           lineFields.push(
             field_helper({
               id,
@@ -1565,6 +1599,7 @@ export function buildDraft(input: {
               value: dutyFormatted,
               status: "computed",
               rule: "P7",
+              note,
               inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
             })
           );
@@ -1740,6 +1775,7 @@ export function buildDraft(input: {
 
     const uniqueOrigins = [...new Set(allOrigins)];
     if (uniqueOrigins.length > 1) {
+      const originList = uniqueOrigins.join(", ");
       return field_helper({
         id: "B10",
         block: "10",
@@ -1747,6 +1783,7 @@ export function buildDraft(input: {
         value: "MULTI",
         status: "computed",
         rule: "7501 p.8",
+        note: `Lines come from ${originList}; each line shows its own origin.`,
         inputs: lineOriginIds,
       });
     } else {
@@ -1863,6 +1900,7 @@ export function buildDraft(input: {
             value: String(totalDollars),
             status: "computed",
             rule: "P5",
+            note: lineValueIds.length > 0 ? `${lineValueIds.map(id => getFieldValue(id) || "0").join(" + ")} = ${totalDollars}` : String(totalDollars),
             inputs: lineValueIds,
           })
         );
@@ -1994,6 +2032,8 @@ export function buildDraft(input: {
       );
     } else {
       const dutyFormatted = formatCents(totalDutyCents);
+      const dutyValues = dutyIds.map(id => getFieldValue(id) || "0.00");
+      const note = `${dutyValues.join(" + ")} = ${dutyFormatted}`;
       totalFields.push(
         field_helper({
           id,
@@ -2002,6 +2042,7 @@ export function buildDraft(input: {
           value: dutyFormatted,
           status: "computed",
           rule: "7501 p.20",
+          note,
           inputs: dutyIds,
         })
       );
@@ -2065,6 +2106,9 @@ export function buildDraft(input: {
       } else {
         const totalCents = mpfResult.value + hmfResult.value;
         const totalFormatted = formatCents(totalCents);
+        const mpfValue = getFieldValue("FEE.MPF") || "0.00";
+        const hmfValue = getFieldValue("FEE.HMF") || "0.00";
+        const note = `${mpfValue} + ${hmfValue} = ${totalFormatted}`;
         totalFields.push(
           field_helper({
             id,
@@ -2073,6 +2117,7 @@ export function buildDraft(input: {
             value: totalFormatted,
             status: "computed",
             rule: "7501 p.20",
+            note,
             inputs: ["FEE.MPF", "FEE.HMF"],
           })
         );
@@ -2124,6 +2169,10 @@ export function buildDraft(input: {
       } else {
         const totalCents = b41Result.value + b42Result.value + b43Result.value;
         const totalFormatted = formatCents(totalCents);
+        const b41Value = getFieldValue("B41") || "0.00";
+        const b42Value = getFieldValue("B42") || "0.00";
+        const b43Value = getFieldValue("B43") || "0.00";
+        const note = `${b41Value} + ${b42Value} + ${b43Value} = ${totalFormatted}`;
         totalFields.push(
           field_helper({
             id,
@@ -2132,6 +2181,7 @@ export function buildDraft(input: {
             value: totalFormatted,
             status: "computed",
             rule: "P10",
+            note,
             inputs: ["B41", "B42", "B43"],
           })
         );
@@ -2244,6 +2294,7 @@ export function buildDraft(input: {
                     field37A.rule = lookup.rateFrom !== lookup.row.htsno ? "P16" : null;
                     field37A.reason = null;
                     field37A.inputs = [];
+                    field37A.note = `General rate of ${lookup.rateFrom}.`;
                   }
                 }
 
@@ -2433,6 +2484,7 @@ export function buildDraft(input: {
             field35.sources = quantityReadingSources;
             field35.reason = null;
             field35.inputs = [];
+            field35.note = `${displayValue} ${htsUnit || ""}`.trim();
           } else {
             field35.value = null;
             field35.status = "needsReview";
@@ -2483,6 +2535,7 @@ export function buildDraft(input: {
                 field37A.sources = [rateSource];
                 field37A.inputs = [];
                 field37A.reason = null;
+                field37A.note = `General rate of ${rateHtsLookup.rateFrom}.`;
               }
             }
           }
@@ -2510,6 +2563,7 @@ export function buildDraft(input: {
             field38.rule = "P7";
             field38.reason = null;
             field38.inputs = [`L${lineNum}.36A`, `L${lineNum}.37A`];
+            field38.note = `${field37A.value} x ${field36A.value} = ${field38.value}`;
           }
         }
       }
@@ -2559,6 +2613,8 @@ export function buildDraft(input: {
           b39Field.value = String(totalResult.value);
           b39Field.reason = null;
           b39Field.rule = "P5";
+          const lineValues = lineValueIds.map(id => allFieldsList.find((f) => f.id === id)?.value || "0").join(" + ");
+          b39Field.note = `${lineValues} = ${totalResult.value}`;
         }
       }
     }
@@ -2638,6 +2694,8 @@ export function buildDraft(input: {
         b41Field.value = formatCents(totalDutyCents);
         b41Field.reason = null;
         b41Field.rule = "7501 p.20";
+        const dutyValues = dutyIds.map(id => allFieldsList.find((f) => f.id === id)?.value || "0.00").join(" + ");
+        b41Field.note = `${dutyValues} = ${b41Field.value}`;
       }
     }
 
@@ -2663,6 +2721,9 @@ export function buildDraft(input: {
           b43Field.value = formatCents(mpfResult.value + hmfResult.value);
           b43Field.reason = null;
           b43Field.rule = "7501 p.20";
+          const mpfValue = mpfField.value || "0.00";
+          const hmfValue = hmfField.value || "0.00";
+          b43Field.note = `${mpfValue} + ${hmfValue} = ${b43Field.value}`;
         }
       }
     }
@@ -2690,6 +2751,10 @@ export function buildDraft(input: {
           b44Field.value = formatCents(b41Result.value + b42Result.value + b43Result.value);
           b44Field.reason = null;
           b44Field.rule = "P10";
+          const b41Value = b41Field.value || "0.00";
+          const b42Value = b42Field.value || "0.00";
+          const b43Value = b43Field.value || "0.00";
+          b44Field.note = `${b41Value} + ${b42Value} + ${b43Value} = ${b44Field.value}`;
         }
       }
     }
