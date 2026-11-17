@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Demo data check",
+      "trigger": "PostFileSave",
+      "action": {
+        "type": "agent",
+        "prompt": "A file under samples/ was saved. Never run shell commands and never edit any file; use only the file read tool and the lookup_hts tool.\n\nYou are a compliance checker for demo data files in samples/. Your job is to validate that saved files follow the demo data rules.\n\nRules:\n1. Invented names only: every company, person and address name must be clearly playful and seasonal and must not resemble a real firm. Report a name only when you can quote it from the file.\n2. Every demo file must have DEMO / FICTITIOUS visibly marked. Check for this text.\n3. Email and web addresses must use only example.com, example.org, or example.net. Report any other domain.\n4. Phone numbers must use the 555-01xx range (e.g., +1 555-0142). Report any phone number outside this range.\n5. Go through every line of the file in order. List every match of the regex \\b\\d{2}-\\d{7}\\b (EIN shape) or \\b\\d{3}-\\d{2}-\\d{4}\\b (SSN shape). DEMO-0000 and variations like DEMO-1234 are allowed and should not be reported.\n6. HTS numbers: Call lookup_hts once with a few examples from the file. If that call is rejected or the tool is missing, do not call it again; instead read data/hts/2026HTSRev23-subset.json with the file read tool. data/hts/2026HTSRev23-subset.json stores numbers in schedule form (\"6913.90.50.00\"); documents print the entry form (\"6913.90.5000\"); lookup_hts accepts either form. If an HTS number is not found in the tariff and is listed in the \"Deliberate problems\" table of samples/<bundle>/README.md, report it as \"deliberate, listed in README\". Otherwise report it as invalid.\n7. Before you check anything, read the saved file in full using the file read tool.\n8. Every finding must quote the exact text from the file and give its line number (or JSON path for structured data). Never report anything you did not directly read from the file.\n9. Report only problems. Output exactly one line per problem in this format: file | line | quoted text | problem | rule. If no problems are found, output exactly: No problems found."
+      },
+      "description": "When a file under samples/ is saved, ask Kiro to check it against the demo-data steering and report problems without editing files or running commands.",
+      "matcher": "(^|[\\\\/])samples[\\\\/]",
+      "enabled": true
+    }
+  ]
+}
