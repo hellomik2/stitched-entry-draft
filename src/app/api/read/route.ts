@@ -11,6 +11,7 @@ import {
   type IntakeReader,
   type UsageStore,
 } from "../../../server/index";
+import { createClaudeReader } from "../../../server/claudeReader";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,6 +109,10 @@ export async function POST(request: Request): Promise<Response> {
     if (fakeReader) {
       readers.fake = fakeReader;
     }
+  }
+
+  if (setup.mode === "claude" && setup.apiKey) {
+    readers.claude = createClaudeReader({ apiKey: setup.apiKey });
   }
 
   // Set up stores
