@@ -171,6 +171,94 @@ html, body {
   font-size: 1rem;
 }
 
+[data-testid="draft-pane"] h3 {
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Draft field buttons */
+[data-field-id] {
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  text-align: left;
+  transition: all 0.2s;
+}
+
+[data-field-id][data-status="copied"] {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+}
+
+[data-field-id][data-status="computed"] {
+  background: #fffacd;
+  border: 1px solid #daa520;
+}
+
+[data-field-id][data-status="needsReview"] {
+  background: #fff;
+  border: 2px dashed #f00;
+}
+
+[data-field-id][data-status="personInput"] {
+  background: #f0f0f0;
+  border: 2px dashed #999;
+}
+
+[data-field-id][data-status="personEdited"] {
+  background: #e3f2fd;
+  border: 2px dashed #2196f3;
+}
+
+/* Source strip */
+[data-testid="source-strip"] {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid #ddd;
+  padding: 1rem;
+  font-size: 0.75rem;
+  max-height: 9rem;
+  overflow-y: auto;
+  line-height: 1.4;
+  z-index: 100;
+}
+
+/* Lines table */
+[data-testid="lines-table"] {
+  width: 100%;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+}
+
+[data-testid="lines-table"] thead tr {
+  border-bottom: 1px solid #ddd;
+}
+
+[data-testid="lines-table"] th,
+[data-testid="lines-table"] td {
+  padding: 0.5rem;
+  text-align: left;
+}
+
+[data-testid="lines-table"] tbody tr {
+  border-bottom: 1px solid #eee;
+}
+
+.field-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.field-card-label {
+  font-size: 0.7rem;
+  color: #555;
+}
+
 /* Loading and error states */
 [data-testid="loading"],
 [data-testid="load-error"] {

@@ -7,6 +7,7 @@ import type {
   ReadingAnswer,
   VerifiedReading,
   Draft,
+  DraftField,
   HtsTable,
   Override,
 } from '../core'
@@ -15,6 +16,7 @@ import {
   verifyReadings,
   buildDraft,
   validateReadingAnswer,
+  allFields,
 } from '../core'
 
 export interface BundleJson {
@@ -147,6 +149,27 @@ export default function StitchBoard({
 
     loadDocuments()
   }, [bundle])
+
+  // Build map of all draft fields by id
+  const fieldMap = useMemo(() => {
+    if (!draft) return new Map<string, DraftField>()
+    const map = new Map<string, DraftField>()
+    for (const field of allFields(draft)) {
+      map.set(field.id, field)
+    }
+    return map
+  }, [draft])
+
+  // When a field is selected and its first source is a document, switch to that document
+  useEffect(() => {
+    if (!selectedField || !draft) return
+    const field = fieldMap.get(selectedField)
+    if (!field) return
+    const first = field.sources[0]
+    if (first && first.kind === 'document') {
+      setActiveDocId(first.doc)
+    }
+  }, [selectedField, draft, fieldMap])
 
   // Render active document page
   useEffect(() => {
@@ -291,7 +314,9 @@ export default function StitchBoard({
                   key={reading.field}
                   data-testid={`box-${reading.field}`}
                   data-reading={reading.field}
-                  data-selected={selectedField === reading.field ? 'true' : 'false'}
+                  data-selected={selectedField && fieldMap.get(selectedField)?.sources.some(
+                    (s) => s.kind === 'document' && s.doc === activeDocId && s.readingField === reading.field
+                  ) ? 'true' : 'false'}
                   style={{
                     position: 'absolute',
                     left: `${left}px`,
@@ -299,7 +324,6 @@ export default function StitchBoard({
                     width: `${width}px`,
                     height: `${height}px`,
                   }}
-                  onClick={() => setSelectedField(reading.field)}
                 />
               )
             })}
@@ -317,29 +341,386 @@ export default function StitchBoard({
         </div>
 
         {/* Right pane - draft */}
-        <div data-testid="draft-pane" style={{ width: '50%', padding: '1rem', background: '#fafafa', overflow: 'auto' }}>
-          <h2>Draft Summary</h2>
+        <div 
+          data-testid="draft-pane" 
+          style={{ 
+            width: '50%', 
+            padding: '1rem', 
+            background: '#fafafa', 
+            overflow: 'auto',
+            paddingBottom: '9rem',
+          }}
+        >
           {draft && (
-            <div>
-              <p>
-                <strong>Bundle:</strong> {draft.bundle}
-              </p>
-              <p>
-                <strong>Reader:</strong> {draft.reader}
-              </p>
-              <p>
-                <strong>Lines:</strong> {draft.lines.length}
-              </p>
-              <p>
-                <strong>Needs Review:</strong> {draft.needsReview.length}
-              </p>
-              <p>
-                <strong>Person Input:</strong> {draft.personInput.length}
-              </p>
-            </div>
+            <>
+              {/* 1. Needs Review Section */}
+              <div data-testid="needs-review" style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>
+                  Needs review <span data-testid="needs-review-count">{draft.needsReview.length}</span>
+                </h3>
+                <p style={{ fontSize: '0.875rem', color: '#666', marginBottom: '0.75rem' }}>
+                  person fills {draft.personInput.length}
+                </p>
+                {draft.needsReview.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {draft.needsReview.map((item) => (
+                      <button
+                        key={item.fieldId}
+                        data-testid={`review-${item.fieldId}`}
+                        onClick={() => setSelectedField(item.fieldId)}
+                        style={{
+                          padding: '0.5rem',
+                          background: '#fff',
+                          border: '1px solid #ddd',
+                          borderRadius: '4px',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{item.label}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#666' }}>{item.reason}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Header Blocks */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                  {draft.header
+                    .filter((f) => f.status !== 'personInput')
+                    .map((field) => (
+                      <div key={field.id} className="field-card"><div className="field-card-label">{field.block}. {field.label}</div><DraftFieldButton
+                        field={field}
+                        selected={selectedField === field.id}
+                        onSelect={() => setSelectedField(field.id)}
+                      /></div>
+                    ))}
+                </div>
+
+                {/* Person Input Blocks (collapsed) */}
+                {draft.header.filter((f) => f.status === 'personInput').length > 0 && (
+                  <details style={{ marginTop: '0.75rem' }}>
+                    <summary style={{ cursor: 'pointer', fontWeight: 500, fontSize: '0.875rem' }}>
+                      Person fills ({draft.header.filter((f) => f.status === 'personInput').length})
+                    </summary>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginTop: '0.75rem' }}>
+                      {draft.header
+                        .filter((f) => f.status === 'personInput')
+                        .map((field) => (
+                          <div key={field.id} className="field-card"><div className="field-card-label">{field.block}. {field.label}</div><DraftFieldButton
+                            field={field}
+                            selected={selectedField === field.id}
+                            onSelect={() => setSelectedField(field.id)}
+                          /></div>
+                        ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+
+              {/* 3. Lines Table */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>Line Items</h3>
+                <table data-testid="lines-table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #ddd' }}>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Line</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Origin</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>32</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>33A</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>34A</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>35</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>36A</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>37A</th>
+                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>38</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {draft.lines.map((line) => {
+                      const fieldMap = new Map(line.fields.map((f) => [f.id.split('.')[1], f]))
+                      const columns = ['10', '32', '33A', '34A', '35', '36A', '37A', '38']
+                      const ch99Field = line.fields.find((f) => f.id.endsWith('.ch99'))
+
+                      return (
+                        <tr key={line.lineNumber} data-testid={`line-${line.lineNumber}`} style={{ borderBottom: '1px solid #eee' }}>
+                          <td style={{ padding: '0.5rem', fontWeight: 500 }}>
+                            {line.lineNumber}
+                            <div style={{ fontSize: '0.65rem', color: '#666' }}>inv {line.invoiceLines.join('+')}</div>
+                          </td>
+                          {columns.map((col) => {
+                            const field = fieldMap.get(col)
+                            return (
+                              <td key={col} style={{ padding: '0.5rem' }}>
+                                {field ? (
+                                  <>
+                                    <DraftFieldButton
+                                      field={field}
+                                      selected={selectedField === field.id}
+                                      onSelect={() => setSelectedField(field.id)}
+                                      compact
+                                    />
+                                    {col === '38' && ch99Field && (
+                                      <div style={{ marginTop: '0.25rem' }}>
+                                        <DraftFieldButton
+                                          field={ch99Field}
+                                          selected={selectedField === ch99Field.id}
+                                          onSelect={() => setSelectedField(ch99Field.id)}
+                                          compact
+                                        />
+                                      </div>
+                                    )}
+                                  </>
+                                ) : null}
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 4. Totals Cards */}
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>Totals</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                  {draft.totals.map((field) => (
+                    <div key={field.id} className="field-card"><div className="field-card-label">{field.block}. {field.label}</div><DraftFieldButton
+                      field={field}
+                      selected={selectedField === field.id}
+                      onSelect={() => setSelectedField(field.id)}
+                    /></div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 5. Checks (collapsed) */}
+              {draft.checks.length > 0 && (
+                <details style={{ marginBottom: '1.5rem' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 500, fontSize: '0.875rem' }}>
+                    Checks ({draft.checks.length})
+                  </summary>
+                  <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {draft.checks.map((check) => (
+                      <div
+                        key={check.id}
+                        data-testid={`check-${check.id}`}
+                        data-ok={check.ok ? 'true' : 'false'}
+                        style={{
+                          padding: '0.5rem',
+                          background: check.ok ? '#f0f8f0' : '#fff0f0',
+                          border: `1px solid ${check.ok ? '#0a0' : '#f00'}`,
+                          borderRadius: '4px',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        <div style={{ fontWeight: 500 }}>{check.label}</div>
+                        {check.detail && <div style={{ color: '#666', marginTop: '0.25rem' }}>{check.detail}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
           )}
         </div>
       </div>
+
+      {/* Source Strip */}
+      <SourceStrip 
+        selectedField={selectedField} 
+        fieldMap={fieldMap} 
+        draft={draft}
+        documents={bundle.documents}
+      />
+    </div>
+  )
+}
+
+/**
+ * DraftFieldButton: renders a single draft field as a button
+ */
+function DraftFieldButton({
+  field,
+  selected,
+  onSelect,
+  compact = false,
+}: {
+  field: DraftField
+  selected: boolean
+  onSelect: () => void
+  compact?: boolean
+}) {
+  const statusStyles: Record<string, React.CSSProperties> = {
+    copied: { background: '#f5f5f5', border: '1px solid #ddd' },
+    computed: { background: '#fffacd', border: '1px solid #daa520' },
+    needsReview: { background: '#fff', border: '2px dashed #f00' },
+    personInput: { background: '#f0f0f0', border: '2px dashed #999' },
+    personEdited: { background: '#e3f2fd', border: '2px dashed #2196f3' },
+  }
+
+  const baseStyle = {
+    padding: compact ? '0.25rem 0.5rem' : '0.5rem',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: compact ? '0.7rem' : '0.75rem',
+    textAlign: 'left' as const,
+    ...statusStyles[field.status],
+    ...(selected && { boxShadow: '0 0 4px rgba(0,0,0,0.3)' }),
+  }
+
+  const displayText = field.value || (field.status === 'needsReview' ? 'needs review' : 'person fills')
+  const text = field.value && field.unit ? `${field.value} ${field.unit}` : displayText
+
+  return (
+    <button
+      data-testid={`field-${field.id}`}
+      data-field-id={field.id}
+      data-status={field.status}
+      onClick={onSelect}
+      style={baseStyle}
+      title={field.label}
+    >
+      {text}
+    </button>
+  )
+}
+
+/**
+ * SourceStrip: fixed footer showing sources for selected field
+ */
+function SourceStrip({
+  selectedField,
+  fieldMap,
+  draft,
+  documents,
+}: {
+  selectedField: string | null
+  fieldMap: Map<string, DraftField>
+  draft: Draft | null
+  documents: Array<{ docId: string; label: string }>
+}) {
+  const field = selectedField && fieldMap ? fieldMap.get(selectedField) : null
+  const docMap = new Map(documents.map((d) => [d.docId, d.label]))
+
+  const statusWords: Record<string, string> = {
+    copied: 'Copied from a document',
+    computed: 'Computed',
+    needsReview: 'Needs review',
+    personInput: 'A person fills this',
+    personEdited: 'Entered by a person',
+  }
+
+  return (
+    <div
+      data-testid="source-strip"
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: '#fff',
+        borderTop: '1px solid #ddd',
+        padding: '1rem',
+        fontSize: '0.75rem',
+        maxHeight: '9rem',
+        overflowY: 'auto',
+        lineHeight: 1.4,
+      }}
+    >
+      {!field ? (
+        <div style={{ color: '#999' }}>Select a value to see where it came from.</div>
+      ) : (
+        <>
+          {/* Header: Block and label */}
+          <div style={{ marginBottom: '0.5rem', fontWeight: 500 }}>
+            {field.line
+              ? `Line ${field.line.substring(1)} · ${field.block}`
+              : `Block ${field.block}`}
+            {' '}{field.label}
+          </div>
+
+          {/* Status */}
+          <div style={{ marginBottom: '0.5rem', color: '#666' }}>
+            <span data-testid="strip-status">{statusWords[field.status]}</span>
+          </div>
+
+          {/* Value */}
+          {field.value && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              <span data-testid="strip-value" style={{ fontWeight: 500 }}>
+                {field.value}
+                {field.unit && ` ${field.unit}`}
+              </span>
+            </div>
+          )}
+
+          {/* Rule */}
+          {field.rule && (
+            <div style={{ marginBottom: '0.5rem', color: '#555' }}>
+              Rule: <em>{field.rule}</em>
+            </div>
+          )}
+
+          {/* Note */}
+          {field.note && (
+            <div style={{ marginBottom: '0.5rem', color: '#555' }}>
+              Note: {field.note}
+            </div>
+          )}
+
+          {/* Reason */}
+          {field.reason && (
+            <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
+              Reason: {field.reason}
+            </div>
+          )}
+
+          {/* Sources */}
+          {field.sources.length > 0 && (
+            <div style={{ marginBottom: '0.5rem' }}>
+              {field.sources.map((source, idx) => (
+                <div
+                  key={idx}
+                  data-testid="strip-source"
+                  style={{ marginBottom: '0.25rem', color: '#333' }}
+                >
+                  {source.kind === 'document'
+                    ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`
+                    : `Tariff schedule ${source.revision}, row ${source.htsno}`}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Input links */}
+          {field.inputs.length > 0 && (
+            <div style={{ fontSize: '0.7rem', color: '#0070f3' }}>
+              Inputs: {field.inputs.map((id) => (
+                <button
+                  key={id}
+                  onClick={() => {
+                    // Selection will be handled elsewhere
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0070f3',
+                    textDecoration: 'underline',
+                    cursor: 'pointer',
+                    padding: 0,
+                    marginRight: '0.25rem',
+                  }}
+                >
+                  {id}
+                </button>
+              ))}</div>
+          )}
+        </>
+      )}
     </div>
   )
 }
