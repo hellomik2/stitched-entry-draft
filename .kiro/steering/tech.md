@@ -1,0 +1,45 @@
+---
+inclusion: always
+---
+
+# Tech
+
+## Stack
+
+- **TypeScript** everywhere, `strict: true`. One repository.
+- **Next.js** (App Router) for UI and server functions, with `src/` directory.
+- **Vitest** for tests, **fast-check** for property-based tests.
+- **npm** as the package manager. Node 20 LTS or newer.
+
+## Rules for code
+
+- `src/rules/` holds **pure functions only**: no I/O, no network, no `Date.now()`, no
+  randomness, no React. Same input, same output. These are the property-test targets.
+- **No floating-point money math.** Amounts inside `src/rules/` are integer **cents**
+  (safe integers). Percentage rates are exact integers (for example parts per million:
+  0.3464% = 3464 ppm). Convert at the edges, and round only where a rule says so, with the
+  rounding mode written in the code.
+- Every rate, minimum, maximum, and unconfirmed rule choice lives in **one config module**
+  (`src/rules/config.ts`). No magic numbers elsewhere.
+- Functions return explicit results for "cannot compute" (for example
+  `{ ok: false, reason }` or a `needsReview` flag) instead of throwing for normal business
+  cases. Throw only for programmer errors (invalid types, non-integer cents).
+- Keep dependencies small. Do not add a library when a few lines of code do the job.
+- No paid AI calls and no API keys in this phase. Never write secrets or `.env` files.
+
+## Commands
+
+The maintainer runs shell commands. **Do not run `npm install`, test, or build commands
+yourself.** When commands are needed, list them in your reply so the maintainer can run
+them, and continue with file edits.
+
+- `npm run test` runs `vitest --run`.
+- `npm run typecheck` runs `tsc --noEmit`.
+- `npm run dev` / `npm run build` for Next.js.
+
+## Tests
+
+- Example tests and property tests sit next to the code: `foo.ts`, `foo.test.ts`,
+  `foo.property.test.ts`.
+- Each property test names the requirement it validates in its title.
+- Official worked examples from the CBP Form 7501 instructions are mandatory example tests.
