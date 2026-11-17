@@ -65,6 +65,9 @@ export default function StitchBoard({
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const redrawTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const documentsPaneRef = useRef<HTMLDivElement>(null)
+  const draftPaneRef = useRef<HTMLDivElement>(null)
+  const [pageScale, setPageScale] = useState(CANVAS_SCALE)
 
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 })
   const [threads, setThreads] = useState<Array<{ kind: 'doc' | 'calc'; d: string }>>([])
@@ -166,6 +169,25 @@ export default function StitchBoard({
     }
     return map
   }, [draft])
+
+  // Fit the page to the width of the documents pane (never larger than CANVAS_SCALE)
+  useEffect(() => {
+    if (loadState !== 'ready' || !documentsPaneRef.current) return
+    const pane = documentsPaneRef.current
+    const activeDoc = documents.find((d) => d.docId === activeDocId)
+    const pageWidth = activeDoc?.documentText.pages[0]?.width || 612
+    const fit = () => {
+      // page-view has a 1rem margin on each side and a vertical scrollbar (about 16 px)
+      const margins = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2
+      const available = pane.clientWidth - margins - 18
+      const next = Math.min(CANVAS_SCALE, Math.max(0.3, Math.floor((available / pageWidth) * 100) / 100))
+      setPageScale((prev) => (prev === next ? prev : next))
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(pane)
+    return () => observer.disconnect()
+  }, [loadState, activeDocId, documents])
 
   // Helper: draw threads when a field is selected
   const redrawThreads = useCallback(() => {
@@ -276,8 +298,16 @@ export default function StitchBoard({
         `[data-reading="${firstDocSource.readingField}"]`
       )
       if (box) {
-        box.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+        scrollIntoPane(pageViewRef.current, box)
       }
+    }
+
+    // Scroll the selected value into view inside the draft pane only
+    const valueButton = draftPaneRef.current?.querySelector<HTMLElement>(
+      `[data-field-id="${selectedField}"]`
+    )
+    if (valueButton && draftPaneRef.current) {
+      scrollIntoPane(draftPaneRef.current, valueButton)
     }
 
     // Redraw after delay
@@ -289,7 +319,7 @@ export default function StitchBoard({
     return () => {
       clearTimeout(timeoutCanvas)
     }
-  }, [selectedField, activeDocId, loadState, fieldMap, redrawThreads])
+  }, [selectedField, activeDocId, loadState, fieldMap, redrawThreads, pageScale])
 
   // Update SVG dimensions when threads change or container resizes
   useEffect(() => {
@@ -347,7 +377,7 @@ export default function StitchBoard({
       if (!activeDoc) return
 
       const pdfPage = await activeDoc.pdf.getPage(1)
-      const viewport = pdfPage.getViewport({ scale: CANVAS_SCALE * window.devicePixelRatio })
+      const viewport = pdfPage.getViewport({ scale: pageScale * window.devicePixelRatio })
 
       // Create new canvas for this render
       const canvas = document.createElement('canvas')
@@ -395,7 +425,7 @@ export default function StitchBoard({
         taskRef.current.cancel()
       }
     }
-  }, [loadState, activeDocId, documents])
+  }, [loadState, activeDocId, documents, pageScale])
 
   // Generate CSV URL when draft changes
   useEffect(() => {
@@ -470,7 +500,7 @@ export default function StitchBoard({
         }}
       >
         {/* Left pane - documents */}
-        <div data-testid="documents-pane" style={{ display: 'flex', flexDirection: 'column', width: '50%' }}>
+        <div ref={documentsPaneRef} data-testid="documents-pane" style={{ display: 'flex', flexDirection: 'column', width: '45%' }}>
           {/* Document tabs */}
           <div data-testid="document-tabs">
             {bundle.documents.map((doc) => (
@@ -501,7 +531,7 @@ export default function StitchBoard({
           >
             {/* Reading boxes overlaid on canvas */}
             {activeReadings.map((reading) => {
-              const scale = CANVAS_SCALE
+              const scale = pageScale
               const left = reading.box.x * scale - 2
               const top = reading.box.y * scale - 2
               const width = reading.box.w * scale + 4
@@ -540,13 +570,13 @@ export default function StitchBoard({
 
         {/* Right pane - draft */}
         <div 
+          ref={draftPaneRef}
           data-testid="draft-pane" 
           style={{ 
-            width: '50%', 
+            width: '55%', 
             padding: '1rem', 
             background: '#fafafa', 
             overflow: 'auto',
-            paddingBottom: '9rem',
           }}
         >
           {draft && (
@@ -807,6 +837,23 @@ export default function StitchBoard({
 }
 
 /**
+ * Scroll `pane` vertically, and only `pane`, so that `el` is inside its visible area.
+ * Does nothing when `el` is already visible or not rendered (for example inside a closed <details>).
+ */
+function scrollIntoPane(pane: HTMLElement, el: HTMLElement) {
+  const r = el.getBoundingClientRect()
+  if (r.width === 0 && r.height === 0) return
+  const p = pane.getBoundingClientRect()
+  const top = p.top + 16
+  const bottom = p.top + pane.clientHeight - 16
+  if (r.top < top) {
+    pane.scrollTop -= top - r.top
+  } else if (r.bottom > bottom) {
+    pane.scrollTop += Math.min(r.bottom - bottom, r.top - top)
+  }
+}
+
+/**
  * DraftFieldButton: renders a single draft field as a button
  */
 function DraftFieldButton({
@@ -890,10 +937,9 @@ function SourceStrip({
     <div
       data-testid="source-strip"
       style={{
-        position: 'fixed',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        position: 'relative',
+        zIndex: 10,
+        flex: '0 0 9rem',
         background: '#fff',
         borderTop: '1px solid #ddd',
         padding: '1rem',

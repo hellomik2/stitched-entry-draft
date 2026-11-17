@@ -54,7 +54,7 @@ html, body {
 [data-testid="documents-pane"] {
   display: flex;
   flex-direction: column;
-  width: 50%;
+  width: 45%;
   border-right: 1px solid #ddd;
   overflow: hidden;
 }
@@ -160,7 +160,7 @@ html, body {
 [data-testid="draft-pane"] {
   display: flex;
   flex-direction: column;
-  width: 50%;
+  width: 55%;
   padding: 1rem;
   background: #fafafa;
   overflow: auto;
@@ -213,10 +213,8 @@ html, body {
 
 /* Source strip */
 [data-testid="source-strip"] {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  flex: 0 0 9rem;
   background: #fff;
   border-top: 1px solid #ddd;
   padding: 1rem;
