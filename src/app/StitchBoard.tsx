@@ -638,8 +638,8 @@ export default function StitchBoard({
                           cursor: 'pointer',
                         }}
                       >
-                        <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{item.label}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#666' }}>{item.reason}</div>
+                        <div style={{ fontWeight: 500, fontSize: '0.875rem' }}>{fieldTitle(fieldMap.get(item.fieldId), item.label)}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#666' }}>{tidyText(item.reason)}</div>
                       </button>
                     ))}
                   </div>
@@ -749,7 +749,7 @@ export default function StitchBoard({
                 <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>Totals</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
                   {draft.totals.map((field) => (
-                    <div key={field.id} className="field-card"><div className="field-card-label">{field.block}. {field.label}</div><DraftFieldButton
+                    <div key={field.id} className="field-card"><div className="field-card-label">{field.id.startsWith('FEE.') ? `Part of ${field.block} · ${field.label}` : `${field.block}. ${field.label}`}</div><DraftFieldButton
                       field={field}
                       selected={selectedField === field.id}
                       onSelect={() => setSelectedField(field.id)}
@@ -834,6 +834,26 @@ export default function StitchBoard({
       />
     </div>
   )
+}
+
+/**
+ * Where a draft field sits on the 7501, for labels:
+ * "Line 004 · 38 Duty (USD)", "Block 41 · Duty (USD)", or
+ * "Part of block 43 · Merchandise processing fee (USD)" for the fee fields (FEE.*) that add up into Block 43.
+ */
+function fieldTitle(field: DraftField | undefined, fallback: string): string {
+  if (!field) return fallback
+  if (field.line) return `Line ${field.line} · ${field.block} ${field.label}`
+  if (field.id.startsWith('FEE.')) return `Part of block ${field.block} · ${field.label}`
+  return `Block ${field.block} · ${field.label}`
+}
+
+/**
+ * Display only: fold a doubled word ("See See") and a doubled full stop ("08..") in reason text.
+ * The draft and the CSV keep the original text.
+ */
+function tidyText(text: string): string {
+  return text.replace(/\b([A-Za-z]+) \1\b/g, '$1').replace(/(?<!\.)\.\.(?!\.)/g, '.')
 }
 
 /**
@@ -955,10 +975,7 @@ function SourceStrip({
         <>
           {/* Header: Block and label */}
           <div style={{ marginBottom: '0.5rem', fontWeight: 500 }}>
-            {field.line
-              ? `Line ${field.line.substring(1)} · ${field.block}`
-              : `Block ${field.block}`}
-            {' '}{field.label}
+            {fieldTitle(field, field.label)}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '1.5rem', alignItems: 'start' }}>
@@ -1032,7 +1049,7 @@ function SourceStrip({
               {/* Reason */}
               {field.reason && (
                 <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
-                  Reason: {field.reason}
+                  Reason: {tidyText(field.reason)}
                 </div>
               )}
 
@@ -1092,10 +1109,10 @@ function SourceStrip({
                         textDecoration: 'underline',
                         cursor: 'pointer',
                         padding: 0,
-                        marginRight: '0.25rem',
+                        marginRight: '0.75rem',
                       }}
                     >
-                      {id}
+                      {[id, fieldMap.get(id)?.label].filter(Boolean).join(' ')}
                     </button>
                   ))}</div>
               )}

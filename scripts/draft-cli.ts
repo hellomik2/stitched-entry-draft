@@ -4,6 +4,7 @@ import { mkdir, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { runBundleFromDisk } from "../src/node/index.js";
 import type { Override, VerifiedReading, Draft } from "../src/core/index.js";
+import { allFields } from "../src/core/index.js";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -70,7 +71,7 @@ async function main() {
     );
     writeFileSync(join(outDir, "draft.csv"), result.csv);
 
-    // Count field statuses
+    // Count field statuses over every field: header, lines and totals
     const statusCounts = {
       copied: 0,
       computed: 0,
@@ -78,20 +79,19 @@ async function main() {
       personInput: 0,
       personEdited: 0,
     };
-
-    for (const line of result.draft.lines) {
-      for (const field of line.fields) {
-        statusCounts[field.status]++;
-      }
+    const fields = allFields(result.draft);
+    for (const field of fields) {
+      statusCounts[field.status]++;
     }
 
-    // Print summary
+    // Print summary. "Needs review" and "person fills" are the same lists, under the same names, as on the screen.
     const readingsCount = result.verified.length;
     const linesCount = result.draft.lines.length;
     const summary = `Processed ${readingsCount} readings into ${linesCount} 7501 lines. ` +
-      `Fields: ${statusCounts.copied} copied, ${statusCounts.computed} computed, ` +
-      `${statusCounts.needsReview} needsReview, ${statusCounts.personInput} personInput, ` +
-      `${statusCounts.personEdited} personEdited.`;
+      `Needs review ${result.draft.needsReview.length}, person fills ${result.draft.personInput.length}. ` +
+      `All ${fields.length} fields: ${statusCounts.copied} copied, ${statusCounts.computed} computed, ` +
+      `${statusCounts.needsReview} needs review, ${statusCounts.personInput} person fills, ` +
+      `${statusCounts.personEdited} entered by a person.`;
 
     console.log(summary);
   } catch (err) {
