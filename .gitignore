@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Secrets and local environment files
+.env*
+
+# Local logs (AI call log, debug output)
+logs/
+
+# Build output
+.next/
+out/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
