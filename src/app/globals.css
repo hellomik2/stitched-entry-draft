@@ -238,7 +238,7 @@ html, body {
 
 [data-testid="lines-table"] th,
 [data-testid="lines-table"] td {
-  padding: 0.5rem;
+  padding: 0.375rem 0.25rem;
   text-align: left;
 }
 

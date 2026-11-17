@@ -687,15 +687,15 @@ export default function StitchBoard({
                 <table data-testid="lines-table" style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse' }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid #ddd' }}>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Line</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>Origin</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>32</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>33A</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>34A</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>35</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>36A</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>37A</th>
-                      <th style={{ padding: '0.5rem', textAlign: 'left' }}>38</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>Line</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>Origin</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>32</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>33A</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>34A</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>35</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>36A</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>37A</th>
+                      <th style={{ padding: '0.375rem 0.25rem', textAlign: 'left' }}>38</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -706,14 +706,14 @@ export default function StitchBoard({
 
                       return (
                         <tr key={line.lineNumber} data-testid={`line-${line.lineNumber}`} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '0.5rem', fontWeight: 500 }}>
+                          <td style={{ padding: '0.375rem 0.25rem', fontWeight: 500 }}>
                             {line.lineNumber}
                             <div style={{ fontSize: '0.65rem', color: '#666' }}>inv {line.invoiceLines.join('+')}</div>
                           </td>
                           {columns.map((col) => {
                             const field = fieldMap.get(col)
                             return (
-                              <td key={col} style={{ padding: '0.5rem' }}>
+                              <td key={col} style={{ padding: '0.375rem 0.25rem' }}>
                                 {field ? (
                                   <>
                                     <DraftFieldButton
@@ -876,7 +876,7 @@ function DraftFieldButton({
   }
 
   const baseStyle = {
-    padding: compact ? '0.25rem 0.5rem' : '0.5rem',
+    padding: compact ? '0.25rem 0.375rem' : '0.5rem',
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: compact ? '0.7rem' : '0.75rem',
@@ -942,7 +942,7 @@ function SourceStrip({
         flex: '0 0 9rem',
         background: '#fff',
         borderTop: '1px solid #ddd',
-        padding: '1rem',
+        padding: '0.75rem 1rem',
         fontSize: '0.75rem',
         maxHeight: '9rem',
         overflowY: 'auto',
@@ -961,141 +961,146 @@ function SourceStrip({
             {' '}{field.label}
           </div>
 
-          {/* Status */}
-          <div style={{ marginBottom: '0.5rem', color: '#666' }}>
-            <span data-testid="strip-status">{statusWords[field.status]}</span>
-          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', columnGap: '1.5rem', alignItems: 'start' }}>
+            <div>
+              {/* Status */}
+              <div style={{ marginBottom: '0.5rem', color: '#666' }}>
+                <span data-testid="strip-status">{statusWords[field.status]}</span>
+              </div>
 
-          {/* Override form for needsReview or personInput */}
-          {(field.status === 'needsReview' || field.status === 'personInput') && (
-            <form
-              key={field.id}
-              onSubmit={(e) => {
-                e.preventDefault()
-                const v = String(new FormData(e.currentTarget).get('value') ?? '').trim()
-                if (v) onApply(field.id, v)
-              }}
-              style={{ marginBottom: '0.5rem' }}
-            >
-              <input
-                name="value"
-                data-testid="override-input"
-                placeholder="Value decided by a person"
-                style={{
-                  padding: '0.5rem',
-                  marginRight: '0.5rem',
-                  borderRadius: '4px',
-                  border: '1px solid #ddd',
-                  fontSize: '0.75rem',
-                }}
-              />
-              <button
-                type="submit"
-                data-testid="override-apply"
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: '#2196f3',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.75rem',
-                }}
-              >
-                Use this value
-              </button>
-            </form>
-          )}
-
-          {/* Undo button for personEdited */}
-          {field.status === 'personEdited' && (
-            <button
-              data-testid="override-undo"
-              onClick={() => onUndo(field.id)}
-              style={{
-                marginBottom: '0.5rem',
-                padding: '0.5rem 1rem',
-                background: '#ff9800',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-              }}
-            >
-              Undo
-            </button>
-          )}
-
-          {/* Reason */}
-          {field.reason && (
-            <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
-              Reason: {field.reason}
-            </div>
-          )}
-
-          {/* Value */}
-          {field.value && (
-            <div style={{ marginBottom: '0.5rem' }}>
-              <span data-testid="strip-value" style={{ fontWeight: 500 }}>
-                {field.value}
-                {field.unit && ` ${field.unit}`}
-              </span>
-            </div>
-          )}
-
-          {/* Rule */}
-          {field.rule && (
-            <div style={{ marginBottom: '0.5rem', color: '#555' }}>
-              Rule: <em>{field.rule}</em>
-            </div>
-          )}
-
-          {/* Note */}
-          {field.note && (
-            <div style={{ marginBottom: '0.5rem', color: '#555' }}>
-              Note: {field.note}
-            </div>
-          )}
-
-          {/* Sources */}
-          {field.sources.length > 0 && (
-            <div style={{ marginBottom: '0.5rem' }}>
-              {field.sources.map((source, idx) => (
-                <div
-                  key={idx}
-                  data-testid="strip-source"
-                  style={{ marginBottom: '0.25rem', color: '#333' }}
+              {/* Override form for needsReview or personInput */}
+              {(field.status === 'needsReview' || field.status === 'personInput') && (
+                <form
+                  key={field.id}
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const v = String(new FormData(e.currentTarget).get('value') ?? '').trim()
+                    if (v) onApply(field.id, v)
+                  }}
+                  style={{ marginBottom: '0.5rem' }}
                 >
-                  {source.kind === 'document'
-                    ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`
-                    : `Tariff schedule ${source.revision}, row ${source.htsno}`}
-                </div>
-              ))}
-            </div>
-          )}
+                  <input
+                    name="value"
+                    data-testid="override-input"
+                    placeholder="Value decided by a person"
+                    style={{
+                      padding: '0.5rem',
+                      marginRight: '0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid #ddd',
+                      fontSize: '0.75rem',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    data-testid="override-apply"
+                    style={{
+                      padding: '0.5rem 1rem',
+                      background: '#2196f3',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    Use this value
+                  </button>
+                </form>
+              )}
 
-          {/* Input links */}
-          {field.inputs.length > 0 && (
-            <div style={{ fontSize: '0.7rem', color: '#0070f3' }}>
-              Inputs: {field.inputs.map((id) => (
+              {/* Undo button for personEdited */}
+              {field.status === 'personEdited' && (
                 <button
-                  key={id}
-                  onClick={() => onSelect(id)}
+                  data-testid="override-undo"
+                  onClick={() => onUndo(field.id)}
                   style={{
-                    background: 'none',
+                    marginBottom: '0.5rem',
+                    padding: '0.5rem 1rem',
+                    background: '#ff9800',
+                    color: '#fff',
                     border: 'none',
-                    color: '#0070f3',
-                    textDecoration: 'underline',
+                    borderRadius: '4px',
                     cursor: 'pointer',
-                    padding: 0,
-                    marginRight: '0.25rem',
+                    fontSize: '0.75rem',
                   }}
                 >
-                  {id}
+                  Undo
                 </button>
-              ))}</div>
-          )}
+              )}
+
+              {/* Reason */}
+              {field.reason && (
+                <div style={{ marginBottom: '0.5rem', color: '#f00' }} data-testid="strip-reason">
+                  Reason: {field.reason}
+                </div>
+              )}
+
+              {/* Value */}
+              {field.value && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  <span data-testid="strip-value" style={{ fontWeight: 500 }}>
+                    {field.value}
+                    {field.unit && ` ${field.unit}`}
+                  </span>
+                </div>
+              )}
+
+              {/* Rule */}
+              {field.rule && (
+                <div style={{ marginBottom: '0.5rem', color: '#555' }}>
+                  Rule: <em>{field.rule}</em>
+                </div>
+              )}
+
+              {/* Note */}
+              {field.note && (
+                <div style={{ marginBottom: '0.5rem', color: '#555' }}>
+                  Note: {field.note}
+                </div>
+              )}
+            </div>
+            <div>
+              {/* Sources */}
+              {field.sources.length > 0 && (
+                <div style={{ marginBottom: '0.5rem' }}>
+                  {field.sources.map((source, idx) => (
+                    <div
+                      key={idx}
+                      data-testid="strip-source"
+                      style={{ marginBottom: '0.25rem', color: '#333' }}
+                    >
+                      {source.kind === 'document'
+                        ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`
+                        : `Tariff schedule ${source.revision}, row ${source.htsno}`}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Input links */}
+              {field.inputs.length > 0 && (
+                <div style={{ fontSize: '0.7rem', color: '#0070f3' }}>
+                  Inputs: {field.inputs.map((id) => (
+                    <button
+                      key={id}
+                      onClick={() => onSelect(id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0070f3',
+                        textDecoration: 'underline',
+                        cursor: 'pointer',
+                        padding: 0,
+                        marginRight: '0.25rem',
+                      }}
+                    >
+                      {id}
+                    </button>
+                  ))}</div>
+              )}
+            </div>
+          </div>
         </>
       )}
     </div>
