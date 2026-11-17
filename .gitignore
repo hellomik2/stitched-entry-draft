@@ -15,3 +15,6 @@ coverage/
 next-env.d.ts
 public/pdf.worker.min.mjs
 public/standard_fonts/
+
+# Netlify CLI local folder (build output and the linked project id)
+.netlify/
