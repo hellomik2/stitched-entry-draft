@@ -1,0 +1,357 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Create package.json with next, react, react-dom, typescript, vitest, fast-check": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327050
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880336107
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880376557
+      }
+    ],
+    "1.2 Create tsconfig.json with strict mode and path aliases": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327192
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880336304
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880376782
+      }
+    ],
+    "1.3 Create next.config.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327299
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880336462
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880377026
+      }
+    ],
+    "1.4 Create vitest.config.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327403
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880336722
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880377196
+      }
+    ],
+    "1.5 Create src/app/layout.tsx with page title \"7501 Draft Helper\"": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327514
+      }
+    ],
+    "1.6 Create src/app/page.tsx with visible disclaimer": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327677
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880337123
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880377378
+      }
+    ],
+    "2.1 Create src/rules/types.ts with result types": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327755
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880469710
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880976748
+      }
+    ],
+    "2.2 Create src/rules/config.ts with all settings": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327859
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880469893
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880977051
+      }
+    ],
+    "3.1 Implement src/rules/rounding.ts with roundEnteredValue()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880327962
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880470136
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880977287
+      }
+    ],
+    "3.2 Write property tests for rounding in src/rules/rounding.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328058
+      }
+    ],
+    "4.1 Implement src/rules/totals.ts with totalEnteredValue()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328146
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880470429
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880977530
+      }
+    ],
+    "4.2 Write property tests for total entered value in src/rules/totals.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328251
+      }
+    ],
+    "5.1 Implement src/rules/charges.ts with formatCharges()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328359
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880470610
+      },
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880977692
+      }
+    ],
+    "5.2 Write property tests for charges in src/rules/charges.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328456
+      }
+    ],
+    "6.1 Implement src/rules/duty.ts with computeDuty()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328562
+      }
+    ],
+    "6.2 Write property tests for duty in src/rules/duty.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328635
+      }
+    ],
+    "7.1 Implement src/rules/fees.ts with computeMPF()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328702
+      }
+    ],
+    "7.2 Write property tests for MPF in src/rules/fees.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328770
+      }
+    ],
+    "8.1 Implement src/rules/totals.ts with summarizeTotals()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328859
+      }
+    ],
+    "8.2 Write property tests for summary totals in src/rules/totals.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880328967
+      }
+    ],
+    "9.1 Implement src/rules/weights.ts with allocateGrossWeight()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329049
+      }
+    ],
+    "9.2 Write property tests for gross weight in src/rules/weights.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329153
+      }
+    ],
+    "10.1 Implement src/rules/checkDigit.ts with computeCheckDigit() and formatEntryNumber()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329264
+      }
+    ],
+    "10.2 Write mandatory example tests for check digit in src/rules/checkDigit.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329396
+      }
+    ],
+    "10.3 Write property tests for check digit in src/rules/checkDigit.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329469
+      }
+    ],
+    "11.1 Implement src/rules/manufacturerId.ts with generateMID()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329545
+      }
+    ],
+    "11.2 Write mandatory example tests for MID in src/rules/manufacturerId.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329620
+      }
+    ],
+    "11.3 Write property tests for MID in src/rules/manufacturerId.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329703
+      }
+    ],
+    "12.1 Implement src/rules/dates.ts with formatDate() and validateDateOrdering()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329781
+      }
+    ],
+    "12.2 Write property tests for dates in src/rules/dates.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329863
+      }
+    ],
+    "13.1 Implement src/rules/lines.ts with numberLines()": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880329953
+      }
+    ],
+    "13.2 Write property tests for lines in src/rules/lines.property.test.ts": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880330031
+      }
+    ],
+    "14.1 Create src/rules/index.ts with all public re-exports": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880330129
+      }
+    ],
+    "15. Checkpoint — Ensure all tests pass": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880330273
+      }
+    ],
+    "16.1 Verify fast-check integration in vitest": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880330354
+      }
+    ],
+    "2. Core Types and Configuration": [
+      {
+        "executionId": "92786111-7a82-44d8-b117-499093e33685",
+        "chatSessionId": "sess_3bd9a1ab-0921-4f1a-aac8-cf14d60416ba",
+        "timestamp": 1794880977129
+      }
+    ]
+  }
+}
