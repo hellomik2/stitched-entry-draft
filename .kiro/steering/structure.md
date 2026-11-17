@@ -7,6 +7,8 @@ inclusion: always
 ```
 /.kiro/            Kiro project files (steering, specs, hooks, agents). Never git-ignored.
 /src/app/          Next.js App Router pages, layouts, route handlers (UI and server).
+/src/server/        Node-only server code for the document reader (never imported by client code).
+/src/app/intake/    Browser code for uploading and preparing documents.
 /src/rules/        Pure 7501 math and validation rules. One file per rule group.
 /src/rules/config.ts   The only place for rates, minimums, maximums, rule switches.
 /samples/          Fictitious demo documents only (see demo-data steering).

@@ -2,7 +2,7 @@ export type DocKind = "invoice" | "packingList" | "billOfLading";
 export type Box = { x: number; y: number; w: number; h: number }; // PDF points at scale 1, origin TOP-LEFT of the page
 export type TextItem = { id: string; str: string; box: Box };
 export type Span = { itemId: string; start: number; end: number }; // where the item sits inside PageText.text
-export type PageText = { page: number; width: number; height: number; items: TextItem[]; text: string; spans: Span[] };
+export type PageText = { page: number; width: number; height: number; items: TextItem[]; text: string; spans: Span[]; origin?: "textLayer" | "imageTranscript" };
 export type DocumentText = { docId: string; kind: DocKind; pages: PageText[] };
 
 export interface PdfPageLike {

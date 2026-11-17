@@ -4,6 +4,9 @@ export * from "./hts";
 export * from "./parse";
 export * from "./draft";
 export * from "./csv";
+export * from "./intakeConfig";
+export * from "./fieldCatalog";
+export * from "./transcript";
 
 import type { DocumentText } from "./pdfText";
 import type { DocumentReader } from "./reading";

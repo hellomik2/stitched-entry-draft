@@ -25,7 +25,7 @@ inclusion: always
   `{ ok: false, reason }` or a `needsReview` flag) instead of throwing for normal business
   cases. Throw only for programmer errors (invalid types, non-integer cents).
 - Keep dependencies small. Do not add a library when a few lines of code do the job.
-- No paid AI calls and no API keys in this phase. Never write secrets or `.env` files.
+- Paid AI calls: exactly one AI reader is allowed, in `src/server/claudeReader.ts` (spec document-intake). It reads the key only from the server environment variable `ANTHROPIC_API_KEY` and passes it explicitly to the official SDK client. No other file calls a paid AI API. Tests never make network calls (they inject a fake client). Never write secrets or `.env` files.
 
 ## Commands
 
