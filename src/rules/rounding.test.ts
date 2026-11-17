@@ -66,7 +66,7 @@ describe("P4: Entered Value Rounding - Unit Tests", () => {
       const result = roundEnteredValue(123456789, "halfUp");
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value).toBe(1234567);
+        expect(result.value).toBe(1234568);
       }
     });
   });

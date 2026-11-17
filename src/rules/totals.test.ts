@@ -20,11 +20,11 @@ describe("totalEnteredValue() - Unit Tests", () => {
     });
 
     it("sums individually rounded values", () => {
-      // $1.50 + $2.00 = $1 (rounded) + $2 (rounded) = $3
+      // $1.50 + $2.00 = $2 (rounded) + $2 (rounded) = $4
       const result = totalEnteredValue([150, 200], "sumOfRoundedLines");
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value).toBe(3);
+        expect(result.value).toBe(4);
       }
     });
 

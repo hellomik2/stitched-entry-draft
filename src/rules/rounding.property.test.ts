@@ -190,12 +190,12 @@ describe("P4: Entered Value Rounding - Property Tests", () => {
   });
 
   /**
-   * Additional property: Values Above 50 Cents Round Up (except halfDown, truncate)
+   * Additional property: Values Above 50 Cents
    *
-   * For cents values from 51 to 99 (fractional part > 0.5), halfUp and halfEven
-   * should round up; halfDown and truncate should round down.
+   * For cents values from 51 to 99 (fractional part > 0.5), halfUp, halfEven,
+   * and halfDown all round up to 1; only truncate rounds down to 0.
    */
-  it("Values above 50 cents (51-99) round up in halfUp and halfEven modes", () => {
+  it("Values above 50 cents (51-99) round up in halfUp, halfEven, and halfDown modes; truncate rounds down", () => {
     fc.assert(
       fc.property(fc.integer({ min: 51, max: 99 }), (cents) => {
         // halfUp should round up
@@ -212,11 +212,11 @@ describe("P4: Entered Value Rounding - Property Tests", () => {
           expect(resultEven.value).toBe(1);
         }
 
-        // halfDown should round down
+        // halfDown should round up for fractional part > 0.5
         const resultDown = roundEnteredValue(cents, "halfDown");
         expect(resultDown.ok).toBe(true);
         if (resultDown.ok) {
-          expect(resultDown.value).toBe(0);
+          expect(resultDown.value).toBe(1);
         }
 
         // truncate should round down

@@ -56,6 +56,28 @@ describe("formatCharges() - Property Tests", () => {
   });
 
   /**
+   * **Property 15: Charges NeedsReview Result Narrowing**
+   * For any negative charges amount that returns NeedsReview, the result must be narrowed
+   * before accessing the reason field to avoid type errors.
+   *
+   * **Validates: Type safety**
+   */
+  it("Property 15: Charges NeedsReview properly narrowed", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: -999999999, max: -1 }), // Negative cents
+        (cents) => {
+          const result = formatCharges(cents);
+          if (result.ok) return true; // Skip ok results
+
+          // After narrowing, we can safely access reason
+          return typeof result.reason === "string" && result.reason.length > 0;
+        }
+      )
+    );
+  });
+
+  /**
    * **Property 13: Charges Negative Rejected**
    * For any negative charges amount, the charges function SHALL return a NeedsReview result.
    *

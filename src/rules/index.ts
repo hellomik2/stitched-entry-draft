@@ -27,7 +27,6 @@ export { formatCharges } from "./charges";
 
 // Re-export config and validation
 export {
-  roundingModes,
   mpfConfig,
   totalEnteredValueMode,
   chargesRounding,
