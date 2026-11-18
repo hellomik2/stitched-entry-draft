@@ -306,6 +306,138 @@ describe("readerContract: validateReaderOutput", () => {
       expect(result.reason).toContain("appears more than once");
     }
   });
+
+  it("accepts invoiceLineCount: null", () => {
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "doc1",
+          page: 2,
+          lines: [
+            { text: "Some text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 } },
+          ],
+        },
+      ],
+      invoiceLineCount: null,
+    };
+
+    const result = validateReaderOutput(output, mockInput);
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts invoiceLineCount: 3", () => {
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "doc1",
+          page: 2,
+          lines: [
+            { text: "Some text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 } },
+          ],
+        },
+      ],
+      invoiceLineCount: 3,
+    };
+
+    const result = validateReaderOutput(output, mockInput);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects invoiceLineCount: -1", () => {
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "doc1",
+          page: 2,
+          lines: [
+            { text: "Some text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 } },
+          ],
+        },
+      ],
+      invoiceLineCount: -1,
+    } as any;
+
+    const result = validateReaderOutput(output, mockInput);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("invoiceLineCount");
+    }
+  });
+
+  it("rejects invoiceLineCount: 1.5", () => {
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "doc1",
+          page: 2,
+          lines: [
+            { text: "Some text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 } },
+          ],
+        },
+      ],
+      invoiceLineCount: 1.5,
+    } as any;
+
+    const result = validateReaderOutput(output, mockInput);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("invoiceLineCount");
+    }
+  });
+
+  it("rejects invoiceLineCount: \"3\"", () => {
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "doc1",
+          page: 2,
+          lines: [
+            { text: "Some text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 } },
+          ],
+        },
+      ],
+      invoiceLineCount: "3",
+    } as any;
+
+    const result = validateReaderOutput(output, mockInput);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("invoiceLineCount");
+    }
+  });
+
+  it("rejects invoiceLineCount: 1000", () => {
+    const output: ReaderOutput = {
+      reader: "test-reader",
+      fields: [],
+      transcripts: [
+        {
+          doc: "doc1",
+          page: 2,
+          lines: [
+            { text: "Some text", box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 } },
+          ],
+        },
+      ],
+      invoiceLineCount: 1000,
+    } as any;
+
+    const result = validateReaderOutput(output, mockInput);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("invoiceLineCount");
+    }
+  });
 });
 
 describe("readerContract: composeDocumentTexts", () => {

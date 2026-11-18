@@ -554,6 +554,13 @@ describe("Claude Reader", () => {
       const catalogNames = FIELD_CATALOG.map((f) => f.name);
       expect(fieldEnum).toEqual(catalogNames);
     });
+
+    it("schema lists invoiceLineCount in required and with type [integer, null]", () => {
+      const schema = READER_OUTPUT_SCHEMA;
+      expect(schema.required).toContain("invoiceLineCount");
+      expect(schema.properties.invoiceLineCount).toBeDefined();
+      expect((schema.properties.invoiceLineCount as any).type).toEqual(["integer", "null"]);
+    });
   });
 
   describe("Feature: document-intake, Property 20: Claude Reader No Retries", () => {
@@ -563,6 +570,10 @@ describe("Claude Reader", () => {
 
       expect(source).toContain("maxRetries: 0");
       expect(source).not.toContain("process.env");
+    });
+
+    it("system prompt contains invoiceLineCount", async () => {
+      expect(READER_SYSTEM_PROMPT).toContain("invoiceLineCount");
     });
   });
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { verifyReadings } from "./reading";
 import type { ReadingAnswer, VerifiedReading } from "./reading";
-import { buildDraft } from "./draft";
+import { buildDraft, IMAGE_REVIEW_REASON, CONFIRMED_NOTE } from "./draft";
 import type { DocumentText } from "./pdfText";
 import type { HtsTable } from "./hts";
 import { loadBundleFromDisk } from "../node/index";
@@ -226,6 +226,280 @@ describe("Draft", () => {
         }
       },
       60000,
+    );
+  });
+
+  describe("Feature: document-intake, Property 35: Image Values Wait for a Person (Validates: Requirements 18.1, 18.2, 18.3)", () => {
+    it(
+      "Property 35: Image Values Wait for a Person",
+      async () => {
+        // Use fast-check to generate random booleans for each verified reading
+        const fc = await import("fast-check");
+        fc.assert(
+          fc.property(
+            fc.array(fc.boolean(), { minLength: 0, maxLength: bundleAnswer.fields.length }),
+            (imageFlags) => {
+              // Generate one boolean per verified reading
+              const originalVerified = verifyReadings(bundleAnswer, bundleDocuments);
+              const plain = buildDraft({
+                bundle: "lantern-hollow",
+                reader: bundleAnswer.reader,
+                readings: originalVerified,
+                hts: bundleHts,
+              });
+
+              // Build readings with image origins based on flags
+              const imageFlagMap = new Map<number, boolean>();
+              let flagIndex = 0;
+              const readingsWithOrigin: VerifiedReading[] = originalVerified.map((r) => {
+                const flag = imageFlags[flagIndex % imageFlags.length];
+                flagIndex++;
+                if (flag && r.status === "accepted") {
+                  return { ...r, origin: "imageTranscript" as const };
+                }
+                return r;
+              });
+
+              // Build img draft with image origins
+              const img = buildDraft({
+                bundle: "lantern-hollow",
+                reader: bundleAnswer.reader,
+                readings: readingsWithOrigin,
+                hts: bundleHts,
+              });
+
+              // No field of img should have status "copied" with a document source with origin "imageTranscript"
+              for (const field of [...img.header, ...img.totals, ...img.lines.flatMap((l) => l.fields)]) {
+                if (field.status === "copied") {
+                  for (const source of field.sources) {
+                    if (source.kind === "document" && source.origin === "imageTranscript") {
+                      throw new Error(`Field ${field.id} has status "copied" but document source with origin "imageTranscript"`);
+                    }
+                  }
+                }
+              }
+
+              // For every field id: check status/value/reason/rule consistency
+              for (const plainField of [...plain.header, ...plain.totals, ...plain.lines.flatMap((l) => l.fields)]) {
+                const imgField = [
+                  ...img.header,
+                  ...img.totals,
+                  ...img.lines.flatMap((l) => l.fields),
+                ].find((f) => f.id === plainField.id);
+
+                if (!imgField) continue;
+
+                // If plain field was copied and img field has an image document source, check the transformation
+                const imgHasImageSource = imgField.sources.some(
+                  (s) => s.kind === "document" && s.origin === "imageTranscript"
+                );
+
+                if (plainField.status === "copied" && imgHasImageSource) {
+                  // img field must have status "needsReview" and reason IMAGE_REVIEW_REASON
+                  expect(imgField.status).toBe("needsReview");
+                  expect(imgField.reason).toBe(IMAGE_REVIEW_REASON);
+                  expect(imgField.value).toBe(plainField.value);
+                  expect(imgField.rule).toBe(plainField.rule);
+                } else {
+                  // Otherwise, status/value/reason/rule should be the same
+                  expect(imgField.status).toBe(plainField.status);
+                  expect(imgField.value).toBe(plainField.value);
+                  expect(imgField.reason).toBe(plainField.reason);
+                  expect(imgField.rule).toBe(plainField.rule);
+                }
+              }
+
+              // Build overrides: for each image field with reason === IMAGE_REVIEW_REASON, apply confirmation
+              const overrides = [
+                ...img.header,
+                ...img.totals,
+                ...img.lines.flatMap((l) => l.fields),
+              ]
+                .filter((f) => f.reason === IMAGE_REVIEW_REASON && f.value !== null)
+                .map((f) => ({ fieldId: f.id, value: f.value as string }));
+
+              const conf = buildDraft({
+                bundle: "lantern-hollow",
+                reader: bundleAnswer.reader,
+                readings: readingsWithOrigin,
+                hts: bundleHts,
+                overrides,
+              });
+
+              // Check confirmed fields
+              for (const confField of [...conf.header, ...conf.totals, ...conf.lines.flatMap((l) => l.fields)]) {
+                const imgField = [
+                  ...img.header,
+                  ...img.totals,
+                  ...img.lines.flatMap((l) => l.fields),
+                ].find((f) => f.id === confField.id);
+
+                const plainField = [...plain.header, ...plain.totals, ...plain.lines.flatMap((l) => l.fields)].find(
+                  (f) => f.id === confField.id
+                );
+
+                if (!imgField || !plainField) continue;
+
+                if (imgField.reason === IMAGE_REVIEW_REASON && imgField.value !== null) {
+                  // This field was confirmed; it should have:
+                  // - status "copied", same value, rule and sources as in img
+                  // - note CONFIRMED_NOTE
+                  // - same status, value, reason and rule as in plain
+                  expect(confField.status).toBe("copied");
+                  expect(confField.value).toBe(imgField.value);
+                  expect(confField.rule).toBe(imgField.rule);
+                  expect(confField.sources).toEqual(imgField.sources);
+                  expect(confField.note).toBe(CONFIRMED_NOTE);
+
+                  expect(confField.status).toBe(plainField.status);
+                  expect(confField.value).toBe(plainField.value);
+                  expect(confField.reason).toBe(plainField.reason);
+                  expect(confField.rule).toBe(plainField.rule);
+                } else {
+                  // Otherwise, conf field should have the same status/value/reason/rule as img field
+                  expect(confField.status).toBe(imgField.status);
+                  expect(confField.value).toBe(imgField.value);
+                  expect(confField.reason).toBe(imgField.reason);
+                  expect(confField.rule).toBe(imgField.rule);
+                }
+              }
+            },
+          ),
+          { numRuns: 25 },
+        );
+      },
+      120000,
+    );
+  });
+
+  describe("Feature: document-intake, Property 36: A Missing Invoice Line Is Flagged (Validates: Requirements 19.1, 19.3)", () => {
+    it(
+      "Property 36: A Missing Invoice Line Is Flagged",
+      async () => {
+        // Test 1: unmodified sample should have no CHK.INVOICE field and should work with invoiceLineCount: 8
+        const originalVerified = verifyReadings(bundleAnswer, bundleDocuments);
+        const originalDraft = buildDraft({
+          bundle: "lantern-hollow",
+          reader: bundleAnswer.reader,
+          readings: originalVerified,
+          hts: bundleHts,
+          invoiceLineCount: 8,
+        });
+
+        expect(originalDraft.needsReview.find((item) => item.fieldId === "CHK.INVOICE")).toBeUndefined();
+
+        // Test 2: for every n from 1 to 8, remove invoice line n and check CHK.INVOICE
+        for (let n = 1; n <= 8; n++) {
+          const modifiedAnswer: ReadingAnswer = {
+            ...bundleAnswer,
+            fields: bundleAnswer.fields.filter((field) => {
+              // Remove all fields for invoice line n
+              if (field.field.startsWith(`invoice.lines.${n}.`)) return false;
+              return true;
+            }),
+          };
+
+          const verified = verifyReadings(modifiedAnswer, bundleDocuments);
+          const draft = buildDraft({
+            bundle: "lantern-hollow",
+            reader: bundleAnswer.reader,
+            readings: verified,
+            hts: bundleHts,
+            invoiceLineCount: 8,
+          });
+
+          const chkField = draft.needsReview.find((item) => item.fieldId === "CHK.INVOICE");
+          expect(chkField).toBeDefined();
+          expect(chkField?.reason).toContain("A line may be missing");
+        }
+
+        // Test 3: remove invoice.subtotal
+        const noSubtotalAnswer: ReadingAnswer = {
+          ...bundleAnswer,
+          fields: bundleAnswer.fields.filter((field) => field.field !== "invoice.subtotal"),
+        };
+
+        const noSubtotalVerified = verifyReadings(noSubtotalAnswer, bundleDocuments);
+        const noSubtotalDraft = buildDraft({
+          bundle: "lantern-hollow",
+          reader: bundleAnswer.reader,
+          readings: noSubtotalVerified,
+          hts: bundleHts,
+          invoiceLineCount: 8,
+        });
+
+        const noSubtotalChk = noSubtotalDraft.needsReview.find((item) => item.fieldId === "CHK.INVOICE");
+        expect(noSubtotalChk).toBeDefined();
+        expect(noSubtotalChk?.reason).toContain("No invoice subtotal was read");
+
+        // Test 4: invoiceLineCount 7 (one less than actual 8)
+        const countMismatchDraft = buildDraft({
+          bundle: "lantern-hollow",
+          reader: bundleAnswer.reader,
+          readings: originalVerified,
+          hts: bundleHts,
+          invoiceLineCount: 7,
+        });
+
+        const countMismatchChk = countMismatchDraft.needsReview.find((item) => item.fieldId === "CHK.INVOICE");
+        expect(countMismatchChk).toBeDefined();
+        expect(countMismatchChk?.reason).toContain("The invoice shows 7 item lines, but the draft has readings for 8");
+
+        // Test 5: invoiceLineCount 12 (more than 8, should mention "reads only the first 8")
+        const count12Draft = buildDraft({
+          bundle: "lantern-hollow",
+          reader: bundleAnswer.reader,
+          readings: originalVerified,
+          hts: bundleHts,
+          invoiceLineCount: 12,
+        });
+
+        const count12Chk = count12Draft.needsReview.find((item) => item.fieldId === "CHK.INVOICE");
+        expect(count12Chk).toBeDefined();
+        expect(count12Chk?.reason).toContain("The invoice shows 12 item lines");
+        expect(count12Chk?.reason).toContain("this draft reads only the first 8");
+
+        // Test 6: invoiceLineCount null should have no CHK.INVOICE
+        const nullCountDraft = buildDraft({
+          bundle: "lantern-hollow",
+          reader: bundleAnswer.reader,
+          readings: originalVerified,
+          hts: bundleHts,
+          invoiceLineCount: null,
+        });
+
+        expect(nullCountDraft.needsReview.find((item) => item.fieldId === "CHK.INVOICE")).toBeUndefined();
+
+        // Test 7: a person value for CHK.INVOICE
+        // Build draft from answer without invoice.subtotal (so "CHK.INVOICE" exists in needsReview)
+        // plus override { fieldId: "CHK.INVOICE", value: "Checked against the invoice" }
+        const noSubtotalAnswerForPerson: ReadingAnswer = {
+          ...bundleAnswer,
+          fields: bundleAnswer.fields.filter((field) => field.field !== "invoice.subtotal"),
+        };
+
+        const noSubtotalVerifiedForPerson = verifyReadings(noSubtotalAnswerForPerson, bundleDocuments);
+        const personValueDraft = buildDraft({
+          bundle: "lantern-hollow",
+          reader: bundleAnswer.reader,
+          readings: noSubtotalVerifiedForPerson,
+          hts: bundleHts,
+          invoiceLineCount: 8,
+          overrides: [{ fieldId: "CHK.INVOICE", value: "Checked against the invoice" }],
+        });
+
+        // CHK.INVOICE should not be in needsReview (it was filled by person)
+        const personChkField = personValueDraft.needsReview.find((item) => item.fieldId === "CHK.INVOICE");
+        expect(personChkField).toBeUndefined();
+
+        // Find CHK.INVOICE in all fields
+        const allFieldsList = [...personValueDraft.header, ...personValueDraft.totals, ...personValueDraft.lines.flatMap((l) => l.fields)];
+        const chkInvoiceField = allFieldsList.find((f) => f.id === "CHK.INVOICE");
+        expect(chkInvoiceField).toBeDefined();
+        expect(chkInvoiceField?.status).toBe("personEdited");
+        expect(chkInvoiceField?.value).toBe("Checked against the invoice");
+      },
+      120000,
     );
   });
 });

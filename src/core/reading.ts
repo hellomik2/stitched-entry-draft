@@ -16,6 +16,7 @@ export type ReadingAnswer = {
   reader: string;
   documents: { docId: string; kind: DocKind }[];
   fields: FieldReading[];
+  invoiceLineCount?: number | null;
 };
 
 export interface DocumentReader {
@@ -38,7 +39,8 @@ export type RejectReason =
   | "quote_not_found"
   | "quote_not_unique"
   | "value_not_in_quote"
-  | "low_confidence";
+  | "low_confidence"
+  | "no_source_box";
 
 export type VerifiedReading = FieldReading &
   (
@@ -92,6 +94,13 @@ export function validateReadingAnswer(json: unknown): RuleResult<ReadingAnswer> 
   // Check fields is an array
   if (!Array.isArray(obj.fields)) {
     return { ok: false, reason: "fields must be an array" };
+  }
+
+  // Check invoiceLineCount if present
+  if (obj.invoiceLineCount !== undefined) {
+    if (obj.invoiceLineCount !== null && (!Number.isInteger(obj.invoiceLineCount) || (obj.invoiceLineCount as number) < 0 || (obj.invoiceLineCount as number) > 999)) {
+      return { ok: false, reason: "invoiceLineCount must be null or an integer from 0 to 999" };
+    }
   }
 
   for (let i = 0; i < obj.fields.length; i++) {
@@ -272,6 +281,25 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
         // Overlaps with [valueStart, valueEnd]
         return span.start < valueEnd && span.end > valueStart;
       });
+    }
+
+    // Requirement 20.1: the quote is part of one text item, so no item lies fully inside it.
+    // Use the items that overlap the value inside the quote.
+    if (selectedItems.length === 0) {
+      selectedItems = page.items.filter((item) => {
+        const span = page.spans.find((s) => s.itemId === item.id);
+        return span !== undefined && span.start < valueEnd && span.end > valueStart;
+      });
+    }
+
+    // Requirement 20.2: nothing on the page lines up with the value.
+    if (selectedItems.length === 0) {
+      return {
+        ...field,
+        status: "rejected" as const,
+        reason: "no_source_box" as const,
+        message: "The value was found, but no line on the page lines up with it, so there is nothing to point to.",
+      };
     }
 
     // Calculate union box

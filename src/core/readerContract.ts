@@ -37,6 +37,7 @@ export type ReaderOutput = {
   reader: string;
   fields: FieldReading[];
   transcripts: TranscriptPage[];
+  invoiceLineCount?: number | null;
 };
 
 function isValidBase64(s: string): boolean {
@@ -428,6 +429,13 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     }
   }
 
+  // Check invoiceLineCount if present
+  if (obj.invoiceLineCount !== undefined) {
+    if (obj.invoiceLineCount !== null && (!Number.isInteger(obj.invoiceLineCount) || (obj.invoiceLineCount as number) < 0 || (obj.invoiceLineCount as number) > 999)) {
+      return { ok: false, reason: "invoiceLineCount: must be null or an integer from 0 to 999" };
+    }
+  }
+
   // Track which image pages have transcripts
   const transcriptedPages = new Set<string>();
 
@@ -574,13 +582,17 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
 }
 
 export function readerOutputToAnswer(input: ReaderInput, output: ReaderOutput): ReadingAnswer {
-  return {
+  const answer: ReadingAnswer = {
     schemaVersion: 1,
     bundle: input.bundle,
     reader: output.reader,
     documents: input.documents.map((d) => ({ docId: d.docId, kind: d.kind })),
     fields: output.fields,
   };
+  if (output.invoiceLineCount !== undefined) {
+    answer.invoiceLineCount = output.invoiceLineCount;
+  }
+  return answer;
 }
 
 export function composeDocumentTexts(

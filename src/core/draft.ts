@@ -14,6 +14,10 @@ import { roundEnteredValue, computeDuty, allocateGrossWeight, totalEnteredValue,
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
+export const IMAGE_REVIEW_REASON = "Read from an image by the AI reader. Check it against the page, then confirm it.";
+
+export const CONFIRMED_NOTE = "Confirmed by a person against the page.";
+
 export type FieldStatus = "copied" | "computed" | "needsReview" | "personInput" | "personEdited";
 
 export type DocSource = {
@@ -158,6 +162,7 @@ export function buildDraft(input: {
   readings: VerifiedReading[];
   hts: HtsTable;
   overrides?: Override[];
+  invoiceLineCount?: number | null;
 }): Draft {
   const { bundle, reader, readings, hts } = input;
   const overrides = input.overrides || [];
@@ -2217,12 +2222,59 @@ export function buildDraft(input: {
     }
   }
 
+  // Invoice lines against the invoice (Requirement 19): a line the reader left out must not disappear silently.
+  {
+    const reasons: string[] = [];
+    const p2 = checks.filter((c) => c.rule === "P2");
+    if (!p2.some((c) => c.id === "P2.invoice.subtotal")) {
+      reasons.push("No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice.");
+    }
+    const failed = p2.filter((c) => !c.ok);
+    if (failed.length > 0) {
+      reasons.push(`The invoice line amounts do not match the invoice totals (${failed.map((c) => c.detail).join("; ")}). A line may be missing; compare the 7501 lines with the invoice.`);
+    }
+    const count = input.invoiceLineCount;
+    if (typeof count === "number") {
+      const linesRead = new Set(
+        verified.map((r) => /^invoice\.lines\.(\d+)\./.exec(r.field)?.[1]).filter((n): n is string => n !== undefined),
+      ).size;
+      if (count !== linesRead) reasons.push(`The invoice shows ${count} item lines, but the draft has readings for ${linesRead}.`);
+      if (count > 8) reasons.push(`The invoice shows ${count} item lines; this draft reads only the first 8.`);
+    }
+    if (reasons.length > 0) {
+      const sources = ["invoice.subtotal", "invoice.total"]
+        .map((name) => accepted.get(name))
+        .filter((r): r is VerifiedReading => r !== undefined)
+        .map((r) => docSource(r));
+      totalFields.push(
+        field_helper({
+          id: "CHK.INVOICE",
+          block: "P2",
+          label: "Invoice lines against the invoice",
+          status: "needsReview",
+          reason: reasons.join(" "),
+          sources,
+          inputs: p2.map((c) => c.id),
+        }),
+      );
+    }
+  }
+
   // Collect all fields before applying overrides
   const allFieldsList = [
     ...headerFields,
     ...draftLines.flatMap((line) => line.fields),
     ...totalFields,
   ];
+
+  // A value read from an image page is not final until a person confirms it (Requirement 18.1).
+  // Computed values keep their status (18.2).
+  for (const f of allFieldsList) {
+    if (f.status === "copied" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
+      f.status = "needsReview";
+      f.reason = IMAGE_REVIEW_REASON;
+    }
+  }
 
   // Apply person value overrides
   for (const override of overrides) {
@@ -2233,6 +2285,15 @@ export function buildDraft(input: {
     let parseResult: { ok: boolean; value?: string | number; reason?: string } | null = null;
     let oldValue = field.value;
     let oldReason = field.reason;
+
+    // Confirming an image value: the person applies the value that is shown (Requirement 18.3).
+    if (oldReason === IMAGE_REVIEW_REASON && oldValue !== null && override.value === oldValue) {
+      // Back to "copied": the value is the document's, now checked by a person. Nothing computed from it changes.
+      field.status = "copied";
+      field.reason = null;
+      field.note = CONFIRMED_NOTE;
+      continue;
+    }
 
     try {
       switch (field.block) {

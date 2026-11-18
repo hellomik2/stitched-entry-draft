@@ -20,6 +20,8 @@ import {
   draftToCsv,
   readerOutputToAnswer,
   composeDocumentTexts,
+  IMAGE_REVIEW_REASON,
+  CONFIRMED_NOTE,
 } from '../core'
 import UploadPanel, { type UploadResult } from './intake/UploadPanel'
 import { APP_NAME, BOARD_TITLE } from './appTitle'
@@ -151,6 +153,7 @@ export default function StitchBoard({
         readings: verified,
         hts,
         overrides,
+        invoiceLineCount: readingAnswer.invoiceLineCount ?? null,
       })
       return { verified, draft }
     } catch (e) {
@@ -1288,6 +1291,17 @@ function SourceStrip({
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
                 <span data-testid="strip-status" style={{ color: 'var(--muted)', fontWeight: 500 }}>{statusWords[field.status]}</span>
 
+              {field.status === 'needsReview' && field.value && field.reason === IMAGE_REVIEW_REASON && (
+                <button
+                  type="button"
+                  data-testid="confirm-image-value"
+                  className="btn btn-small"
+                  onClick={() => onApply(field.id, field.value as string)}
+                >
+                  Confirm this value
+                </button>
+              )}
+
               {/* Override form for needsReview or personInput */}
               {(field.status === 'needsReview' || field.status === 'personInput') && (
                 <form
@@ -1315,8 +1329,8 @@ function SourceStrip({
                 </form>
               )}
 
-              {/* Undo button for personEdited */}
-              {field.status === 'personEdited' && (
+              {/* Undo button for personEdited or confirmed */}
+              {(field.status === 'personEdited' || field.note === CONFIRMED_NOTE) && (
                 <button
                   data-testid="override-undo"
                   onClick={() => onUndo(field.id)}
