@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { validateReaderInput } from "./readerContract";
+import { validateReaderInput, validateReaderOutput } from "./readerContract";
 import { intakeConfig } from "./intakeConfig";
 
 describe("readerContract: property tests", () => {
@@ -189,6 +189,109 @@ describe("readerContract: property tests", () => {
           // 6. requestBytes exceeds limit
           const violationResult = validateReaderInput(input, intakeConfig, intakeConfig.maxRequestBytes + 1);
           expect(violationResult.ok).toBe(false);
+
+          return true;
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("Feature: document-intake, Property 38: Reader Call Limits and No Document Text in Errors (Validates: Requirements 21, 22)", () => {
+    fc.assert(
+      fc.property(
+        fc.string(),
+        fc.string(),
+        (a, b) => {
+          const A = "ZQX" + a;
+          const B = "ZQX" + b;
+
+          const input = {
+            bundle: "test",
+            documents: [
+              {
+                docId: "invoice",
+                kind: "invoice" as const,
+                fileName: "invoice.pdf",
+                fileSha256: "a".repeat(64),
+                pages: [
+                  {
+                    page: 1,
+                    width: 612,
+                    height: 792,
+                    text: "test",
+                    image: null,
+                  },
+                ],
+              },
+            ],
+          };
+
+          // Test 1: field with unknown field name should not leak it
+          const output1 = {
+            reader: "test",
+            fields: [
+              {
+                field: A,
+                value: "1",
+                quote: "1",
+                doc: "invoice",
+                page: 1,
+                confidence: "high" as const,
+              },
+            ],
+            transcripts: [],
+            invoiceLineCount: null,
+          };
+
+          const result1 = validateReaderOutput(output1, input);
+          expect(result1.ok).toBe(false);
+          const reason1 = (result1 as any).reason;
+          expect(reason1).not.toContain(A);
+          expect(reason1).toContain("not in the catalog");
+
+          // Test 2: output with unknown doc should not leak it
+          const output2 = {
+            reader: "test",
+            fields: [
+              {
+                field: "invoice.number",
+                value: "1",
+                quote: "1",
+                doc: B,
+                page: 1,
+                confidence: "high" as const,
+              },
+            ],
+            transcripts: [],
+            invoiceLineCount: null,
+          };
+
+          const result2 = validateReaderOutput(output2, input);
+          expect(result2.ok).toBe(false);
+          const reason2 = (result2 as any).reason;
+          expect(reason2).not.toContain(B);
+          expect(reason2).toContain("unknown document");
+
+          // Test 3: transcript with unknown doc should not leak it
+          const output3 = {
+            reader: "test",
+            fields: [],
+            transcripts: [
+              {
+                doc: B,
+                page: 1,
+                lines: [],
+              },
+            ],
+            invoiceLineCount: null,
+          };
+
+          const result3 = validateReaderOutput(output3, input);
+          expect(result3.ok).toBe(false);
+          const reason3 = (result3 as any).reason;
+          expect(reason3).not.toContain(B);
+          expect(reason3).toContain("unknown document");
 
           return true;
         },

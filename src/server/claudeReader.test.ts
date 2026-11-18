@@ -8,6 +8,7 @@ import {
   READER_OUTPUT_SCHEMA,
   buildReaderRequest,
   mapSdkError,
+  SDK_ERRORS,
 } from "./claudeReader";
 import type { ReaderInput, ReaderOutput } from "../core/readerContract";
 import { ReaderError } from "./readerTypes";
@@ -617,42 +618,150 @@ describe("Claude Reader", () => {
     }
   });
 
-  it('text "[]" with stop_reason end_turn rejects with message about output must be object', async () => {
-    const testInput: ReaderInput = {
-      bundle: "test",
-      documents: [
-        {
-          docId: "invoice",
-          kind: "invoice",
-          fileName: "invoice.pdf",
-          fileSha256: "a".repeat(64),
-          pages: [
-            {
-              page: 1,
-              width: 612,
-              height: 792,
-              text: "x",
-              image: null,
-            },
-          ],
+  describe("Feature: document-intake, Property 38: Reader Call Limits and No Document Text in Errors (Validates: Requirements 21, 22)", () => {
+    it("with an injected client that records (params, options): options.timeout is 45000 and params.max_tokens is 8000", async () => {
+      let recordedOptions: { timeout?: number } | undefined;
+      let recordedParams: any;
+
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async (params) => {
+        recordedParams = params;
+        return {
+          stop_reason: "end_turn",
+          content: [{ type: "text", text: JSON.stringify({ fields: [], transcripts: [], invoiceLineCount: null }) }],
+          usage: { input_tokens: 100, output_tokens: 10 },
+        };
+      });
+
+      // Wrap to capture options
+      const wrappedClient: ClaudeClientLike = {
+        messages: {
+          async create(params, options) {
+            recordedOptions = options;
+            return client.messages.create(params, options);
+          },
         },
-      ],
-    };
+      };
 
-    const { client } = makeClient(async () => ({
-      stop_reason: "end_turn",
-      content: [{ type: "text", text: "[]" }],
-      usage: { input_tokens: 1200, output_tokens: 300 },
-    }));
-
-    const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
-
-    try {
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client: wrappedClient });
       await reader.read(testInput);
-      expect.fail("should have thrown");
-    } catch (e) {
-      if (!(e instanceof ReaderError)) throw e;
-      expect(e.message).toContain("The reader answer was not valid: output must be an object");
-    }
+
+      expect(recordedOptions?.timeout).toBe(45000);
+      expect(recordedParams.max_tokens).toBe(8000);
+    });
+
+    it("an injected client whose create rejects with APIConnectionTimeoutError makes read reject with timeout message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => {
+        throw new SDK_ERRORS.APIConnectionTimeoutError({ message: "timeout" });
+      });
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe("The AI reader took longer than 45 seconds and was stopped. Try fewer pages.");
+        expect(e.usage).toBeNull();
+      }
+    });
+
+    it("mapSdkError(APIConnectionError) still gives 'Could not reach the AI service.'", () => {
+      const error = new SDK_ERRORS.APIConnectionError({ message: "x" });
+      const result = mapSdkError(error);
+      expect(result.message).toBe("Could not reach the AI service.");
+    });
+
+    it("buildReaderRequest with documents 'invoice' and 'packingList' has schema doc enum matching request docs", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+          {
+            docId: "packingList",
+            kind: "packingList",
+            fileName: "packing.pdf",
+            fileSha256: "b".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: null,
+                image: { mediaType: "image/jpeg" as const, base64: "QUJD" },
+              },
+            ],
+          },
+        ],
+      };
+
+      const request = buildReaderRequest(testInput);
+      const schema = (request.output_config as any).format.schema;
+
+      const fieldsDocEnum = schema.properties.fields.items.properties.doc.enum;
+      const transcriptsDocEnum = schema.properties.transcripts.items.properties.doc.enum;
+
+      expect(fieldsDocEnum).toEqual(["invoice", "packingList"]);
+      expect(transcriptsDocEnum).toEqual(["invoice", "packingList"]);
+
+      // Check that READER_OUTPUT_SCHEMA is unchanged
+      expect(READER_OUTPUT_SCHEMA.properties.fields.items.properties.doc).toEqual({ type: "string" });
+    });
   });
 });

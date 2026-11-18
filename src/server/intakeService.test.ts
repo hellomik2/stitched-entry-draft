@@ -1187,6 +1187,137 @@ describe("Per-call size and cost line (Requirement 17)", () => {
     const finalState = await store.readState();
     expect(finalState.reservedCostNanoUsd).toBe(estimate.worstCaseCostNanoUsd * 2);
   });
+
+  describe("Feature: document-intake, Property 38: Reader Call Limits and No Document Text in Errors (Validates: Requirements 21, 22)", () => {
+    it("claude mode with a reader that rejects with APIConnectionTimeoutError: status 502 with timeout message", async () => {
+      const { createClaudeReader, SDK_ERRORS } = await import("./claudeReader");
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 1_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      const store = createMemoryUsageStore();
+
+      const claudeReader = createClaudeReader({
+        apiKey: "key",
+        client: {
+          messages: {
+            async create() {
+              throw new SDK_ERRORS.APIConnectionTimeoutError({ message: "timeout" });
+            },
+          },
+        },
+      });
+
+      const result = await handleReadRequest({
+        setup,
+        store,
+        fakeStore: createMemoryUsageStore(),
+        readers: { claude: claudeReader },
+        nowIso: "2026-01-01T00:00:00Z",
+        ip: "127.0.0.1",
+        bodyBytes: 100,
+        body: createTestInput(),
+      });
+
+      expect(result.status).toBe(502);
+      expect(result.json.ok).toBe(false);
+      expect(result.json.message).toBe("The AI reader took longer than 45 seconds and was stopped. Try fewer pages.");
+
+      // Check record
+      const records = (store as any).records as UsageRecord[];
+      expect(records).toHaveLength(1);
+      expect(records[0]).toMatchObject({
+        outcome: "error",
+        errorMessage: "The AI reader took longer than 45 seconds and was stopped. Try fewer pages.",
+        inputTokens: null,
+        outputTokens: null,
+      });
+
+      // Check that reserved cost equals worst case estimate
+      expect(records[0]?.estimatedCostNanoUsd).toBeNull();
+      expect((await store.readState()).reservedCostNanoUsd).toBe(estimateReaderCall(createTestInput()).worstCaseCostNanoUsd);
+    });
+
+    it("injected client that answers with doc field containing confidential text: response and records contain no confidential text", async () => {
+      const { createClaudeReader } = await import("./claudeReader");
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 1_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      const store = createMemoryUsageStore();
+
+      const claudeReader = createClaudeReader({
+        apiKey: "key",
+        client: {
+          messages: {
+            async create() {
+              return {
+                stop_reason: "end_turn",
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      fields: [
+                        {
+                          field: "invoice.number",
+                          value: "1",
+                          quote: "1",
+                          doc: "CONFIDENTIAL: Unit price 4.10 USD",
+                          page: 1,
+                          confidence: "high",
+                        },
+                      ],
+                      transcripts: [],
+                      invoiceLineCount: null,
+                    }),
+                  },
+                ],
+                usage: { input_tokens: 100, output_tokens: 10 },
+              };
+            },
+          },
+        },
+      });
+
+      const result = await handleReadRequest({
+        setup,
+        store,
+        fakeStore: createMemoryUsageStore(),
+        readers: { claude: claudeReader },
+        nowIso: "2026-01-01T00:00:00Z",
+        ip: "127.0.0.1",
+        bodyBytes: 100,
+        body: createTestInput(),
+      });
+
+      expect(result.status).toBe(502);
+
+      // Check that response JSON doesn't contain confidential text
+      const responseJson = JSON.stringify(result.json);
+      expect(responseJson).not.toContain("CONFIDENTIAL");
+
+      // Check that records don't contain confidential text
+      const records = (store as any).records as UsageRecord[];
+      const recordsJson = JSON.stringify(records);
+      expect(recordsJson).not.toContain("CONFIDENTIAL");
+    });
+  });
 });
 
 describe("intakeService: handleStatusRequest", () => {

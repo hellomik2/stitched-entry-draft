@@ -6,6 +6,12 @@ import { intakeConfig } from "../core/intakeConfig";
 import type { IntakeReader, ReaderUsage } from "./readerTypes";
 import { ReaderError } from "./readerTypes";
 
+// Lets tests build SDK errors without importing the SDK outside this file.
+export const SDK_ERRORS = {
+  APIConnectionError: Anthropic.APIConnectionError,
+  APIConnectionTimeoutError: Anthropic.APIConnectionTimeoutError,
+};
+
 // Injection types for testing
 export type ClaudeResponseLike = {
   stop_reason: string | null;
@@ -17,6 +23,7 @@ export type ClaudeClientLike = {
   messages: {
     create(
       params: Anthropic.MessageCreateParamsNonStreaming,
+      options?: { timeout?: number },
     ): Promise<ClaudeResponseLike>;
   };
 };
@@ -147,6 +154,30 @@ export function buildReaderRequest(input: ReaderInput): Anthropic.MessageCreateP
     text: "Return the JSON now.",
   });
 
+  // Build schema with document-specific enum for "doc" fields
+  const docIds = input.documents.map((d) => d.docId);
+  const docEnum = { type: "string" as const, enum: docIds };
+  const schema = {
+    ...READER_OUTPUT_SCHEMA,
+    properties: {
+      ...READER_OUTPUT_SCHEMA.properties,
+      fields: {
+        ...READER_OUTPUT_SCHEMA.properties.fields,
+        items: {
+          ...READER_OUTPUT_SCHEMA.properties.fields.items,
+          properties: { ...READER_OUTPUT_SCHEMA.properties.fields.items.properties, doc: docEnum },
+        },
+      },
+      transcripts: {
+        ...READER_OUTPUT_SCHEMA.properties.transcripts,
+        items: {
+          ...READER_OUTPUT_SCHEMA.properties.transcripts.items,
+          properties: { ...READER_OUTPUT_SCHEMA.properties.transcripts.items.properties, doc: docEnum },
+        },
+      },
+    },
+  };
+
   return {
     model: intakeConfig.readerModel,
     max_tokens: intakeConfig.readerMaxOutputTokens,
@@ -155,7 +186,7 @@ export function buildReaderRequest(input: ReaderInput): Anthropic.MessageCreateP
       effort: "low",
       format: {
         type: "json_schema",
-        schema: READER_OUTPUT_SCHEMA,
+        schema,
       },
     },
     messages: [
@@ -171,6 +202,13 @@ export function mapSdkError(e: unknown): ReaderError {
   // Check most specific error types first
   if (e instanceof ReaderError) {
     return e;
+  }
+
+  if (e instanceof Anthropic.APIConnectionTimeoutError) {
+    return new ReaderError(
+      `The AI reader took longer than ${Math.round(intakeConfig.readerTimeoutMs / 1000)} seconds and was stopped. Try fewer pages.`,
+      null,
+    );
   }
 
   if (e instanceof Anthropic.AuthenticationError || e instanceof Anthropic.PermissionDeniedError) {
@@ -215,16 +253,16 @@ export function createClaudeReader(config: {
         });
         lazyClient = {
           messages: {
-            create: (params) =>
-              sdk.messages.create(params as Anthropic.MessageCreateParamsNonStreaming),
+            create: (params, options) =>
+              sdk.messages.create(params as Anthropic.MessageCreateParamsNonStreaming, options),
           },
         };
       }
 
-      // Call the AI service
+      // Call the AI service with timeout
       let response: ClaudeResponseLike;
       try {
-        response = await lazyClient.messages.create(buildReaderRequest(readerInput));
+        response = await lazyClient.messages.create(buildReaderRequest(readerInput), { timeout: intakeConfig.readerTimeoutMs });
       } catch (e) {
         throw mapSdkError(e);
       }

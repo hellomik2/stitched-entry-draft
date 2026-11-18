@@ -79,4 +79,17 @@ describe("readerEnv: resolveReaderSetup cost cap", () => {
     expect(Object.keys(setup.caps)).toEqual(["total", "daily", "perVisitorDaily"]);
     expect(setup.caps).toEqual({ total: 100, daily: 10, perVisitorDaily: 3 });
   });
+
+  it("with DOCUMENT_INTAKE_TOTAL_CAP: 'x' and DOCUMENT_INTAKE_COST_CAP_KRW: 'y' the reason is 'invalid setting DOCUMENT_INTAKE_TOTAL_CAP'", () => {
+    const setup = resolveReaderSetup({
+      DOCUMENT_INTAKE_STORE: "file",
+      DOCUMENT_INTAKE_TOTAL_CAP: "x",
+      DOCUMENT_INTAKE_DAILY_CAP: "10",
+      DOCUMENT_INTAKE_VISITOR_DAILY_CAP: "3",
+      DOCUMENT_INTAKE_COST_CAP_KRW: "y",
+    });
+
+    expect(setup.mode).toBe("off");
+    expect(setup.reason).toBe("invalid setting DOCUMENT_INTAKE_TOTAL_CAP");
+  });
 });

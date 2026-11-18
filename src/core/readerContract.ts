@@ -359,7 +359,7 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     if (!isCatalogField(fieldObj.field)) {
       return {
         ok: false,
-        reason: `fields[${fieldIndex}].field: "${fieldObj.field}" is not in the catalog`,
+        reason: `fields[${fieldIndex}].field: not in the catalog`,
       };
     }
 
@@ -367,7 +367,7 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     if (seenFields.has(fieldObj.field)) {
       return {
         ok: false,
-        reason: `fields[${fieldIndex}].field: "${fieldObj.field}" appears more than once`,
+        reason: `fields[${fieldIndex}].field: appears more than once`,
       };
     }
     seenFields.add(fieldObj.field);
@@ -399,7 +399,7 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     if (!docMap.has(fieldObj.doc)) {
       return {
         ok: false,
-        reason: `fields[${fieldIndex}].doc: unknown document "${fieldObj.doc}"`,
+        reason: `fields[${fieldIndex}].doc: unknown document`,
       };
     }
 
@@ -416,7 +416,7 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     if (!pageExists) {
       return {
         ok: false,
-        reason: `fields[${fieldIndex}].page: page ${fieldObj.page} does not exist in document "${fieldObj.doc}"`,
+        reason: `fields[${fieldIndex}].page: no such page in that document`,
       };
     }
 
@@ -463,7 +463,7 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     if (!docMap.has(transcriptObj.doc)) {
       return {
         ok: false,
-        reason: `transcripts[${transcriptIndex}].doc: unknown document "${transcriptObj.doc}"`,
+        reason: `transcripts[${transcriptIndex}].doc: unknown document`,
       };
     }
 
@@ -481,7 +481,7 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     if (!imagePage) {
       return {
         ok: false,
-        reason: `transcripts[${transcriptIndex}]: page ${transcriptObj.page} of document "${transcriptObj.doc}" is not an image page`,
+        reason: `transcripts[${transcriptIndex}]: not an image page`,
       };
     }
 

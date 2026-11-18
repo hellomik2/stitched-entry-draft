@@ -79,20 +79,20 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
   }
 
   // 4. Parse cost cap (won cap)
-  let costCapNanoUsd: number = store === "netlify-blobs" 
-    ? Math.floor((defaultCaps.costKrw * 1_000_000_000) / intakeConfig.krwPerUsd)
-    : Math.floor((defaultCaps.costKrw * 1_000_000_000) / intakeConfig.krwPerUsd);
+  let costCapNanoUsd: number = Math.floor((defaultCaps.costKrw * 1_000_000_000) / intakeConfig.krwPerUsd);
 
   const costCapKrwStr = trimEnv(env.DOCUMENT_INTAKE_COST_CAP_KRW);
   if (costCapKrwStr !== null) {
-    if (!/^\d{1,7}$/.test(costCapKrwStr)) {
-      capError = "invalid setting DOCUMENT_INTAKE_COST_CAP_KRW";
-    } else {
-      const costCapKrw = parseInt(costCapKrwStr, 10);
-      if (costCapKrw <= 0) {
+    if (capError === null) {
+      if (!/^\d{1,7}$/.test(costCapKrwStr)) {
         capError = "invalid setting DOCUMENT_INTAKE_COST_CAP_KRW";
       } else {
-        costCapNanoUsd = Math.floor((costCapKrw * 1_000_000_000) / intakeConfig.krwPerUsd);
+        const costCapKrw = parseInt(costCapKrwStr, 10);
+        if (costCapKrw <= 0) {
+          capError = "invalid setting DOCUMENT_INTAKE_COST_CAP_KRW";
+        } else {
+          costCapNanoUsd = Math.floor((costCapKrw * 1_000_000_000) / intakeConfig.krwPerUsd);
+        }
       }
     }
   }

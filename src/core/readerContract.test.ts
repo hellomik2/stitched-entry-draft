@@ -141,7 +141,7 @@ describe("readerContract: validateReaderOutput", () => {
     const result = validateReaderOutput(output, mockInput);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.reason).toContain("does not exist");
+      expect(result.reason).toContain("no such page in that document");
     }
   });
 
