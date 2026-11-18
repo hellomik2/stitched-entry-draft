@@ -203,35 +203,35 @@
   - [x] 23.2 Readings, boxes and threads for the current page; clicking a value opens the page its source is on
   - _Requirements: 4, 13.4_
 
-- [ ] 24. Size and cost limit for one reader call
-  - [ ] 24.1 `intakeConfig`: `perCall` (maxPageTextChars 15000, maxTotalTextChars 60000, maxImageBase64Chars 1500000, imageTokensPerPage 5000, promptOverheadTokens 10000, maxCallCostNanoUsd 10800000), readerMaxOutputTokens 8000, readerTimeoutMs 45000, krwPerUsd 1500, costKrw 20000 (local) and 10000 (publicSite)
-  - [ ] 24.2 `validateReaderInput` size limits; `estimateReaderCall` in `budget.ts`
-  - [ ] 24.3 `UsageState.reservedCostNanoUsd`, cost option and "cost_cap" in `decideCall` and `remainingCalls`
-  - [ ] 24.4 `readerEnv`: `costCapNanoUsd`, `DOCUMENT_INTAKE_COST_CAP_KRW`
-  - [ ] 24.5 `intakeService`: 413 before any store access; reserve the worst case with the call; cost cap message
-  - [ ] 24.6 Property 33 and Property 34 tests
+- [x] 24. Size and cost limit for one reader call
+  - [x] 24.1 `intakeConfig`: `perCall` (maxPageTextChars 15000, maxTotalTextChars 60000, maxImageBase64Chars 1500000, imageTokensPerPage 5000, promptOverheadTokens 10000, maxCallCostNanoUsd 10800000), readerMaxOutputTokens 8000, readerTimeoutMs 45000, krwPerUsd 1500, costKrw 20000 (local) and 10000 (publicSite)
+  - [x] 24.2 `validateReaderInput` size limits; `estimateReaderCall` in `budget.ts`
+  - [x] 24.3 `UsageState.reservedCostNanoUsd`, cost option and "cost_cap" in `decideCall` and `remainingCalls`
+  - [x] 24.4 `readerEnv`: `costCapNanoUsd`, `DOCUMENT_INTAKE_COST_CAP_KRW`
+  - [x] 24.5 `intakeService`: 413 before any store access; reserve the worst case with the call; cost cap message
+  - [x] 24.6 Property 33 and Property 34 tests
   - _Requirements: 17_
-- [ ] 25. Values read from images are confirmed by a person
-  - [ ] 25.1 `buildDraft`: image-origin copied values become needsReview; confirming keeps value, sources and rule
-  - [ ] 25.2 StitchBoard "Confirm this value" button
-  - [ ] 25.3 Property 35 test
+- [x] 25. Values read from images are confirmed by a person
+  - [x] 25.1 `buildDraft`: image-origin copied values become needsReview; confirming the shown value returns them to copied with the note "Confirmed by a person against the page."
+  - [x] 25.2 StitchBoard "Confirm this value" button
+  - [x] 25.3 Property 35 test
   - _Requirements: 18_
-- [ ] 26. Invoice lines checked against the invoice
-  - [ ] 26.1 `invoiceLineCount` in schema, prompt, contract, reading answer and board
-  - [ ] 26.2 `CHK.INVOICE` in `buildDraft`
-  - [ ] 26.3 Property 36 test
+- [x] 26. Invoice lines checked against the invoice
+  - [x] 26.1 `invoiceLineCount` in schema, prompt, contract, reading answer and board
+  - [x] 26.2 `CHK.INVOICE` in `buildDraft`
+  - [x] 26.3 Property 36 test
   - _Requirements: 19_
-- [ ] 27. Every accepted value points to its place
-  - [ ] 27.1 `verifyReadings` box fallback and "no_source_box"
-  - [ ] 27.2 Property 37 test
+- [x] 27. Every accepted value points to its place
+  - [x] 27.1 `verifyReadings` box fallback and "no_source_box"
+  - [x] 27.2 Property 37 test
   - _Requirements: 20_
-- [ ] 28. Time limit for the reader call and no document text in errors
-  - [ ] 28.1 45-second timeout, timeout message, `max_tokens` 8000
-  - [ ] 28.2 Validation reasons without model strings; doc id enum in the schema
-  - [ ] 28.3 Property 38 test
+- [x] 28. Time limit for the reader call and no document text in errors
+  - [x] 28.1 45-second timeout, timeout message, `max_tokens` 8000
+  - [x] 28.2 Validation reasons without model strings; doc id enum in the schema
+  - [x] 28.3 Property 38 test
   - _Requirements: 21, 22_
-- [ ] 29. Upgrade `pdfjs-dist` to 6.2.108
-  - [ ] 29.1 Update `package.json` and the lock file; type check, tests, build, sample and upload checks
+- [x] 29. Upgrade `pdfjs-dist` to 6.2.108
+  - [x] 29.1 Update `package.json` and the lock file; type check, tests, build, sample and upload checks
   - _Requirements: 12.5_
 
 ## Summary

@@ -305,7 +305,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 1. WHEN a draft value would be "copied" and any of its document sources has origin "imageTranscript", THE draft SHALL give it status "needsReview" with reason "Read from an image by the AI reader. Check it against the page, then confirm it." The value and its sources stay, so the board still shows the value and the thread.
 2. Values computed from such a value keep their status; they change only if the person enters a different value.
-3. THE board SHALL show a "Confirm this value" button (data-testid "confirm-image-value") in the source strip of such a field. It applies the field's own value as the person's value. A confirmed field gets status "personEdited", keeps its value, sources and rule, and its note is "Confirmed by a person against the page." Entering a different value works as for any other field.
+3. THE board SHALL show a "Confirm this value" button (data-testid "confirm-image-value") in the source strip of such a field. It applies the field's own value as the person's value. A confirmed field returns to status "copied" (the value is the document's, now checked by a person), keeps its value, sources and rule, and gets the note "Confirmed by a person against the page."; the board offers Undo for it. Status "personEdited" was not used because the existing recomputation after person values would then change other fields.
 4. THE sample bundle has no image pages and is unchanged.
 
 ---

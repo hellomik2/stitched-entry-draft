@@ -956,7 +956,7 @@ export default function StitchBoard(...) {
 
 **Requirement 20 (Every Accepted Value Points to Its Place):** Fallback box logic in `reading.ts` (`verifyReadings`) when quote is part of one item: use items that overlap the value. New reject reason "no_source_box" when no items overlap.
 
-**Requirement 21 (Time Limit for the Reader Call) and Requirement 22 (Reader Errors Never Carry Document Text):** Claude reader in `claudeReader.ts` passes `timeout` (45,000 ms) to `messages.create`, maps `APIConnectionTimeoutError` before other connection errors, generates error message "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." Validation reasons in `readerContract.ts` contain only positions and fixed words, never model-provided strings. Output schema in `claudeReader.ts` constrains "doc" field enum to the request document IDs. Configuration: `intakeConfig.ts` defines `readerMaxOutputTokens` (8,000) and `readerTimeoutMs` (45,000 ms).
+**Requirement 21 (Time Limit for the Reader Call) and Requirement 22 (Reader Errors Never Carry Document Text):** Claude reader in `claudeReader.ts` passes `timeout` (45,000 ms) to `messages.create`, maps `APIConnectionTimeoutError` before other connection errors, generates error message "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." Validation reasons in `readerContract.ts` contain only positions and fixed words, never model-provided strings. Output schema in `claudeReader.ts` constrains "doc" field enum to the request document IDs. Configuration: `intakeConfig.ts` defines `readerMaxOutputTokens` (8,000) and `readerTimeoutMs` (45,000 ms). Tests get the SDK error classes through the export `SDK_ERRORS` of `claudeReader.ts`, because the SDK may be imported only in that file.
 
 **UsageState Update:** Add `reservedCostNanoUsd: 52000000` (52 million nano-USD) to the example. Add line: "Cost cap: `setup.costCapNanoUsd` = floor(costKrw x 1e9 / krwPerUsd), 6,666,666,666 for the public site."
 
@@ -1152,7 +1152,7 @@ For any sequence of calls with worst-case costs c_i under a cost cap C, the allo
 
 ### Property 35: Image Values Wait for a Person
 
-For any draft built from readings, no field with an image-origin document source has status "copied"; applying each such field's own value as a person value gives status "personEdited" with the same value, sources and rule, and leaves every other field as before.
+For any draft built from readings, no field with an image-origin document source has status "copied"; applying each such field's own value as a person value gives status "copied" with the same value, sources and rule and the note "Confirmed by a person against the page.", and leaves every other field as before.
 
 **Validates: Requirements 18.1, 18.2, 18.3**
 
@@ -1280,6 +1280,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (28 properties), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (38 properties: 1 to 28, 33 to 38 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 28
+**Total Correctness Properties:** 38
