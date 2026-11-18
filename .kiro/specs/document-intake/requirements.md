@@ -208,6 +208,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 2. THE server SHALL NOT retain document text or images in memory after the reader call completes and the response is sent.
 3. THE server SHALL NOT log or echo document content in any log file, error message, or trace output.
 4. NOTHING except the file hashes, page metadata (dimensions), and extracted field values SHALL persist after the response.
+5. Libraries that open uploaded files SHALL be on a version without a known high-severity advisory (`pdfjs-dist` 6.2.108 or later, advisory GHSA-hq66-cqwq-w95j).
 
 ---
 
@@ -280,6 +281,87 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 17 (MUST): Size and Cost Limit for One Reader Call
+
+**User Story:** As an operator, I want every AI call to stay under a fixed cost and the running total to stay under the approved won budget, so that large or crafted uploads cannot spend more than approved.
+
+#### Acceptance Criteria
+
+1. THE server SHALL refuse with status 400 (model not called) a reader input with a page text longer than `intakeConfig.perCall.maxPageTextChars` (15,000 characters), page texts totalling more than `maxTotalTextChars` (60,000), or a page image whose base64 text is longer than `maxImageBase64Chars` (1,500,000).
+2. BEFORE the model is called, THE server SHALL estimate the worst case of the call with `estimateReaderCall(input)`: input tokens = `promptOverheadTokens` (10,000: system prompt, field list, output schema) + for every page text and file name ceil(ASCII characters / 2) + 2 x other characters + `imageTokensPerPage` (5,000) per image page; output tokens = `intakeConfig.readerMaxOutputTokens` (8,000, the `max_tokens` of the request); cost from the configured prices. These are upper bounds (Claude scales every image to at most about 4,800 tokens).
+3. IF the worst-case cost is above `perCall.maxCallCostNanoUsd` (10,800,000 nano-USD = 0.0108 USD), THE server SHALL answer 413 with "These documents are too large to read in one go. Split them and upload fewer pages at a time." and SHALL NOT call the model or write the cap state. The line is 1.5 times the large-call cost assumed when the AI budget was approved (32,000 input and 8,000 output tokens = 0.0072 USD), the same factor used to re-check the first real calls.
+4. THE cap state SHALL keep a running total `reservedCostNanoUsd`. Every allowed call adds its worst-case cost in the same conditional write that reserves the call (before the model is called), so the total can only over-count, also when a call times out or the function is stopped.
+5. THE server SHALL refuse a call with 429 "This demo has used its AI budget." (usage record outcome "cap-exceeded", errorMessage "cost_cap") when the running total plus the call's worst-case cost would exceed the won cap converted at a deliberately high rate: `costKrw` 10,000 for the public site and 20,000 for local use, `krwPerUsd` 1,500. `DOCUMENT_INTAKE_COST_CAP_KRW` overrides the won cap (a positive integer; anything else turns the reader off, like the other caps). The converted cap is `setup.costCapNanoUsd`; `setup.caps` keeps its three call caps unchanged.
+6. `/api/reader-status` remaining calls SHALL also respect the calls the cost cap still allows (each counted at the per-call line).
+7. Fake mode applies the same size limits and the 413 line (test mode behaves like the real reader) but never touches the paid cap state.
+
+---
+
+### Requirement 18 (MUST): Values Read from Images Are Confirmed by a Person
+
+**User Story:** As an entry writer, I want every value the AI read from a photo or scan to wait for my check, so that a misread or a tampered image cannot slip into the draft as a copied value.
+
+#### Acceptance Criteria
+
+1. WHEN a draft value would be "copied" and any of its document sources has origin "imageTranscript", THE draft SHALL give it status "needsReview" with reason "Read from an image by the AI reader. Check it against the page, then confirm it." The value and its sources stay, so the board still shows the value and the thread.
+2. Values computed from such a value keep their status; they change only if the person enters a different value.
+3. THE board SHALL show a "Confirm this value" button (data-testid "confirm-image-value") in the source strip of such a field. It applies the field's own value as the person's value. A confirmed field gets status "personEdited", keeps its value, sources and rule, and its note is "Confirmed by a person against the page." Entering a different value works as for any other field.
+4. THE sample bundle has no image pages and is unchanged.
+
+---
+
+### Requirement 19 (MUST): Invoice Lines Checked Against the Invoice
+
+**User Story:** As an entry writer, I want the draft to tell me when invoice lines may be missing, so that a line the reader left out does not silently disappear from the 7501.
+
+#### Acceptance Criteria
+
+1. THE draft SHALL add a totals field "CHK.INVOICE" (block "P2", label "Invoice lines against the invoice", status "needsReview", value null) when any of the following holds, with the reason of every case that holds joined by a space:
+   - no `P2.invoice.subtotal` check ran (no accepted, parseable invoice subtotal): "No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."
+   - a P2 check failed: "The invoice line amounts do not match the invoice totals (<detail of each failed P2 check, joined by "; ">). A line may be missing; compare the 7501 lines with the invoice."
+   - the reader gave an invoice line count N that differs from the number M of invoice lines with at least one reading: "The invoice shows N item lines, but the draft has readings for M."
+   - N is above 8: "The invoice shows N item lines; this draft reads only the first 8."
+   Its sources are the accepted invoice subtotal and total readings, its inputs the P2 check ids. It appears in Needs review and in the CSV. A person closes it by entering a note as its value.
+2. THE reader output SHALL include "invoiceLineCount": the number of item lines printed on the commercial invoice, counting lines whose fields were left out, or null when no invoice was given. The JSON schema requires it (integer or null); the output validator accepts it absent (older recordings) and otherwise requires null or an integer from 0 to 999. `readerOutputToAnswer` copies it into the reading answer (optional `invoiceLineCount`), and the board passes it to `buildDraft` (optional input `invoiceLineCount`).
+3. THE sample bundle and the upload test recordings are unchanged (subtotal and total are read and match; they carry no count).
+
+---
+
+### Requirement 20 (MUST): Every Accepted Value Points to Its Place
+
+**User Story:** As an entry writer, I want every accepted value to have a box on its page, so that the thread always leads to the printed value.
+
+#### Acceptance Criteria
+
+1. WHEN `verifyReadings` accepts a value but no text item lies fully inside the quote (the quote is part of one item, for example "HM-INV-1124" from the item "Invoice No.: HM-INV-1124"), THE box SHALL come from the items that overlap the value inside the quote.
+2. IF no item overlaps the value either, THE reading SHALL be rejected with the new reason "no_source_box" and the message "The value was found, but no line on the page lines up with it, so there is nothing to point to." so it goes to Needs review.
+3. Readings that get a box today keep exactly the same box.
+
+---
+
+### Requirement 21 (MUST): Time Limit for the Reader Call
+
+**User Story:** As an operator, I want a stuck AI call to stop before the hosting platform cuts the function, so that the person gets a clear message and the call is still recorded.
+
+#### Acceptance Criteria
+
+1. THE Claude reader SHALL pass a request timeout of `intakeConfig.readerTimeoutMs` (45,000 ms) to `messages.create` (second argument `{ timeout }`), under the 60-second limit of a synchronous Netlify function.
+2. A timeout SHALL become the ReaderError "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." The usage record has outcome "error", that message and null tokens; the cost was already reserved (Requirement 17.4).
+3. `max_tokens` SHALL be `intakeConfig.readerMaxOutputTokens` (8,000), the output size of the approved cost assumption.
+
+---
+
+### Requirement 22 (MUST): Reader Errors Never Carry Document Text
+
+**User Story:** As a user, I want error messages and usage records to hold no text from my documents, so that nothing from them is kept on the server.
+
+#### Acceptance Criteria
+
+1. Validation reasons for reader output SHALL name only positions and fixed words (for example "fields[3].doc: unknown document"), never a string taken from the model's answer, because the reason is stored in usage records.
+2. THE output JSON schema sent to the model SHALL limit "doc" (in fields and in transcripts) to the document ids of the request.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -299,6 +381,13 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 13. (MUST) UI — Upload Control and Board Integration
 14. (MUST) Tests — Property-Based
 15. (MUST) Sample Bundle Unchanged
+16. (MUST) Local Test Documents
+17. (MUST) Size and Cost Limit for One Reader Call
+18. (MUST) Values Read from Images Are Confirmed by a Person
+19. (MUST) Invoice Lines Checked Against the Invoice
+20. (MUST) Every Accepted Value Points to Its Place
+21. (MUST) Time Limit for the Reader Call
+22. (MUST) Reader Errors Never Carry Document Text
 
 **NICE (if time is left):**
 

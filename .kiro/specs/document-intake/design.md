@@ -913,6 +913,7 @@ export default function StitchBoard(...) {
 ```typescript
 {
   totalCalls: 42,
+  reservedCostNanoUsd: 52000000,
   days: {
     "2026-11-28": {
       calls: 10,
@@ -941,11 +942,29 @@ export default function StitchBoard(...) {
 }
 ```
 
+**Cost cap:** `setup.costCapNanoUsd` = floor(costKrw x 1e9 / krwPerUsd), 6,666,666,666 for the public site.
+
+---
+
+## Independent Review Fixes (2026-11-18)
+
+**Requirement 17 (Size and Cost Limit for One Reader Call):** Configuration limits in `intakeConfig.ts` (`perCall` object with `maxPageTextChars`, `maxTotalTextChars`, `maxImageBase64Chars`, `imageTokensPerPage`, `promptOverheadTokens`, `maxCallCostNanoUsd`, `readerMaxOutputTokens`, `readerTimeoutMs`; also `krwPerUsd`, `costKrw` in both public and local cap sets). Input validation in `readerContract.ts` (`validateReaderInput` size limits). Cost estimation in `budget.ts` (`estimateReaderCall` function), new `UsageState.reservedCostNanoUsd` field, new optional cost parameter and "cost_cap" reason in `decideCall` and `remainingCalls`. Environment variable `costCapNanoUsd` in `readerEnv.ts` with `DOCUMENT_INTAKE_COST_CAP_KRW` override. Route handler `intakeService.ts` returns 413 before any store access and reserves worst-case cost atomically with the call.
+
+**Requirement 18 (Values Read from Images Are Confirmed by a Person):** After values are built in `draft.ts`, copied values with image-origin sources become `needsReview` with a confirmation message. StitchBoard adds a "Confirm this value" button in the source strip to apply the field's own value as a person edit, changing status to "personEdited".
+
+**Requirement 19 (Invoice Lines Checked Against the Invoice):** Reader schema and prompt in `claudeReader.ts` include `invoiceLineCount`. Contract type and validator in `readerContract.ts`. Reading answer type in `reading.ts` includes optional `invoiceLineCount`. New "CHK.INVOICE" check field in `draft.ts` combining P2 checks, subtotal parsing, and line count comparison. Board passes `invoiceLineCount` to `buildDraft`.
+
+**Requirement 20 (Every Accepted Value Points to Its Place):** Fallback box logic in `reading.ts` (`verifyReadings`) when quote is part of one item: use items that overlap the value. New reject reason "no_source_box" when no items overlap.
+
+**Requirement 21 (Time Limit for the Reader Call) and Requirement 22 (Reader Errors Never Carry Document Text):** Claude reader in `claudeReader.ts` passes `timeout` (45,000 ms) to `messages.create`, maps `APIConnectionTimeoutError` before other connection errors, generates error message "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." Validation reasons in `readerContract.ts` contain only positions and fixed words, never model-provided strings. Output schema in `claudeReader.ts` constrains "doc" field enum to the request document IDs. Configuration: `intakeConfig.ts` defines `readerMaxOutputTokens` (8,000) and `readerTimeoutMs` (45,000 ms).
+
+**UsageState Update:** Add `reservedCostNanoUsd: 52000000` (52 million nano-USD) to the example. Add line: "Cost cap: `setup.costCapNanoUsd` = floor(costKrw x 1e9 / krwPerUsd), 6,666,666,666 for the public site."
+
 ---
 
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data.*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 38 are defined below (38 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1118,6 +1137,42 @@ For the sample bundle, running the pipeline exactly as today (frozen reader, sam
 For any transcript item used as a whole quote, with a value extracted from inside that line, and when that line text is unique on the page, `verifyReadings` SHALL accept the reading and return a box inside the page.
 
 **Validates: Requirements 4.2, 14.3**
+
+### Property 33: Per-Call Line Holds Before Any Spending
+
+For any valid reader input, `estimateReaderCall` never decreases when page text or an image page is added; when its worst-case cost is above `maxCallCostNanoUsd`, `handleReadRequest` answers 413 and calls neither the reader nor the store's `writeState`.
+
+**Validates: Requirements 17.2, 17.3, 17.7**
+
+### Property 34: Cost Ledger Never Exceeds the Won Cap
+
+For any sequence of calls with worst-case costs c_i under a cost cap C, the allowed calls satisfy sum(c_i) <= C, `reservedCostNanoUsd` equals that sum, and a call is refused with "cost_cap" exactly when reserved + c > C (other caps permitting).
+
+**Validates: Requirements 17.4, 17.5**
+
+### Property 35: Image Values Wait for a Person
+
+For any draft built from readings, no field with an image-origin document source has status "copied"; applying each such field's own value as a person value gives status "personEdited" with the same value, sources and rule, and leaves every other field as before.
+
+**Validates: Requirements 18.1, 18.2, 18.3**
+
+### Property 36: A Missing Invoice Line Is Flagged
+
+Removing every reading of any one invoice line while the subtotal stays, removing the subtotal, or giving a line count that differs from the lines read always puts "CHK.INVOICE" in Needs review; the sample bundle never gets it.
+
+**Validates: Requirements 19.1, 19.3**
+
+### Property 37: Partial Quotes Keep a Box
+
+For any accepted reading the box has positive width and height and lies on its page; a quote that is part of one text item gets that item's box; readings that had a box keep it.
+
+**Validates: Requirements 20.1, 20.2, 20.3**
+
+### Property 38: Reader Call Limits and No Document Text in Errors
+
+The Claude reader sends `max_tokens` 8,000 and a 45,000 ms timeout; a timeout maps to the fixed message; for any reader answer with arbitrary strings in "field" and "doc", a failed validation reason contains none of those strings.
+
+**Validates: Requirements 21, 22**
 
 ---
 
