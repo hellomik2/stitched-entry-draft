@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { promises as fs } from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { createFileUsageStore, createMemoryUsageStore } from "./usageStore";
+import { createFileUsageStore, createMemoryUsageStore, parseUsageState } from "./usageStore";
 import { emptyUsageState } from "../core/budget";
 import type { UsageRecord } from "./readerTypes";
 
@@ -137,6 +137,55 @@ describe("usageStore", () => {
       // Store should not be affected
       const nextState = store.state();
       expect(nextState.totalCalls).toBe(0);
+    });
+  });
+
+  describe("parseUsageState", () => {
+    it("accepts a state without reservedCostNanoUsd", () => {
+      const state = {
+        totalCalls: 1,
+        days: {
+          "2026-01-15": { calls: 1, visitors: { key1: 1 } },
+        },
+      };
+
+      expect(() => parseUsageState(state)).not.toThrow();
+    });
+
+    it("accepts a state with reservedCostNanoUsd 52000000", () => {
+      const state = {
+        totalCalls: 1,
+        days: {
+          "2026-01-15": { calls: 1, visitors: { key1: 1 } },
+        },
+        reservedCostNanoUsd: 52000000,
+      };
+
+      expect(() => parseUsageState(state)).not.toThrow();
+    });
+
+    it("throws for reservedCostNanoUsd -1", () => {
+      const state = {
+        totalCalls: 1,
+        days: {
+          "2026-01-15": { calls: 1, visitors: { key1: 1 } },
+        },
+        reservedCostNanoUsd: -1,
+      };
+
+      expect(() => parseUsageState(state)).toThrow("invalid usage state");
+    });
+
+    it("throws for reservedCostNanoUsd 1.5", () => {
+      const state = {
+        totalCalls: 1,
+        days: {
+          "2026-01-15": { calls: 1, visitors: { key1: 1 } },
+        },
+        reservedCostNanoUsd: 1.5,
+      };
+
+      expect(() => parseUsageState(state)).toThrow("invalid usage state");
     });
   });
 });

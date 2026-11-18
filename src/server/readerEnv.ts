@@ -7,6 +7,7 @@ export type ReaderSetup = {
   mode: ReaderMode;
   reason: string | null;
   caps: Caps;
+  costCapNanoUsd: number;
   store: "file" | "netlify-blobs" | null;
   storeDir: string;
   visitorSalt: string | null;
@@ -32,6 +33,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
       mode: "off",
       reason: "kill switch is on",
       caps: { total: 0, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 0,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -76,11 +78,31 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     caps.perVisitorDaily = visitorCap;
   }
 
+  // 4. Parse cost cap (won cap)
+  let costCapNanoUsd: number = store === "netlify-blobs" 
+    ? Math.floor((defaultCaps.costKrw * 1_000_000_000) / intakeConfig.krwPerUsd)
+    : Math.floor((defaultCaps.costKrw * 1_000_000_000) / intakeConfig.krwPerUsd);
+
+  const costCapKrwStr = trimEnv(env.DOCUMENT_INTAKE_COST_CAP_KRW);
+  if (costCapKrwStr !== null) {
+    if (!/^\d{1,7}$/.test(costCapKrwStr)) {
+      capError = "invalid setting DOCUMENT_INTAKE_COST_CAP_KRW";
+    } else {
+      const costCapKrw = parseInt(costCapKrwStr, 10);
+      if (costCapKrw <= 0) {
+        capError = "invalid setting DOCUMENT_INTAKE_COST_CAP_KRW";
+      } else {
+        costCapNanoUsd = Math.floor((costCapKrw * 1_000_000_000) / intakeConfig.krwPerUsd);
+      }
+    }
+  }
+
   if (capError) {
     return {
       mode: "off",
       reason: capError,
       caps,
+      costCapNanoUsd,
       store,
       storeDir: "logs",
       visitorSalt: null,
@@ -88,13 +110,14 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     };
   }
 
-  // 4. Check for fake mode
+  // 5. Check for fake mode
   const intakeMode = trimEnv(env.DOCUMENT_INTAKE_MODE);
   if (intakeMode === "fake") {
     return {
       mode: "fake",
       reason: null,
       caps,
+      costCapNanoUsd,
       store: null,
       storeDir: "logs",
       visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),
@@ -102,7 +125,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     };
   }
 
-  // 5. Check for Claude mode
+  // 6. Check for Claude mode
   const apiKey = trimEnv(env.ANTHROPIC_API_KEY);
 
   if (!apiKey) {
@@ -110,6 +133,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
       mode: "off",
       reason: "no API key",
       caps,
+      costCapNanoUsd,
       store,
       storeDir: trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs",
       visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),
@@ -122,6 +146,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
       mode: "off",
       reason: "no durable usage store configured",
       caps,
+      costCapNanoUsd,
       store,
       storeDir: trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs",
       visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),
@@ -133,6 +158,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
     mode: "claude",
     reason: null,
     caps,
+    costCapNanoUsd,
     store,
     storeDir: trimEnv(env.DOCUMENT_INTAKE_STORE_DIR) ?? "logs",
     visitorSalt: trimEnv(env.DOCUMENT_INTAKE_VISITOR_SALT),

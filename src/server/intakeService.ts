@@ -1,7 +1,7 @@
 import type { ReaderInput, ReaderOutput } from "../core/readerContract";
 import { validateReaderInput, validateReaderOutput } from "../core/readerContract";
 import { intakeConfig } from "../core/intakeConfig";
-import { decideCall, remainingCalls, utcDay, estimateCostNanoUsd } from "../core/budget";
+import { decideCall, remainingCalls, utcDay, estimateCostNanoUsd, estimateReaderCall } from "../core/budget";
 import { visitorKey } from "./visitorKey";
 import type { ReaderSetup } from "./readerEnv";
 import type { UsageRecord, IntakeReader } from "./readerTypes";
@@ -51,6 +51,12 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
 
   const input: ReaderInput = validationResult.value;
   const filesSha256 = input.documents.map((d) => d.fileSha256).sort();
+
+  // Per-call line (Requirement 17.2, 17.3, 17.7): checked before any store access or reader call, in fake mode too.
+  const estimate = estimateReaderCall(input);
+  if (estimate.worstCaseCostNanoUsd > intakeConfig.perCall.maxCallCostNanoUsd) {
+    return { status: 413, json: { ok: false, message: "These documents are too large to read in one go. Split them and upload fewer pages at a time." } };
+  }
 
   // 3. Handle fake mode
   if (setup.mode === "fake") {
@@ -152,7 +158,7 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
 
     const day = utcDay(nowIso);
     const key = visitorKey(ip, setup.visitorSalt, day);
-    const decision = decideCall(state, setup.caps, nowIso, key);
+    const decision = decideCall(state, setup.caps, nowIso, key, { callNanoUsd: estimate.worstCaseCostNanoUsd, capNanoUsd: setup.costCapNanoUsd });
 
     // Handle cap refusal
     if (!decision.allowed) {
@@ -182,6 +188,8 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
         message = "This demo has used all of its AI reads.";
       } else if (decision.reason === "daily_cap") {
         message = "This demo has used today's AI reads. Try again after midnight UTC.";
+      } else if (decision.reason === "cost_cap") {
+        message = "This demo has used its AI budget.";
       } else {
         // visitor_cap
         message = "You have used your AI reads for today. Try again after midnight UTC.";
@@ -379,7 +387,7 @@ export async function handleStatusRequest(
     const state = await store.readState();
     const day = utcDay(nowIso);
     const key = visitorKey(ip, setup.visitorSalt, day);
-    const callsRemaining = remainingCalls(state, setup.caps, nowIso, key);
+    const callsRemaining = remainingCalls(state, setup.caps, nowIso, key, { callNanoUsd: intakeConfig.perCall.maxCallCostNanoUsd, capNanoUsd: setup.costCapNanoUsd });
 
     return {
       status: 200,

@@ -35,6 +35,14 @@ export function parseUsageState(value: unknown): UsageState {
     }
   }
 
+  // Validate optional reservedCostNanoUsd
+  const reservedCost = (parsed as Record<string, unknown>).reservedCostNanoUsd;
+  if (reservedCost !== undefined) {
+    if (!Number.isInteger(reservedCost) || (reservedCost as number) < 0 || !(Number.isSafeInteger(reservedCost as number))) {
+      throw new Error("invalid usage state");
+    }
+  }
+
   return parsed as UsageState;
 }
 

@@ -146,7 +146,7 @@ export function buildReaderRequest(input: ReaderInput): Anthropic.MessageCreateP
 
   return {
     model: intakeConfig.readerModel,
-    max_tokens: 16000,
+    max_tokens: intakeConfig.readerMaxOutputTokens,
     system: READER_SYSTEM_PROMPT,
     output_config: {
       effort: "low",

@@ -219,6 +219,14 @@ export function validateReaderInput(
             reason: `documents[${docIndex}].pages[${pageIndex}].text: must be a string`,
           };
         }
+
+        // Check text page length
+        if ((pageObj.text as string).length > limits.perCall.maxPageTextChars) {
+          return {
+            ok: false,
+            reason: `documents[${docIndex}].pages[${pageIndex}].text: more than ${limits.perCall.maxPageTextChars} characters; split the document and upload fewer pages`,
+          };
+        }
       }
 
       // Validate image if present
@@ -246,6 +254,14 @@ export function validateReaderInput(
           };
         }
 
+        // Check image base64 length
+        if ((imageObj.base64 as string).length > limits.perCall.maxImageBase64Chars) {
+          return {
+            ok: false,
+            reason: `documents[${docIndex}].pages[${pageIndex}].image: more than ${limits.perCall.maxImageBase64Chars} base64 characters; use a smaller image`,
+          };
+        }
+
         totalImagePages++;
       }
     }
@@ -256,6 +272,23 @@ export function validateReaderInput(
     return {
       ok: false,
       reason: `total image pages (${totalImagePages}) exceeds limit (${limits.maxImagePages})`,
+    };
+  }
+
+  // Check total text length
+  let totalTextChars = 0;
+  for (const doc of obj.documents) {
+    for (const page of doc.pages as Array<Record<string, unknown>>) {
+      if (page.text !== null && typeof page.text === "string") {
+        totalTextChars += page.text.length;
+      }
+    }
+  }
+
+  if (totalTextChars > limits.perCall.maxTotalTextChars) {
+    return {
+      ok: false,
+      reason: `page texts total ${totalTextChars} characters, more than ${limits.perCall.maxTotalTextChars}; split the documents and upload fewer pages`,
     };
   }
 

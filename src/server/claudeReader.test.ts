@@ -496,7 +496,7 @@ describe("Claude Reader", () => {
 
       // Check model and max_tokens
       expect(params.model).toBe("claude-haiku-5-5");
-      expect(params.max_tokens).toBe(16000);
+      expect(params.max_tokens).toBe(8000);
 
       // Check output_config
       expect(params.output_config).toBeDefined();

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { UsageState, Caps } from "../core/budget";
-import { emptyUsageState, estimateCostNanoUsd } from "../core/budget";
+import { emptyUsageState, estimateCostNanoUsd, estimateReaderCall } from "../core/budget";
 import type { ReaderInput, ReaderOutput } from "../core/readerContract";
 import { intakeConfig } from "../core/intakeConfig";
 import {
@@ -120,6 +120,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "off",
       reason: "no API key",
       caps: { total: 0, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 0,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -148,6 +149,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "fake",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -174,6 +176,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "fake",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -200,6 +203,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "fake",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -247,6 +251,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "fake",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -281,6 +286,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "fake",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -337,6 +343,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -378,6 +385,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -424,6 +432,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 0, daily: 10, perVisitorDaily: 10 }, // total cap is 0
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -462,6 +471,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 100, daily: 5, perVisitorDaily: 10 }, // daily cap is reached
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -507,6 +517,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 100, daily: 100, perVisitorDaily: 3 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: salt,
@@ -540,6 +551,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -590,6 +602,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 10, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -679,6 +692,7 @@ describe("intakeService: handleReadRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 10, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 100_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -717,12 +731,471 @@ describe("intakeService: handleReadRequest", () => {
   });
 });
 
+describe("Per-call size and cost line (Requirement 17)", () => {
+  it("input with large content (6 images + 4 text pages of 15000 chars) answers 413", async () => {
+    // Create input with valid but large content to exceed per-call line
+    const largeInput: ReaderInput = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "doc1",
+          kind: "invoice",
+          fileName: "invoice.pdf",
+          fileSha256: "a".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+            {
+              page: 2,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+            {
+              page: 3,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+            {
+              page: 4,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+          ],
+        },
+        {
+          docId: "doc2",
+          kind: "packingList",
+          fileName: "packing.pdf",
+          fileSha256: "b".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 2,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 3,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 4,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+          ],
+        },
+        {
+          docId: "doc3",
+          kind: "billOfLading",
+          fileName: "bol.pdf",
+          fileSha256: "c".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 2,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(estimateReaderCall(largeInput).worstCaseCostNanoUsd).toBeGreaterThan(intakeConfig.perCall.maxCallCostNanoUsd);
+
+    const setup: ReaderSetup = {
+      mode: "claude",
+      reason: null,
+      caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
+      store: "file",
+      storeDir: "logs",
+      visitorSalt: "salt",
+      apiKey: "key",
+    };
+
+    let readerCalled = false;
+    const store = createSpyStore();
+
+    const result = await handleReadRequest({
+      setup,
+      store,
+      fakeStore: createMemoryUsageStore(),
+      readers: {
+        claude: {
+          name: "claude",
+          read: async () => {
+            readerCalled = true;
+            return { output: createTestOutput(), usage: { inputTokens: 0, outputTokens: 0 } };
+          },
+        },
+      },
+      nowIso: "2026-01-01T00:00:00Z",
+      ip: "127.0.0.1",
+      bodyBytes: 100,
+      body: largeInput,
+    });
+
+    expect(result.status).toBe(413);
+    expect(result.json.message).toContain("too large to read in one go");
+    expect(readerCalled).toBe(false);
+    expect((store as any).events).not.toContain("writeState");
+    expect((store as any).events).not.toContain("readState");
+  });
+
+  it("same large input in fake mode also answers 413 without calling fake reader", async () => {
+    const largeInput: ReaderInput = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "doc1",
+          kind: "invoice",
+          fileName: "invoice.pdf",
+          fileSha256: "a".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+            {
+              page: 2,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+            {
+              page: 3,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+            {
+              page: 4,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15000),
+              image: null,
+            },
+          ],
+        },
+        {
+          docId: "doc2",
+          kind: "packingList",
+          fileName: "packing.pdf",
+          fileSha256: "b".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 2,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 3,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 4,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+          ],
+        },
+        {
+          docId: "doc3",
+          kind: "billOfLading",
+          fileName: "bol.pdf",
+          fileSha256: "c".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+            {
+              page: 2,
+              width: 612,
+              height: 792,
+              text: null,
+              image: {
+                mediaType: "image/jpeg",
+                base64: "QUJD",
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(estimateReaderCall(largeInput).worstCaseCostNanoUsd).toBeGreaterThan(intakeConfig.perCall.maxCallCostNanoUsd);
+
+    const setup: ReaderSetup = {
+      mode: "fake",
+      reason: null,
+      caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
+      store: null,
+      storeDir: "logs",
+      visitorSalt: null,
+      apiKey: null,
+    };
+
+    let fakeReaderCalled = false;
+
+    const result = await handleReadRequest({
+      setup,
+      store: null,
+      fakeStore: createMemoryUsageStore(),
+      readers: {
+        fake: {
+          name: "fake",
+          read: async () => {
+            fakeReaderCalled = true;
+            return { output: createTestOutput(), usage: { inputTokens: 0, outputTokens: 0 } };
+          },
+        },
+      },
+      nowIso: "2026-01-01T00:00:00Z",
+      ip: "127.0.0.1",
+      bodyBytes: 100,
+      body: largeInput,
+    });
+
+    expect(result.status).toBe(413);
+    expect(fakeReaderCalled).toBe(false);
+  });
+
+  it("text page of 15001 characters answers 400 with appropriate reason", async () => {
+    const input: ReaderInput = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "doc1",
+          kind: "invoice",
+          fileName: "invoice.pdf",
+          fileSha256: "a".repeat(64),
+          pages: [
+            {
+              page: 1,
+              width: 612,
+              height: 792,
+              text: "A".repeat(15001),
+              image: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    const setup: ReaderSetup = {
+      mode: "claude",
+      reason: null,
+      caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
+      store: "file",
+      storeDir: "logs",
+      visitorSalt: "salt",
+      apiKey: "key",
+    };
+
+    const result = await handleReadRequest({
+      setup,
+      store: createSpyStore(),
+      fakeStore: createMemoryUsageStore(),
+      readers: { claude: { name: "claude", read: async () => ({ output: createTestOutput(), usage: { inputTokens: 0, outputTokens: 0 } }) } },
+      nowIso: "2026-01-01T00:00:00Z",
+      ip: "127.0.0.1",
+      bodyBytes: 100,
+      body: input,
+    });
+
+    expect(result.status).toBe(400);
+    expect(result.json.message).toContain("more than 15000 characters");
+  });
+
+  it("claude mode with costCapNanoUsd-(worstCaseEstimate-1) answers 429 with cost_cap message", async () => {
+    const input = createTestInput();
+    const estimate = estimateReaderCall(input);
+
+    const setup: ReaderSetup = {
+      mode: "claude",
+      reason: null,
+      caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: Math.max(0, estimate.worstCaseCostNanoUsd - 1),
+      store: "file",
+      storeDir: "logs",
+      visitorSalt: "salt",
+      apiKey: "key",
+    };
+
+    const store = createSpyStore();
+
+    const result = await handleReadRequest({
+      setup,
+      store,
+      fakeStore: createMemoryUsageStore(),
+      readers: { claude: { name: "claude", read: async () => ({ output: createTestOutput(), usage: { inputTokens: 0, outputTokens: 0 } }) } },
+      nowIso: "2026-01-01T00:00:00Z",
+      ip: "127.0.0.1",
+      bodyBytes: 100,
+      body: input,
+    });
+
+    expect(result.status).toBe(429);
+    expect(result.json.message).toBe("This demo has used its AI budget.");
+
+    const records = (store as any).getRecords() as UsageRecord[];
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({
+      outcome: "cap-exceeded",
+      errorMessage: "cost_cap",
+    });
+  });
+
+  it("two calls with cost tracking leaves reservedCostNanoUsd equal to twice the estimate", async () => {
+    const input = createTestInput();
+    const estimate = estimateReaderCall(input);
+
+    const setup: ReaderSetup = {
+      mode: "claude",
+      reason: null,
+      caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: estimate.worstCaseCostNanoUsd * 3,
+      store: "file",
+      storeDir: "logs",
+      visitorSalt: "salt",
+      apiKey: "key",
+    };
+
+    const store = createMemoryUsageStore();
+
+    // First call
+    const result1 = await handleReadRequest({
+      setup,
+      store,
+      fakeStore: createMemoryUsageStore(),
+      readers: { claude: { name: "claude", read: async () => ({ output: createTestOutput(), usage: { inputTokens: 100, outputTokens: 10 } }) } },
+      nowIso: "2026-01-01T00:00:00Z",
+      ip: "127.0.0.1",
+      bodyBytes: 100,
+      body: input,
+    });
+
+    expect(result1.status).toBe(200);
+
+    // Second call
+    const result2 = await handleReadRequest({
+      setup,
+      store,
+      fakeStore: createMemoryUsageStore(),
+      readers: { claude: { name: "claude", read: async () => ({ output: createTestOutput(), usage: { inputTokens: 100, outputTokens: 10 } }) } },
+      nowIso: "2026-01-01T00:00:00Z",
+      ip: "127.0.0.1",
+      bodyBytes: 100,
+      body: input,
+    });
+
+    expect(result2.status).toBe(200);
+
+    // Check that reserved cost is tracked
+    const finalState = await store.readState();
+    expect(finalState.reservedCostNanoUsd).toBe(estimate.worstCaseCostNanoUsd * 2);
+  });
+});
+
 describe("intakeService: handleStatusRequest", () => {
   it("off mode returns status 200 with mode off and reason", async () => {
     const setup: ReaderSetup = {
       mode: "off",
       reason: "no API key",
       caps: { total: 0, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 0,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -747,6 +1220,7 @@ describe("intakeService: handleStatusRequest", () => {
       mode: "fake",
       reason: null,
       caps: { total: 10, daily: 0, perVisitorDaily: 0 },
+      costCapNanoUsd: 1_000_000_000,
       store: null,
       storeDir: "logs",
       visitorSalt: null,
@@ -780,6 +1254,7 @@ describe("intakeService: handleStatusRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 5, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -805,6 +1280,7 @@ describe("intakeService: handleStatusRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 5, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
       store: "file",
       storeDir: "logs",
       visitorSalt: "salt",
@@ -837,6 +1313,7 @@ describe("intakeService: handleStatusRequest", () => {
       mode: "claude",
       reason: null,
       caps: { total: 5, daily: 100, perVisitorDaily: 100 },
+      costCapNanoUsd: 1_000_000_000,
       store: null, // no store
       storeDir: "logs",
       visitorSalt: "salt",

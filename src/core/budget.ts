@@ -1,8 +1,10 @@
 import { intakeConfig } from "./intakeConfig";
+import type { ReaderInput } from "./readerContract";
 
 export type UsageState = {
   totalCalls: number;
   days: Record<string, { calls: number; visitors: Record<string, number> }>;
+  reservedCostNanoUsd?: number;
 };
 
 export type Caps = {
@@ -11,9 +13,11 @@ export type Caps = {
   perVisitorDaily: number;
 };
 
+export type CostOption = { callNanoUsd: number; capNanoUsd: number };
+
 export type CallDecision =
   | { allowed: true; next: UsageState; remaining: number }
-  | { allowed: false; reason: "total_cap" | "daily_cap" | "visitor_cap" };
+  | { allowed: false; reason: "total_cap" | "daily_cap" | "visitor_cap" | "cost_cap" };
 
 export function emptyUsageState(): UsageState {
   return {
@@ -36,6 +40,7 @@ export function decideCall(
   caps: Caps,
   nowIso: string,
   visitorKey: string,
+  cost?: CostOption,
 ): CallDecision {
   const day = utcDay(nowIso);
   const today = state.days[day] ?? { calls: 0, visitors: {} };
@@ -53,6 +58,12 @@ export function decideCall(
   // Check per-visitor daily cap
   if (caps.perVisitorDaily > 0 && (today.visitors[visitorKey] ?? 0) >= caps.perVisitorDaily) {
     return { allowed: false, reason: "visitor_cap" };
+  }
+
+  // Check cost cap
+  const reserved = state.reservedCostNanoUsd ?? 0;
+  if (cost && reserved + cost.callNanoUsd > cost.capNanoUsd) {
+    return { allowed: false, reason: "cost_cap" };
   }
 
   // Build new state (never mutate input or nested objects)
@@ -85,7 +96,12 @@ export function decideCall(
     days: newDays,
   };
 
-  const remaining = remainingCalls(next, caps, nowIso, visitorKey);
+  // Track reserved cost if provided or if already tracking
+  if (cost || state.reservedCostNanoUsd !== undefined) {
+    next.reservedCostNanoUsd = reserved + (cost?.callNanoUsd ?? 0);
+  }
+
+  const remaining = remainingCalls(next, caps, nowIso, visitorKey, cost);
 
   return {
     allowed: true,
@@ -99,6 +115,7 @@ export function remainingCalls(
   caps: Caps,
   nowIso: string,
   visitorKey: string | null,
+  cost?: CostOption,
 ): number {
   let min = caps.total - state.totalCalls;
 
@@ -114,6 +131,13 @@ export function remainingCalls(
   if (caps.perVisitorDaily > 0 && visitorKey !== null) {
     const visitorCount = today.visitors[visitorKey] ?? 0;
     min = Math.min(min, caps.perVisitorDaily - visitorCount);
+  }
+
+  // Check cost cap
+  if (cost && cost.callNanoUsd > 0) {
+    const reserved = state.reservedCostNanoUsd ?? 0;
+    const remainingCap = Math.floor((cost.capNanoUsd - reserved) / cost.callNanoUsd);
+    min = Math.min(min, remainingCap);
   }
 
   return Math.max(0, min);
@@ -168,4 +192,59 @@ export function formatUsd(nanoUsd: number): string {
   const decimalPart = String(remainingMicroUsd).padStart(6, "0");
 
   return `${dollars}.${decimalPart}`;
+}
+
+export type CallEstimate = {
+  inputTokens: number;
+  outputTokens: number;
+  worstCaseCostNanoUsd: number;
+};
+
+export function estimateReaderCall(
+  input: ReaderInput,
+  cfg = intakeConfig,
+): CallEstimate {
+  // Count code points in a string and classify as ASCII or other
+  function countTokens(s: string): number {
+    let ascii = 0;
+    let other = 0;
+    for (const ch of s) {
+      const code = ch.charCodeAt(0);
+      if (code < 128) {
+        ascii++;
+      } else {
+        other++;
+      }
+    }
+    return Math.ceil(ascii / 2) + 2 * other;
+  }
+
+  // Start with prompt overhead
+  let inputTokens = cfg.perCall.promptOverheadTokens;
+
+  // Add tokens for each document fileName
+  for (const doc of input.documents) {
+    inputTokens += countTokens(doc.fileName);
+  }
+
+  // Add tokens for each page
+  for (const doc of input.documents) {
+    for (const page of doc.pages) {
+      if (page.text !== null) {
+        inputTokens += countTokens(page.text);
+      } else {
+        // Image page
+        inputTokens += cfg.perCall.imageTokensPerPage;
+      }
+    }
+  }
+
+  const outputTokens = cfg.readerMaxOutputTokens;
+  const worstCaseCostNanoUsd = estimateCostNanoUsd(inputTokens, outputTokens, cfg.prices);
+
+  return {
+    inputTokens,
+    outputTokens,
+    worstCaseCostNanoUsd,
+  };
 }

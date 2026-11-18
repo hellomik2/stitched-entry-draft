@@ -6,8 +6,10 @@ import {
   remainingCalls,
   estimateCostNanoUsd,
   formatUsd,
+  estimateReaderCall,
 } from "./budget";
 import { intakeConfig } from "./intakeConfig";
+import * as fc from "fast-check";
 
 describe("budget: utility functions", () => {
   describe("utcDay", () => {
@@ -212,5 +214,159 @@ describe("budget: remainingCalls", () => {
 
     // Should not consider per-visitor cap
     expect(remaining).toBe(3); // min(10-2, 5-2) = min(8, 3) = 3
+  });
+});
+
+describe("Feature: document-intake, Property 33: Per-Call Line Holds Before Any Spending (Validates: Requirements 17.2, 17.3, 17.7)", () => {
+  it("estimate is at least promptOverhead, output is maxOutputTokens, adding pages never lowers cost", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 3 }),
+        fc.array(
+          fc.record({
+            docId: fc.string({ minLength: 1, maxLength: 10 }),
+            pages: fc.array(
+              fc.oneof(
+                fc.record({ text: fc.string({ minLength: 0, maxLength: 2000 }), isText: fc.constant(true) }),
+                fc.record({ text: fc.constant(""), isText: fc.constant(false) }),
+              ),
+              { minLength: 1, maxLength: 4 },
+            ),
+          }),
+          { minLength: 1, maxLength: 3 },
+        ),
+        (numDocs, docTemplates) => {
+          // Build a valid input
+          const documents = docTemplates.map((template, docIdx) => ({
+            docId: `doc${docIdx}`,
+            kind: "invoice" as const,
+            fileName: `file${docIdx}.pdf`,
+            fileSha256: "a".repeat(64),
+            pages: template.pages.map((page, pageIdx) => ({
+              page: pageIdx + 1,
+              width: 612,
+              height: 792,
+              text: page.isText ? page.text : null,
+              image: page.isText
+                ? null
+                : {
+                    mediaType: "image/jpeg" as const,
+                    base64: "QUJD",
+                  },
+            })),
+          }));
+
+          const input = {
+            bundle: "test",
+            documents,
+          };
+
+          const estimate1 = estimateReaderCall(input);
+
+          // Check: inputTokens >= promptOverheadTokens
+          expect(estimate1.inputTokens).toBeGreaterThanOrEqual(intakeConfig.perCall.promptOverheadTokens);
+
+          // Check: outputTokens == maxOutputTokens
+          expect(estimate1.outputTokens).toBe(intakeConfig.readerMaxOutputTokens);
+
+          // Check: adding a text page never lowers cost
+          if (documents.length > 0 && documents[0].pages.length < 4) {
+            const doc = documents[0];
+            const extendedDocs = [...documents];
+            extendedDocs[0] = {
+              ...doc,
+              pages: [
+                ...doc.pages,
+                {
+                  page: doc.pages.length + 1,
+                  width: 612,
+                  height: 792,
+                  text: "A".repeat(100),
+                  image: null,
+                },
+              ],
+            };
+
+            const estimate2 = estimateReaderCall({ bundle: "test", documents: extendedDocs });
+            expect(estimate2.worstCaseCostNanoUsd).toBeGreaterThanOrEqual(estimate1.worstCaseCostNanoUsd);
+          }
+
+          // Check: adding an image page never lowers cost
+          if (documents.length > 0 && documents[0].pages.length < 4) {
+            const doc = documents[0];
+            const extendedDocs = [...documents];
+            extendedDocs[0] = {
+              ...doc,
+              pages: [
+                ...doc.pages,
+                {
+                  page: doc.pages.length + 1,
+                  width: 612,
+                  height: 792,
+                  text: null,
+                  image: {
+                    mediaType: "image/jpeg" as const,
+                    base64: "QUJD",
+                  },
+                },
+              ],
+            };
+
+            const estimate2 = estimateReaderCall({ bundle: "test", documents: extendedDocs });
+            expect(estimate2.worstCaseCostNanoUsd).toBeGreaterThanOrEqual(estimate1.worstCaseCostNanoUsd);
+          }
+        },
+      ),
+      { numRuns: 50 },
+    );
+  });
+});
+
+describe("Feature: document-intake, Property 34: Cost Ledger Never Exceeds the Won Cap (Validates: Requirements 17.4, 17.5)", () => {
+  it("sum of allowed costs never exceeds cap, final reserved equals sum, calls refused when reserved + cost > cap", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 100_000_000 }),
+        fc.array(fc.integer({ min: 1, max: 20_000_000 }), { minLength: 1, maxLength: 40 }),
+        (capNanoUsd, callCosts) => {
+          const caps = { total: 1_000_000, daily: 0, perVisitorDaily: 0 };
+          let state = emptyUsageState();
+          let sumAllowed = 0;
+
+          for (const callNanoUsd of callCosts) {
+            const decision = decideCall(state, caps, "2026-01-01T12:00:00Z", "visitor1", {
+              callNanoUsd,
+              capNanoUsd,
+            });
+
+            if (decision.allowed) {
+              sumAllowed += callNanoUsd;
+              state = decision.next;
+              // Verify that final reserved cost equals sum of allowed costs
+              expect(state.reservedCostNanoUsd ?? 0).toBe(sumAllowed);
+              // Verify sum never exceeds cap
+              expect(sumAllowed).toBeLessThanOrEqual(capNanoUsd);
+            } else {
+              // Verify each refusal is exactly when reserved + cost > cap
+              expect(decision.reason).toBe("cost_cap");
+              expect((state.reservedCostNanoUsd ?? 0) + callNanoUsd).toBeGreaterThan(capNanoUsd);
+            }
+          }
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("without cost option, decideCall next has no reservedCostNanoUsd property", () => {
+    const state = emptyUsageState();
+    const caps = { total: 10, daily: 100, perVisitorDaily: 100 };
+
+    const result = decideCall(state, caps, "2026-01-01T12:00:00Z", "v1");
+
+    expect(result.allowed).toBe(true);
+    if (result.allowed) {
+      expect((result.next as any).reservedCostNanoUsd).toBeUndefined();
+    }
   });
 });
