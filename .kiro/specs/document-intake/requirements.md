@@ -12,10 +12,10 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 - **Transcript**: The output of AI reading for image pages: an array of items, each with text, a bounding box in page-relative coordinates (0..1), and optional confidence. Transcripts are converted to the same `PageText` structure used for text pages so that quotes and threads work identically for both.
 - **Reader Input**: The standardized input shape passed to a reader: `bundle` ID, and per document: `docId`, document `kind` (invoice, packing list, or billOfLading), original file SHA-256, and pages (each with page number, width, height in pixels, and either extracted text or a rendered image).
 - **Reader Output**: The standardized output shape returned by a reader: the existing `ReadingAnswer` shape (`field`, `value`, `quote`, `doc`, `page`) plus per-field `confidence` ("high" or "low") and per-image-page `transcript` (items with text and box in page-relative 0..1 coordinates).
-- **Real Reader**: The AI reader that calls the Claude Haiku 5.5 model via the Anthropic SDK, used on the public site when `ANTHROPIC_API_KEY` is set and the kill switch is not off.
+- **Real Reader**: The AI reader that calls the Claude Haiku 5.5 model via the Anthropic SDK, used on the public site when `DOCUMENT_INTAKE_ANTHROPIC_KEY` is set and the kill switch is not off.
 - **Fake Reader**: A test-only reader that looks up pre-recorded answers by exact file SHA-256 set; refuses any other file set with "no recorded answer".
 - **Recording**: A pre-recorded JSON file pairing a set of file SHA-256 values to a complete `ReadingAnswer`.
-- **Reader Mode**: The server mode controlling which reader is active: "off" (sample bundle only; no AI calls), "fake" (recorded answers for testing; visible "Test mode" label on the board), or "claude" (real AI reader; active only if `ANTHROPIC_API_KEY` is set).
+- **Reader Mode**: The server mode controlling which reader is active: "off" (sample bundle only; no AI calls), "fake" (recorded answers for testing; visible "Test mode" label on the board), or "claude" (real AI reader; active only if `DOCUMENT_INTAKE_ANTHROPIC_KEY` is set).
 - **Kill Switch**: An environment variable `DOCUMENT_INTAKE_KILL_SWITCH` that, when set to any value, turns the AI reader off entirely; the sample bundle keeps working.
 - **Usage Record**: One JSON-Lines entry logged per AI call: timestamp (ISO), model name, input/output token counts, estimated cost in USD, file SHA-256 values, reader mode, and outcome (success/error). Never includes document text, images, the API key, or visitor IP.
 - **Cap**: A limit on AI reader calls. Types: total (default 300 for dev), daily (default 30 per UTC day for public, 0 = no limit), daily-per-visitor (default 3, identified by salted hash of IP; public site only), and public-total (500 for the public site).
@@ -119,9 +119,9 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 1. THE server (Next.js route handler) SHALL determine reader mode based on environment variables, in this order:
    - IF `DOCUMENT_INTAKE_KILL_SWITCH` is set to a non-empty value, mode is "off".
    - ELSE IF `DOCUMENT_INTAKE_MODE` equals "fake", mode is "fake" (no key needed, no AI call).
-   - ELSE IF `ANTHROPIC_API_KEY` is set AND a durable usage store is configured (`DOCUMENT_INTAKE_STORE` is "file" for local use; other stores are NICE), mode is "claude".
+   - ELSE IF `DOCUMENT_INTAKE_ANTHROPIC_KEY` is set AND a durable usage store is configured (`DOCUMENT_INTAKE_STORE` is "file" for local use; other stores are NICE), mode is "claude".
    - ELSE mode is "off".
-2. THE `ANTHROPIC_API_KEY` SHALL be read only on the server, passed explicitly to the Anthropic SDK client, never logged, never echoed in responses, and never written to any file.
+2. THE `DOCUMENT_INTAKE_ANTHROPIC_KEY` SHALL be read only on the server, passed explicitly to the Anthropic SDK client, never logged, never echoed in responses, and never written to any file.
 3. THE kill switch environment variable `DOCUMENT_INTAKE_KILL_SWITCH` SHALL accept any non-empty value to turn off the AI reader. The sample bundle keeps working.
 4. THE server SHALL expose a `/api/reader-status` endpoint returning `{ mode: "off" | "fake" | "claude"; callsRemaining: number | null; reason: string | null }` where `reason` is a short plain message when mode is "off" (for example "no API key", "kill switch is on", "no durable usage store configured") and null otherwise.
 
@@ -304,7 +304,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 #### Acceptance Criteria
 
 1. WHEN a draft value would be "copied" and any of its document sources has origin "imageTranscript", THE draft SHALL give it status "needsReview" with reason "Read from an image by the AI reader. Check it against the page, then confirm it." The value and its sources stay, so the board still shows the value and the thread.
-2. Values computed from such a value keep their status; they change only if the person enters a different value.
+2. (Replaced by Requirement 26.) Values computed from such a value wait for a person as Requirement 26 says.
 3. THE board SHALL show a "Confirm this value" button (data-testid "confirm-image-value") in the source strip of such a field. It applies the field's own value as the person's value. A confirmed field returns to status "copied" (the value is the document's, now checked by a person), keeps its value, sources and rule, and gets the note "Confirmed by a person against the page."; the board offers Undo for it. Status "personEdited" was not used because the existing recomputation after person values would then change other fields.
 4. THE sample bundle has no image pages and is unchanged.
 
@@ -362,6 +362,71 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 23 (MUST): A Cap Reservation Counts Only When the Store Confirms It
+
+**User Story:** As an operator, I want a call to go ahead only after the usage store has really saved its reservation, so that a store error cannot let calls through without being counted.
+
+#### Acceptance Criteria
+
+1. `createBlobsUsageStore().writeState` SHALL treat a conditional write as saved only when the result has `modified: true` and a non-empty string `etag`. Otherwise it SHALL throw "usage state write was not confirmed by the store; not written" (the existing "usage state changed by another request; not written" stays for `modified: false`).
+2. WHEN `writeState` throws, THE server SHALL answer 503 "Usage store unavailable; the AI reader was not called." and SHALL NOT call the reader (as today).
+3. Reason: the installed `@netlify/blobs` (10.7.13) answers a conditional write with `{ modified: true, etag: "" }` for every HTTP status other than 412, for example 403, 429 or 5xx after its retries, so `modified` alone does not prove the write.
+
+---
+
+### Requirement 24 (MUST): The Worst Case Counts Every Byte, and the Ledger Gets the Actual Cost
+
+**User Story:** As an operator, I want the worst-case estimate to hold for any text a visitor uploads, and the cost ledger to hold what a call really cost, so that crafted text cannot spend more than the approved budget.
+
+#### Acceptance Criteria
+
+1. `estimateReaderCall` SHALL count every text the uploader controls at one token per UTF-8 byte (a token always covers at least one byte, so this bounds any text, also characters outside the Basic Multilingual Plane). inputTokens = `promptOverheadTokens` (10,000: the fixed system prompt, field list and output schema) + for every page: `perPageOverheadTokens` (160: the fixed words the request puts around a page) + utf8Bytes(fileName) + 4 x utf8Bytes(docId) (the request repeats the file name and the document id on every page, and the output schema lists the document id twice) + utf8Bytes(text) for a text page or `imageTokensPerPage` (5,000) for an image page. utf8Bytes counts, for each code point, 1 byte below U+0080, 2 below U+0800, 3 below U+10000 (lone surrogates included), 4 otherwise.
+2. Any input that passes the per-call line (0.0108 USD with 8,000 output tokens) therefore has at most 68,000 input tokens, under the 100,000-token price step.
+3. AFTER a reader call that reports token usage (a valid answer, an invalid answer, or a ReaderError that carries usage), THE server SHALL compute the actual cost with `estimateCostNanoUsd(inputTokens, outputTokens)`. IF it is above the worst case reserved for the call, THE server SHALL add the difference to `reservedCostNanoUsd`: read the state, apply `addReservedCost`, write it, up to 3 tries; if all fail, log "usage cost top-up not written" (no document text). The answer to the person does not change.
+4. `addReservedCost(state, extraNanoUsd)` in `budget.ts` SHALL return a new state with `reservedCostNanoUsd` = (old value or 0) + extraNanoUsd and every other part unchanged; it never changes its input.
+
+---
+
+### Requirement 25 (MUST): The Reader Uses Only the App's Own Key and the Anthropic Address
+
+**User Story:** As an operator, I want the AI reader to start only with the key I set for this app and to call Anthropic directly, so that variables the hosting platform adds by itself cannot turn the reader on or route its calls elsewhere.
+
+#### Acceptance Criteria
+
+1. THE server SHALL read the Claude API key only from the environment variable `DOCUMENT_INTAKE_ANTHROPIC_KEY` (trimmed). It SHALL NOT read `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL`; with only `ANTHROPIC_API_KEY` and a store set, the mode is "off" with reason "no API key". Reason: on credit plans Netlify's AI Gateway puts `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL` into every function by itself; with them the reader would start without the operator's key and its calls would go through the Gateway and be billed in Netlify credits, which can pause every site of the team.
+2. THE Claude reader SHALL build its SDK client in one exported function `createAnthropicClient(apiKey)` in `claudeReader.ts` with `apiKey` given, `baseURL` fixed in code to "https://api.anthropic.com" (exported constant `ANTHROPIC_API_BASE_URL`), `maxRetries: 0`, `logLevel: "off"` and `openTelemetry: false`, so no environment variable can change the address, turn on SDK request logging or send traces with request content.
+3. Operator order: set `DOCUMENT_INTAKE_ANTHROPIC_KEY` first, then `DOCUMENT_INTAKE_STORE=netlify-blobs` and `DOCUMENT_INTAKE_VISITOR_SALT`.
+
+---
+
+### Requirement 26 (MUST): Values Computed from Image Readings Wait for a Person
+
+**User Story:** As an entry writer, I want every value the draft computes from something the AI read in a photo or scan to wait for my check, so that a misread total, quantity or weight cannot reach the 7501 as a computed value.
+
+#### Acceptance Criteria
+
+1. WHEN a draft value would be "computed" and any of its document sources has origin "imageTranscript", THE draft SHALL give it status "needsReview" with reason "Computed from values the AI reader read from an image. Check them against the page, then confirm it." (exported constant `IMAGE_COMPUTED_REVIEW_REASON`). Value, sources, rule, note and inputs stay. This happens in the same step as Requirement 18.1, before person values are applied. Examples: 34A gross weight from a packing list photo, 35 quantity and 36A entered value from a scanned invoice.
+2. Confirming such a field (applying its own value; the same "Confirm this value" button) SHALL return it to status "computed" with reason null and the note "Confirmed by a person against the page."; value, sources, rule and inputs stay; the board offers Undo. Entering a different value works as for any other field.
+3. AFTER all person values and the recomputation of totals, and before the Needs review list is built, every field with status "computed" or "copied" that depends on an image-waiting field SHALL get status "needsReview" with reason "Waiting on <ids>: values read from an image are not confirmed yet." where <ids> are the image-waiting fields it depends on, in draft order (header, then lines, then totals), joined by ", ". An image-waiting field has status "needsReview" and reason `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON`. A field depends on the fields in its `inputs`, and an "37A" field also on the "33A" and "10" fields of its own line (its rate is looked up from them), directly or through other fields. Value, sources, rule, note and inputs stay. There is no confirm button for these fields: they clear when the values they wait on are confirmed.
+4. Requirement 18.2 ("values computed from such a value keep their status") is replaced by 26.1 to 26.3; 18.1, 18.3 and 18.4 stay.
+5. THE sample bundle has no image pages and is unchanged.
+
+---
+
+### Requirement 27 (MUST): Missing Amounts, Currency and Gross Weight Go to a Person
+
+**User Story:** As an entry writer, I want the draft to stop when an amount, the currency or the gross weight was not read, so that a missing value never becomes a zero or a partial sum on the 7501.
+
+#### Acceptance Criteria
+
+1. 36A: WHEN the invoice currency is read and is USD, no P1 check of the group failed, and any invoice line of the 7501 line has no accepted amount that parses as money, THE 36A field SHALL get status "needsReview", value null, reason "No accepted amount for invoice line <n>[, <m> ...]. A person enters the entered value." (the invoice line numbers without one, joined by ", "), and the accepted amount readings of the group as sources, instead of adding up the amounts that were read.
+2. 36A: IF no accepted `invoice.currency` reading with a non-empty value exists, every 36A field SHALL get status "needsReview", value null, reason "No invoice currency was read. A person checks that the amounts are in USD and enters the entered value." (checked after the existing "Currency is not USD." case and before the P1 case).
+3. 34A: IF no accepted `packingList.totalGrossKg` reading parses as kilograms, every 34A field SHALL get status "needsReview", value null, reason "No total gross weight was read from the packing list. A person enters the gross weight." (today they stay "computed" with no value).
+4. Fields computed from these (38, B39, fees, totals) wait as they do today for a 36A in Needs review; none of them becomes "computed" with 0.
+5. THE sample bundle, the upload test recordings and the verifier's expected drafts are unchanged (they read every amount, the currency and the total gross weight).
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -388,6 +453,11 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 20. (MUST) Every Accepted Value Points to Its Place
 21. (MUST) Time Limit for the Reader Call
 22. (MUST) Reader Errors Never Carry Document Text
+23. (MUST) A Cap Reservation Counts Only When the Store Confirms It
+24. (MUST) The Worst Case Counts Every Byte, and the Ledger Gets the Actual Cost
+25. (MUST) The Reader Uses Only the App's Own Key and the Anthropic Address
+26. (MUST) Values Computed from Image Readings Wait for a Person
+27. (MUST) Missing Amounts, Currency and Gross Weight Go to a Person
 
 **NICE (if time is left):**
 

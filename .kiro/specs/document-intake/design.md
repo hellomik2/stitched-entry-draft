@@ -88,12 +88,13 @@ src/app/
 **Environment Variables** (server only, never in browser code):
 - `DOCUMENT_INTAKE_MODE`: "fake" or unset (default)
 - `DOCUMENT_INTAKE_KILL_SWITCH`: any non-empty value to turn off AI
-- `ANTHROPIC_API_KEY`: Claude API key (read only on server, never logged)
+- `DOCUMENT_INTAKE_ANTHROPIC_KEY`: Claude API key (read only on server, never logged)
 - `DOCUMENT_INTAKE_STORE`: "file" (local use, default)
 - `DOCUMENT_INTAKE_TOTAL_CAP`: integer, default 300
 - `DOCUMENT_INTAKE_DAILY_CAP`: integer, default 0 (no limit)
 - `DOCUMENT_INTAKE_VISITOR_DAILY_CAP`: integer, default 3
 - `DOCUMENT_INTAKE_VISITOR_SALT`: string for visitor key hash salt; if unset, per-visitor key is "unknown"
+- `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL` are never read (Requirement 25).
 
 ### Reader Interface
 
@@ -612,7 +613,7 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
   // Logic order (Requirement 7.1):
   // 1. If DOCUMENT_INTAKE_KILL_SWITCH set, mode "off" with reason "kill switch is on"
   // 2. Else if DOCUMENT_INTAKE_MODE === "fake", mode "fake"
-  // 3. Else if ANTHROPIC_API_KEY set AND DOCUMENT_INTAKE_STORE === "file", mode "claude"
+  // 3. Else if DOCUMENT_INTAKE_ANTHROPIC_KEY set AND DOCUMENT_INTAKE_STORE === "file", mode "claude"
   // 4. Else mode "off" with appropriate reason
 
   // Parse caps from env (default to 300 total, 0 daily, 3 per-visitor)
@@ -962,9 +963,23 @@ export default function StitchBoard(...) {
 
 ---
 
+## Cross-Check Fixes (2026-11-20)
+
+**Requirement 23 (A Cap Reservation Counts Only When the Store Confirms It):** `usageStoreBlobs.ts` (`writeState` requires `modified: true` and a non-empty `etag`); throw "usage state write was not confirmed by the store; not written" otherwise. Server answers 503 "Usage store unavailable; the AI reader was not called." when the write fails.
+
+**Requirement 24 (The Worst Case Counts Every Byte, and the Ledger Gets the Actual Cost):** `intakeConfig.ts` adds `perCall.perPageOverheadTokens: 160`. `budget.ts` adds `utf8Bytes(s)` function (1 byte per code point below U+0080, 2 below U+0800, 3 below U+10000, 4 otherwise); byte-based `estimateReaderCall(input)` computing inputTokens from UTF-8 bytes of every text and file name in the request plus image page overhead; `addReservedCost(state, extraNanoUsd)` returning new state with incremented `reservedCostNanoUsd` without mutating input. `intakeService.ts` true-up logic after every call with token usage: compute actual cost, if above worst case add difference to `reservedCostNanoUsd`, read-apply-write up to 3 tries, log "usage cost top-up not written" (no document text) if all fail.
+
+**Requirement 25 (The Reader Uses Only the App's Own Key and the Anthropic Address):** `readerEnv.ts` reads the key from `DOCUMENT_INTAKE_ANTHROPIC_KEY` only, never `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` (with only `DOCUMENT_INTAKE_ANTHROPIC_KEY` set, the mode is "off" with reason "no API key"). `claudeReader.ts` exports constant `ANTHROPIC_API_BASE_URL: "https://api.anthropic.com"` and exports function `createAnthropicClient(apiKey)` building the SDK client with `baseURL: ANTHROPIC_API_BASE_URL`, `maxRetries: 0`, `logLevel: "off"`, `openTelemetry: false`. `.kiro/steering/tech.md` references the new variable name `DOCUMENT_INTAKE_ANTHROPIC_KEY`.
+
+**Requirement 26 (Values Computed from Image Readings Wait for a Person):** `draft.ts` defines `IMAGE_COMPUTED_REVIEW_REASON: "Computed from values the AI reader read from an image. Check them against the page, then confirm it."`. In the step of 18.1, computed values with image-origin sources get `needsReview` with this reason; confirming (applying own value) returns to "computed" with reason null and note "Confirmed by a person against the page.". After `recomputeTotals` and before Needs review list, a pass marks fields with "computed" or "copied" status that depend on image-waiting fields (those with `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON`) as `needsReview` with reason "Waiting on <ids>: values read from an image are not confirmed yet." where <ids> are the waiting fields in draft order, joined by ", ". `StitchBoard.tsx` shows the confirm button for both `IMAGE_REVIEW_REASON` and `IMAGE_COMPUTED_REVIEW_REASON`.
+
+**Requirement 27 (Missing Amounts, Currency and Gross Weight Go to a Person):** `draft.ts` adds three cases in `buildDraft`: (1) no accepted invoice currency reading → all 36A get `needsReview` with "No invoice currency was read. A person checks that the amounts are in USD and enters the entered value." (2) no accepted amount for a 7501 line after currency is read and no P1 check failed → 36A for that line gets `needsReview` with "No accepted amount for invoice line <n>[, <m> ...]. A person enters the entered value." (3) no accepted packing-list total gross weight → all 34A get `needsReview` with "No total gross weight was read from the packing list. A person enters the gross weight."
+
+---
+
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 38 are defined below (38 in total).*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 44 are defined below (44 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1050,13 +1065,13 @@ For any environment where `DOCUMENT_INTAKE_KILL_SWITCH` is set to a non-empty va
 
 ### Property 14: Resolver Mode Fake Needs No Key
 
-For any environment where `DOCUMENT_INTAKE_MODE=fake`, `resolveReaderSetup` SHALL return mode "fake" without requiring `ANTHROPIC_API_KEY`.
+For any environment where `DOCUMENT_INTAKE_MODE=fake`, `resolveReaderSetup` SHALL return mode "fake" without requiring `DOCUMENT_INTAKE_ANTHROPIC_KEY`.
 
 **Validates: Requirements 7.1**
 
 ### Property 15: Resolver Mode Claude Needs Key and Store
 
-For any environment where mode would be "claude", both `ANTHROPIC_API_KEY` and a durable store (`DOCUMENT_INTAKE_STORE=file`) SHALL be set.
+For any environment where mode would be "claude", both `DOCUMENT_INTAKE_ANTHROPIC_KEY` and a durable store (`DOCUMENT_INTAKE_STORE=file`) SHALL be set.
 
 **Validates: Requirements 7.1**
 
@@ -1152,9 +1167,9 @@ For any sequence of calls with worst-case costs c_i under a cost cap C, the allo
 
 ### Property 35: Image Values Wait for a Person
 
-For any draft built from readings, no field with an image-origin document source has status "copied"; applying each such field's own value as a person value gives status "copied" with the same value, sources and rule and the note "Confirmed by a person against the page.", and leaves every other field as before.
+For any draft built from readings with image origins, no field with an image-origin document source has status "copied" or "computed"; confirming every image-waiting field (reason `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON`) with its own value gives every field the status, value, reason and rule it has in the draft built without image origins, and each confirmed field keeps its sources and gets the note "Confirmed by a person against the page."
 
-**Validates: Requirements 18.1, 18.2, 18.3**
+**Validates: Requirements 18.1, 18.3, 26.1, 26.2, 26.3**
 
 ### Property 36: A Missing Invoice Line Is Flagged
 
@@ -1173,6 +1188,42 @@ For any accepted reading the box has positive width and height and lies on its p
 The Claude reader sends `max_tokens` 8,000 and a 45,000 ms timeout; a timeout maps to the fixed message; for any reader answer with arbitrary strings in "field" and "doc", a failed validation reason contains none of those strings.
 
 **Validates: Requirements 21, 22**
+
+### Property 39: Unconfirmed Cap Writes Stop the Call
+
+For any number of requests against a usage store whose conditional writes answer `{ modified: true }` with an empty or missing `etag`, `handleReadRequest` answers 503 every time and never calls the reader; with a store that answers real etags, at most `caps.total` requests reach the reader.
+
+**Validates: Requirements 23.1, 23.2**
+
+### Property 40: The Byte Count Bounds Any Text
+
+For any valid reader input whose texts may hold any code point, `estimateReaderCall(input).inputTokens` equals `promptOverheadTokens` + for every page (`perPageOverheadTokens` + utf8Bytes(fileName) + 4 x utf8Bytes(docId) + utf8Bytes(text) or `imageTokensPerPage`), utf8Bytes equals `new TextEncoder().encode(s).length` for strings without lone surrogates, and every input whose worst case passes the per-call line has at most 68,000 input tokens.
+
+**Validates: Requirements 24.1, 24.2**
+
+### Property 41: The Ledger Holds the Actual Cost
+
+For any reserved worst case w and reported usage (input i, output o) of a call, after the call `reservedCostNanoUsd` has grown by max(w, `estimateCostNanoUsd(i, o)`); `addReservedCost` never lowers the total and leaves the rest of the state unchanged.
+
+**Validates: Requirements 24.3, 24.4**
+
+### Property 42: Platform Variables Cannot Turn the Reader On
+
+For any environment, the mode, reason and apiKey of `resolveReaderSetup` do not change when `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` is added or removed; the client from `createAnthropicClient` has `baseURL` "https://api.anthropic.com" whatever `ANTHROPIC_BASE_URL` says.
+
+**Validates: Requirements 25.1, 25.2**
+
+### Property 43: Waiting Fields Name What They Wait On
+
+For any draft built from readings with image origins, no field with status "computed" or "copied" depends on an image-waiting field, and every field whose reason ends with "values read from an image are not confirmed yet." names exactly the image-waiting fields it depends on.
+
+**Validates: Requirements 26.3**
+
+### Property 44: A Missing Amount, Currency or Gross Weight Is Never Computed
+
+Removing any non-empty set of invoice line amounts, the invoice currency, or the packing list total gross weight from the sample readings never gives a "computed" 36A for a line that lost an amount (or any 36A without a currency), a "computed" 34A without a total gross weight, or a "computed" 38, B39 or total with value 0 or 0.00 that the full sample does not have; the full sample is unchanged.
+
+**Validates: Requirements 27.1 to 27.5**
 
 ---
 
@@ -1280,6 +1331,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (38 properties: 1 to 28, 33 to 38 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (44 properties: 1 to 28, 33 to 44 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 38
+**Total Correctness Properties:** 44
