@@ -7,6 +7,8 @@ import {
   estimateCostNanoUsd,
   formatUsd,
   estimateReaderCall,
+  utf8Bytes,
+  addReservedCost,
 } from "./budget";
 import { intakeConfig } from "./intakeConfig";
 import * as fc from "fast-check";
@@ -368,5 +370,198 @@ describe("Feature: document-intake, Property 34: Cost Ledger Never Exceeds the W
     if (result.allowed) {
       expect((result.next as any).reservedCostNanoUsd).toBeUndefined();
     }
+  });
+});
+
+describe("Feature: document-intake, Property 40: The Byte Count Bounds Any Text (Validates: Requirements 24.1, 24.2)", () => {
+  it("utf8Bytes examples", () => {
+    expect(utf8Bytes("")).toBe(0);
+    expect(utf8Bytes("A")).toBe(1);
+    expect(utf8Bytes("é")).toBe(2);
+    expect(utf8Bytes("€")).toBe(3);
+    expect(utf8Bytes(String.fromCodePoint(0x20000))).toBe(4);
+    expect(utf8Bytes("\uD800")).toBe(3); // lone surrogate
+  });
+
+  it("utf8Bytes matches TextEncoder for fullUnicode strings", () => {
+    fc.assert(
+      fc.property(fc.fullUnicodeString({ maxLength: 200 }), (s) => {
+        expect(utf8Bytes(s)).toBe(new TextEncoder().encode(s).length);
+      }),
+      { numRuns: 200 },
+    );
+  });
+
+  it("estimateReaderCall matches formula for varied documents and pages", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 1, max: 3 }),
+        fc.array(fc.integer({ min: 1, max: 4 }), { minLength: 1, maxLength: 3 }),
+        (numDocs, pagesPerDoc) => {
+          const documents = Array.from({ length: numDocs }, (_, dIdx) => {
+            const docId = `doc${dIdx}`;
+            return {
+              docId,
+              kind: "invoice" as const,
+              fileName: `file${dIdx}.pdf`,
+              fileSha256: "a".repeat(64),
+              pages: Array.from({ length: pagesPerDoc[dIdx] || 1 }, (_, pIdx) => {
+                const isText = Math.random() > 0.4;
+                return {
+                  page: pIdx + 1,
+                  width: 612,
+                  height: 792,
+                  text: isText ? fc.sample(fc.fullUnicodeString({ maxLength: 300 }), 1)[0] : null,
+                  image: isText ? null : { mediaType: "image/jpeg" as const, base64: "QUJD" },
+                };
+              }),
+            };
+          });
+
+          const input = { bundle: "test", documents };
+          const estimate = estimateReaderCall(input);
+
+          // Manual calculation
+          let expected = 10_000; // promptOverheadTokens
+          for (const doc of documents) {
+            for (const page of doc.pages) {
+              expected += 160; // perPageOverheadTokens
+              expected += utf8Bytes(doc.fileName);
+              expected += 4 * utf8Bytes(doc.docId);
+              expected += page.text !== null ? utf8Bytes(page.text) : 5_000;
+            }
+          }
+
+          expect(estimate.inputTokens).toBe(expected);
+        },
+      ),
+      { numRuns: 50 },
+    );
+  });
+
+  it("7249 characters U+20000 (4 pages): worstCaseCostNanoUsd above maxCallCostNanoUsd", () => {
+    const text = String.fromCodePoint(0x20000).repeat(7249);
+    const input = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "t",
+          kind: "invoice" as const,
+          fileName: "a.pdf",
+          fileSha256: "a".repeat(64),
+          pages: Array.from({ length: 4 }, (_, i) => ({
+            page: i + 1,
+            width: 612,
+            height: 792,
+            text,
+            image: null,
+          })),
+        },
+      ],
+    };
+
+    const estimate = estimateReaderCall(input);
+    expect(estimate.worstCaseCostNanoUsd).toBeGreaterThan(intakeConfig.perCall.maxCallCostNanoUsd);
+  });
+
+  it("four text pages of 15000 'x' plus five image pages: above the line", () => {
+    const input = {
+      bundle: "test",
+      documents: [
+        {
+          docId: "t",
+          kind: "invoice" as const,
+          fileName: "f.pdf",
+          fileSha256: "a".repeat(64),
+          pages: Array.from({ length: 4 }, (_, i) => ({
+            page: i + 1,
+            width: 612,
+            height: 792,
+            text: "x".repeat(15000),
+            image: null,
+          })),
+        },
+        {
+          docId: "i",
+          kind: "packingList" as const,
+          fileName: "g.pdf",
+          fileSha256: "b".repeat(64),
+          pages: Array.from({ length: 5 }, (_, i) => ({
+            page: i + 1,
+            width: 612,
+            height: 792,
+            text: null,
+            image: { mediaType: "image/jpeg" as const, base64: "QUJD" },
+          })),
+        },
+        {
+          docId: "j",
+          kind: "billOfLading" as const,
+          fileName: "h.pdf",
+          fileSha256: "c".repeat(64),
+          pages: [],
+        },
+      ],
+    };
+
+    const estimate = estimateReaderCall(input);
+    expect(estimate.worstCaseCostNanoUsd).toBeGreaterThan(intakeConfig.perCall.maxCallCostNanoUsd);
+  });
+
+  it("property: for input tokens up to 68000, cost is within maxCallCostNanoUsd", () => {
+    fc.assert(
+      fc.property(fc.integer({ min: 0, max: 68_000 }), (inputTokens) => {
+        const cost = estimateCostNanoUsd(inputTokens, 8000);
+        expect(cost).toBeLessThanOrEqual(intakeConfig.perCall.maxCallCostNanoUsd);
+      }),
+      { numRuns: 100 },
+    );
+  });
+});
+
+describe("Feature: document-intake, Property 41: The Ledger Holds the Actual Cost (Validates: Requirements 24.3, 24.4)", () => {
+  it("addReservedCost adds the extra to reserved, preserves other fields, does not mutate input", () => {
+    fc.assert(
+      fc.property(
+        fc.nat({ max: 1_000_000_000 }),
+        fc.nat({ max: 1_000_000_000 }),
+        (startTotal, extra) => {
+          const startState = {
+            totalCalls: 1,
+            days: { "2026-01-01": { calls: 1, visitors: { v1: 1 } } },
+            reservedCostNanoUsd: startTotal,
+          };
+
+          const clone = structuredClone(startState);
+          const result = addReservedCost(startState, extra);
+
+          // Input unchanged
+          expect(startState).toEqual(clone);
+
+          // Output is new object with correct values
+          expect(result).not.toBe(startState);
+          expect(result.reservedCostNanoUsd).toBe(startTotal + extra);
+          expect(result.totalCalls).toBe(startState.totalCalls);
+          expect(result.days).toBe(startState.days); // shared reference is OK (days not changed)
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it("addReservedCost throws for negative input", () => {
+    const state = emptyUsageState();
+    expect(() => addReservedCost(state, -1)).toThrow("extraNanoUsd must be a non-negative safe integer");
+  });
+
+  it("addReservedCost throws for non-integer input", () => {
+    const state = emptyUsageState();
+    expect(() => addReservedCost(state, 1.5)).toThrow("extraNanoUsd must be a non-negative safe integer");
+  });
+
+  it("addReservedCost with undefined reservedCostNanoUsd treats it as 0", () => {
+    const state: any = { totalCalls: 0, days: {} };
+    const result = addReservedCost(state, 100);
+    expect(result.reservedCostNanoUsd).toBe(100);
   });
 });

@@ -1,7 +1,7 @@
 import type { ReaderInput, ReaderOutput } from "../core/readerContract";
 import { validateReaderInput, validateReaderOutput } from "../core/readerContract";
 import { intakeConfig } from "../core/intakeConfig";
-import { decideCall, remainingCalls, utcDay, estimateCostNanoUsd, estimateReaderCall } from "../core/budget";
+import { decideCall, remainingCalls, utcDay, estimateCostNanoUsd, estimateReaderCall, addReservedCost } from "../core/budget";
 import { visitorKey } from "./visitorKey";
 import type { ReaderSetup } from "./readerEnv";
 import type { UsageRecord, IntakeReader } from "./readerTypes";
@@ -21,6 +21,44 @@ export type ReadDeps = {
   body: unknown;
   log?: (message: string) => void; // server log; never pass document text, images or the key
 };
+
+// Requirement 24.3: the ledger gets the actual cost when it is above the reserved worst case.
+async function topUpCost(
+  store: UsageStore,
+  usage: { inputTokens: number; outputTokens: number } | null,
+  reservedNanoUsd: number,
+  log?: (message: string) => void,
+): Promise<void> {
+  if (usage === null) {
+    return;
+  }
+
+  let actual: number;
+  try {
+    actual = estimateCostNanoUsd(usage.inputTokens, usage.outputTokens);
+  } catch {
+    log?.("usage cost top-up not written");
+    return;
+  }
+
+  if (actual <= reservedNanoUsd) {
+    return;
+  }
+
+  let attempts = 0;
+  while (attempts < 3) {
+    try {
+      attempts++;
+      const s = await store.readState();
+      await store.writeState(addReservedCost(s, actual - reservedNanoUsd));
+      return;
+    } catch {
+      // Continue to next attempt
+    }
+  }
+
+  log?.("usage cost top-up not written");
+}
 
 export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse> {
   const { setup, store, fakeStore, readers, nowIso, ip, bodyBytes, body, log } = deps;
@@ -229,6 +267,8 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
       const errorMessage = e instanceof ReaderError ? e.message : "The AI reader failed.";
       const errorUsage = e instanceof ReaderError ? e.usage : null;
 
+      await topUpCost(store, errorUsage, estimate.worstCaseCostNanoUsd, log);
+
       const record: UsageRecord = {
         timestamp: nowIso,
         model: intakeConfig.readerModel,
@@ -263,6 +303,8 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
     // Validate output
     const outputValidation = validateReaderOutput(output, input);
     if (!outputValidation.ok) {
+      await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log);
+
       const record: UsageRecord = {
         timestamp: nowIso,
         model: intakeConfig.readerModel,
@@ -295,6 +337,8 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
     }
 
     // Success: append record
+    await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log);
+
     const cost = usage ? estimateCostNanoUsd(usage.inputTokens, usage.outputTokens) : null;
     const record: UsageRecord = {
       timestamp: nowIso,

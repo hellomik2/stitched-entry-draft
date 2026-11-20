@@ -28,6 +28,7 @@ export const intakeConfig = {
     maxImageBase64Chars: 1_500_000,
     imageTokensPerPage: 5_000,
     promptOverheadTokens: 10_000,
+    perPageOverheadTokens: 160,
     maxCallCostNanoUsd: 10_800_000,
   },
   // Won caps are converted at a deliberately high rate, so the dollar cap is smaller than the real one.

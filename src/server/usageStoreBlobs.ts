@@ -76,7 +76,14 @@ export function createBlobsUsageStore(options: { blobs?: BlobsLike; storeName?: 
         throw new Error("usage state changed by another request; not written");
       }
 
-      lastRead = { exists: true, etag: r.etag ?? null };
+      // Requirement 23: the installed @netlify/blobs answers a conditional write with
+      // { modified: true, etag: "" } for every HTTP status other than 412 (403, 429, 5xx after
+      // its retries), so modified alone does not prove the write was confirmed by the store.
+      if (typeof r.etag !== "string" || r.etag.length === 0) {
+        throw new Error("usage state write was not confirmed by the store; not written");
+      }
+
+      lastRead = { exists: true, etag: r.etag };
     },
 
     async appendRecord(r: UsageRecord): Promise<void> {

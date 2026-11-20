@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import fc from "fast-check";
 import type { UsageState } from "../core/budget";
 import { emptyUsageState } from "../core/budget";
-import type { UsageRecord } from "./readerTypes";
+import type { UsageRecord, IntakeReader } from "./readerTypes";
 import { createBlobsUsageStore, type BlobsLike } from "./usageStoreBlobs";
 import { handleReadRequest } from "./intakeService";
 import { resolveReaderSetup } from "./readerEnv";
@@ -273,6 +273,140 @@ describe("Feature: document-intake, Property 29: Blobs Store Never Lets Concurre
           if (numRequests * 2 > total) {
             expect(cap429 + lost503).toBeGreaterThan(0);
           }
+        },
+      ),
+      { numRuns: 50 },
+    );
+  });
+});
+
+describe("Feature: document-intake, Property 39: Unconfirmed Cap Writes Stop the Call (Validates: Requirements 23.1, 23.2)", () => {
+  it("blobs mock returning empty etag: writeState rejects", async () => {
+    const blobs: BlobsLike = {
+      async getWithMetadata() {
+        return null;
+      },
+      async setJSON() {
+        return { modified: true, etag: "" };
+      },
+    };
+
+    const store = createBlobsUsageStore({ blobs });
+    await store.readState();
+
+    const newState: any = { totalCalls: 1, days: {} };
+    await expect(store.writeState(newState)).rejects.toThrow(
+      "usage state write was not confirmed by the store; not written",
+    );
+  });
+
+  it("blobs mock returning no etag property: writeState rejects", async () => {
+    const blobs: BlobsLike = {
+      async getWithMetadata() {
+        return null;
+      },
+      async setJSON() {
+        return { modified: true };
+      },
+    };
+
+    const store = createBlobsUsageStore({ blobs });
+    await store.readState();
+
+    const newState: any = { totalCalls: 1, days: {} };
+    await expect(store.writeState(newState)).rejects.toThrow(
+      "usage state write was not confirmed by the store; not written",
+    );
+  });
+
+  it("five consecutive handleReadRequest calls with unconfirmed writes: all return 503, reader never called", async () => {
+    const blobs: BlobsLike = {
+      async getWithMetadata() {
+        return null;
+      },
+      async setJSON() {
+        return { modified: true, etag: "" };
+      },
+    };
+
+    const setup = resolveReaderSetup({
+      ANTHROPIC_API_KEY: "test-key-not-real",
+      DOCUMENT_INTAKE_STORE: "netlify-blobs",
+      DOCUMENT_INTAKE_TOTAL_CAP: "1",
+      DOCUMENT_INTAKE_DAILY_CAP: "0",
+      DOCUMENT_INTAKE_VISITOR_DAILY_CAP: "0",
+    });
+
+    let readerCallCount = 0;
+    const stubReader: IntakeReader = {
+      name: "stub",
+      read: async () => {
+        readerCallCount++;
+        throw new Error("should not be called");
+      },
+    };
+
+    const results = [];
+    for (let i = 0; i < 5; i++) {
+      const store = createBlobsUsageStore({ blobs });
+      const result = await handleReadRequest({
+        setup,
+        store,
+        fakeStore: createMemoryUsageStore(),
+        readers: { claude: stubReader },
+        nowIso: "2026-01-01T10:00:00Z",
+        ip: "203.0.113.1",
+        bodyBytes: 100,
+        body: createTestInput(),
+      });
+      results.push(result);
+    }
+
+    expect(readerCallCount).toBe(0);
+    expect(results.every((r) => r.status === 503)).toBe(true);
+    expect(results.every((r) => r.json.message === "Usage store unavailable; the AI reader was not called.")).toBe(true);
+  });
+
+  it("property: with etag-returning blobs, reader called exactly min(total, requests) times", async () => {
+    fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 1, max: 5 }),
+        fc.integer({ min: 1, max: 10 }),
+        async (total, numRequests) => {
+          const blobs = createFakeBlobs();
+
+          const setup = resolveReaderSetup({
+            ANTHROPIC_API_KEY: "test-key-not-real",
+            DOCUMENT_INTAKE_STORE: "netlify-blobs",
+            DOCUMENT_INTAKE_TOTAL_CAP: String(total),
+            DOCUMENT_INTAKE_DAILY_CAP: "0",
+            DOCUMENT_INTAKE_VISITOR_DAILY_CAP: "0",
+          });
+
+          let readerCallCount = 0;
+          const countingReader: IntakeReader = {
+            name: "counting",
+            read: async () => {
+              readerCallCount++;
+              throw new ReaderError("counting", null);
+            },
+          };
+
+          for (let i = 0; i < numRequests; i++) {
+            const store = createBlobsUsageStore({ blobs });
+            await handleReadRequest({
+              setup,
+              store,
+              fakeStore: createMemoryUsageStore(),
+              readers: { claude: countingReader },
+              nowIso: "2026-01-01T10:00:00Z",
+              ip: `203.0.113.${i}`, // Different IP per request to avoid visitor cap
+              bodyBytes: 100,
+              body: createTestInput(),
+            });
+          }
+
+          expect(readerCallCount).toBe(Math.min(total, numRequests));
         },
       ),
       { numRuns: 50 },

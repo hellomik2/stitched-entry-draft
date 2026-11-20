@@ -1318,6 +1318,298 @@ describe("Per-call size and cost line (Requirement 17)", () => {
       expect(recordsJson).not.toContain("CONFIDENTIAL");
     });
   });
+
+  describe("Feature: document-intake, Property 41: The Ledger Holds the Actual Cost (service) (Validates: Requirements 24.3)", () => {
+    it("reader returns 200_000 input, 8_000 output: stored reserved cost above worst case estimate", async () => {
+      const input = createTestInput();
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 10_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      const store = createSpyStore();
+
+      const result = await handleReadRequest({
+        setup,
+        store,
+        fakeStore: createMemoryUsageStore(),
+        readers: {
+          claude: {
+            name: "claude",
+            read: async () => ({
+              output: createTestOutput(),
+              usage: { inputTokens: 200_000, outputTokens: 8_000 },
+            }),
+          },
+        },
+        nowIso: "2026-01-01T00:00:00Z",
+        ip: "127.0.0.1",
+        bodyBytes: 100,
+        body: input,
+      });
+
+      expect(result.status).toBe(200);
+
+      const finalState = await store.readState();
+      const actualCost = estimateCostNanoUsd(200_000, 8_000);
+      const worstCase = estimateReaderCall(input).worstCaseCostNanoUsd;
+
+      expect(actualCost).toBeGreaterThan(worstCase);
+      expect(finalState.reservedCostNanoUsd).toBe(actualCost);
+    });
+
+    it("reader throws with 200_000 input, 8_000 output: stored reserved cost equals actual", async () => {
+      const input = createTestInput();
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 10_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      const store = createSpyStore();
+
+      const result = await handleReadRequest({
+        setup,
+        store,
+        fakeStore: createMemoryUsageStore(),
+        readers: {
+          claude: {
+            name: "claude",
+            read: async () => {
+              throw new ReaderError("reader failed", {
+                inputTokens: 200_000,
+                outputTokens: 8_000,
+              });
+            },
+          },
+        },
+        nowIso: "2026-01-01T00:00:00Z",
+        ip: "127.0.0.1",
+        bodyBytes: 100,
+        body: input,
+      });
+
+      expect(result.status).toBe(502);
+
+      const finalState = await store.readState();
+      const actualCost = estimateCostNanoUsd(200_000, 8_000);
+
+      expect(finalState.reservedCostNanoUsd).toBe(actualCost);
+    });
+
+    it("reader returns 10 input, 10 output: stored reserved cost equals worst case (no top-up)", async () => {
+      const input = createTestInput();
+      const worstCase = estimateReaderCall(input).worstCaseCostNanoUsd;
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 10_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      const store = createSpyStore();
+
+      const result = await handleReadRequest({
+        setup,
+        store,
+        fakeStore: createMemoryUsageStore(),
+        readers: {
+          claude: {
+            name: "claude",
+            read: async () => ({
+              output: createTestOutput(),
+              usage: { inputTokens: 10, outputTokens: 10 },
+            }),
+          },
+        },
+        nowIso: "2026-01-01T00:00:00Z",
+        ip: "127.0.0.1",
+        bodyBytes: 100,
+        body: input,
+      });
+
+      expect(result.status).toBe(200);
+
+      const finalState = await store.readState();
+      const actualCost = estimateCostNanoUsd(10, 10);
+
+      expect(actualCost).toBeLessThanOrEqual(worstCase);
+      expect(finalState.reservedCostNanoUsd).toBe(worstCase);
+      
+      // Check that there was only one writeState call (the reserve, not a top-up)
+      const writeStateCount = store.events.filter((e) => e === "writeState").length;
+      expect(writeStateCount).toBe(1);
+    });
+
+    it("top-up writes fail: status 200, log gets 'usage cost top-up not written' once, response same as with a working store", async () => {
+      const input = createTestInput();
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 10_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      let savedState: UsageState = emptyUsageState();
+      let writeStateCallCount = 0;
+      const faultyStore: UsageStore = {
+        async readState() {
+          return savedState;
+        },
+        async writeState(s: UsageState) {
+          writeStateCallCount++;
+          savedState = s;
+          if (writeStateCallCount === 1) {
+            // First call (reservation) succeeds
+            return;
+          }
+          // All later calls (top-up attempts) fail
+          throw new Error("write failed");
+        },
+        async appendRecord(r: UsageRecord) {
+          // Do nothing
+        },
+      };
+
+      const logMessages: string[] = [];
+
+      const nowIso = "2026-01-01T00:00:00Z";
+      const ip = "127.0.0.1";
+      const reader = {
+        name: "claude",
+        read: async () => ({
+          output: createTestOutput(),
+          usage: { inputTokens: 200_000, outputTokens: 8_000 },
+        }),
+      };
+
+      const result = await handleReadRequest({
+        setup,
+        store: faultyStore,
+        fakeStore: createMemoryUsageStore(),
+        readers: { claude: reader },
+        nowIso,
+        ip,
+        bodyBytes: 100,
+        body: input,
+        log: (msg) => logMessages.push(msg),
+      });
+
+      // Expect status 200 despite top-up failures
+      expect(result.status).toBe(200);
+
+      // Expect exactly 1 log message about top-up not written
+      expect(logMessages.filter((m) => m === "usage cost top-up not written").length).toBe(1);
+
+      // Expect 4 writeState calls: 1 reserve + 3 top-up attempts
+      expect(writeStateCallCount).toBe(4);
+
+      // Run the same request with a working store to compare responses
+      const workingLogMessages: string[] = [];
+      const workingResult = await handleReadRequest({
+        setup,
+        store: createSpyStore(),
+        fakeStore: createMemoryUsageStore(),
+        readers: { claude: reader },
+        nowIso,
+        ip,
+        bodyBytes: 100,
+        body: input,
+        log: (msg) => workingLogMessages.push(msg),
+      });
+
+      // Responses should be the same
+      expect(result.json).toEqual(workingResult.json);
+    });
+
+    it("store writeState succeeds reserve, then fails all 3 top-up attempts: status 200, log receives 'not written', response same as success", async () => {
+      const input = createTestInput();
+
+      const setup: ReaderSetup = {
+        mode: "claude",
+        reason: null,
+        caps: { total: 100, daily: 100, perVisitorDaily: 100 },
+        costCapNanoUsd: 10_000_000_000,
+        store: "file",
+        storeDir: "logs",
+        visitorSalt: "salt",
+        apiKey: "key",
+      };
+
+      let writeAttempts = 0;
+      const faultyStore: UsageStore & { events: string[] } = {
+        events: [],
+        async readState() {
+          this.events.push("readState");
+          return emptyUsageState();
+        },
+        async writeState(s: UsageState) {
+          this.events.push("writeState");
+          writeAttempts++;
+          // First call succeeds (reserve), rest fail (top-up attempts)
+          if (writeAttempts > 1) {
+            throw new Error("top-up write fails");
+          }
+        },
+        async appendRecord(r: UsageRecord) {
+          this.events.push("appendRecord");
+        },
+      };
+
+      const logMessages: string[] = [];
+
+      const result = await handleReadRequest({
+        setup,
+        store: faultyStore,
+        fakeStore: createMemoryUsageStore(),
+        readers: {
+          claude: {
+            name: "claude",
+            read: async () => ({
+              output: createTestOutput(),
+              usage: { inputTokens: 200_000, outputTokens: 8_000 },
+            }),
+          },
+        },
+        nowIso: "2026-01-01T00:00:00Z",
+        ip: "127.0.0.1",
+        bodyBytes: 100,
+        body: input,
+        log: (msg) => logMessages.push(msg),
+      });
+
+      // Reserve succeeds, reader is called, top-up fails 3 times
+      expect(result.status).toBe(200);
+      expect(result.json.ok).toBe(true);
+      expect(logMessages).toContain("usage cost top-up not written");
+
+      // writeState was called 4 times: 1 reserve + 3 top-up attempts
+      expect(faultyStore.events.filter((e) => e === "writeState").length).toBe(4);
+    });
+  });
 });
 
 describe("intakeService: handleStatusRequest", () => {

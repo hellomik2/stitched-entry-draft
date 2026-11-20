@@ -35,6 +35,36 @@ export function utcDay(nowIso: string): string {
   return `${year}-${month}-${day}`;
 }
 
+export function utf8Bytes(s: string): number {
+  // Count exact UTF-8 bytes: every text the uploader controls is counted at one token per byte.
+  // This bounds any text; also characters outside the Basic Multilingual Plane.
+  let bytes = 0;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    if (cp < 0x80) {
+      bytes += 1;
+    } else if (cp < 0x800) {
+      bytes += 2;
+    } else if (cp < 0x10000) {
+      bytes += 3;
+    } else {
+      bytes += 4;
+    }
+  }
+  return bytes;
+}
+
+export function addReservedCost(state: UsageState, extraNanoUsd: number): UsageState {
+  // The ledger gets the actual cost when it is above the reserved worst case (Requirement 24.3).
+  if (!Number.isInteger(extraNanoUsd) || extraNanoUsd < 0) {
+    throw new Error("extraNanoUsd must be a non-negative safe integer");
+  }
+  return {
+    ...state,
+    reservedCostNanoUsd: (state.reservedCostNanoUsd ?? 0) + extraNanoUsd,
+  };
+}
+
 export function decideCall(
   state: UsageState,
   caps: Caps,
@@ -204,38 +234,19 @@ export function estimateReaderCall(
   input: ReaderInput,
   cfg = intakeConfig,
 ): CallEstimate {
-  // Count code points in a string and classify as ASCII or other
-  function countTokens(s: string): number {
-    let ascii = 0;
-    let other = 0;
-    for (const ch of s) {
-      const code = ch.charCodeAt(0);
-      if (code < 128) {
-        ascii++;
-      } else {
-        other++;
-      }
-    }
-    return Math.ceil(ascii / 2) + 2 * other;
-  }
+  // Every text the uploader controls is counted at one token per UTF-8 byte (bounds any text).
+  // The request repeats the file name and the document id on every page.
+  // The fixed prompt text is in promptOverheadTokens.
+  // Claude scales every image to at most about 4,800 tokens (we use 5,000).
+  // Any input under the per-call line therefore has at most 68,000 input tokens,
+  // below the 100,000-token price step (Requirement 24.1, 24.2).
 
-  // Start with prompt overhead
   let inputTokens = cfg.perCall.promptOverheadTokens;
 
-  // Add tokens for each document fileName
-  for (const doc of input.documents) {
-    inputTokens += countTokens(doc.fileName);
-  }
-
-  // Add tokens for each page
   for (const doc of input.documents) {
     for (const page of doc.pages) {
-      if (page.text !== null) {
-        inputTokens += countTokens(page.text);
-      } else {
-        // Image page
-        inputTokens += cfg.perCall.imageTokensPerPage;
-      }
+      inputTokens += cfg.perCall.perPageOverheadTokens + utf8Bytes(doc.fileName) + 4 * utf8Bytes(doc.docId);
+      inputTokens += page.text !== null ? utf8Bytes(page.text) : cfg.perCall.imageTokensPerPage;
     }
   }
 
