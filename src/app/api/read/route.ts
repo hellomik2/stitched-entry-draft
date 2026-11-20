@@ -13,6 +13,7 @@ import {
   type UsageStore,
 } from "../../../server/index";
 import { createClaudeReader } from "../../../server/claudeReader";
+import { readRequestRefusal } from "../../../server/requestGuard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +47,11 @@ function getMemoryFakeStore(): UsageStore {
 
 export async function POST(request: Request): Promise<Response> {
   const setup = resolveReaderSetup(process.env);
+
+  const refusal = readRequestRefusal(request.headers);
+  if (refusal) {
+    return Response.json({ ok: false, message: refusal.message }, { status: refusal.status, headers: { "cache-control": "no-store" } });
+  }
 
   // Check content-length header
   const contentLengthHeader = request.headers.get("content-length");

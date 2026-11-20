@@ -43,12 +43,14 @@ export function formatSource(s: Source): string {
 /**
  * Escape a cell value for RFC 4180 CSV.
  * If the cell contains comma, quote, CR, or LF, wrap in double quotes and escape inner quotes.
+ * Requirement 28.2: a cell that starts with a formula character gets a leading quote, so a spreadsheet shows the text instead of running it.
  */
 function escapeCsvCell(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\r") || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
+  const v = /^[=+\-@\t\r]/.test(value) ? "'" + value : value;
+  if (v.includes(",") || v.includes('"') || v.includes("\r") || v.includes("\n")) {
+    return `"${v.replace(/"/g, '""')}"`;
   }
-  return value;
+  return v;
 }
 
 /**

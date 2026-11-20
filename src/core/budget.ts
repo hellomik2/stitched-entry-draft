@@ -102,10 +102,14 @@ export function decideCall(
 
   const newDays: Record<string, { calls: number; visitors: Record<string, number> }> = {};
 
-  // Keep only the current day and the previous UTC day
+  // Keep the previous, current and next UTC day (Requirement 28.3): a server whose clock is a little behind must not erase the count of a day another server has started.
   const prevDate = new Date(nowIso);
   prevDate.setUTCDate(prevDate.getUTCDate() - 1);
   const prevDay = utcDay(prevDate.toISOString());
+
+  const nextDate = new Date(nowIso);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const nextDay = utcDay(nextDate.toISOString());
 
   // Copy previous day if it exists
   if (prevDay in state.days && prevDay !== day) {
@@ -120,6 +124,14 @@ export function decideCall(
     calls: today.calls + 1,
     visitors: newTodayVisitors,
   };
+
+  // Copy next day if it exists and differs from current day
+  if (nextDay in state.days && nextDay !== day) {
+    newDays[nextDay] = {
+      calls: state.days[nextDay].calls,
+      visitors: { ...state.days[nextDay].visitors },
+    };
+  }
 
   const next: UsageState = {
     totalCalls: state.totalCalls + 1,

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import type { UsageState } from "./budget";
 import {
   emptyUsageState,
   utcDay,
@@ -563,5 +564,96 @@ describe("Feature: document-intake, Property 41: The Ledger Holds the Actual Cos
     const state: any = { totalCalls: 0, days: {} };
     const result = addReservedCost(state, 100);
     expect(result.reservedCostNanoUsd).toBe(100);
+  });
+});
+
+
+describe("Feature: document-intake, Property 45: Small Guards Hold (day counts) (Validates: Requirements 28.3)", () => {
+  describe("example", () => {
+    it("three calls at 2026-12-10T00:00:01, then one call at 2026-12-09T23:59:59, keeps both days", () => {
+      let state = emptyUsageState();
+      const caps = { total: 100, daily: 100, perVisitorDaily: 100 };
+
+      // Three calls on "2026-12-10"
+      for (let i = 0; i < 3; i++) {
+        const result = decideCall(state, caps, "2026-12-10T00:00:01.000Z", `v${i}`);
+        expect(result.allowed).toBe(true);
+        if (result.allowed) {
+          state = result.next;
+        }
+      }
+
+      // One call on "2026-12-09"
+      const result = decideCall(state, caps, "2026-12-09T23:59:59.000Z", "vlate");
+      expect(result.allowed).toBe(true);
+      if (result.allowed) {
+        state = result.next;
+      }
+
+      // Check: next.days["2026-12-10"].calls is 3 and next.days["2026-12-09"].calls is 1
+      expect(state.days["2026-12-10"].calls).toBe(3);
+      expect(state.days["2026-12-09"].calls).toBe(1);
+    });
+  });
+
+  describe("property", () => {
+    it("keeps exactly the stored days among 2026-12-09, 2026-12-11 plus 2026-12-10 with updated count", () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            "2026-12-08": fc.option(fc.integer({ min: 0, max: 5 })),
+            "2026-12-09": fc.option(fc.integer({ min: 0, max: 5 })),
+            "2026-12-10": fc.option(fc.integer({ min: 0, max: 5 })),
+            "2026-12-11": fc.option(fc.integer({ min: 0, max: 5 })),
+            "2026-12-12": fc.option(fc.integer({ min: 0, max: 5 })),
+          }),
+          (dayRecords) => {
+            // Build the initial state with the random day records
+            const startDays: Record<string, { calls: number; visitors: Record<string, number> }> = {};
+            for (const [day, count] of Object.entries(dayRecords)) {
+              if (count !== null) {
+                startDays[day] = { calls: count, visitors: {} };
+              }
+            }
+
+            const state: UsageState = {
+              totalCalls: 0,
+              days: startDays,
+            };
+
+            const caps = { total: 1000, daily: 0, perVisitorDaily: 0 };
+            const result = decideCall(state, caps, "2026-12-10T12:00:00.000Z", "visitor");
+
+            expect(result.allowed).toBe(true);
+            if (!result.allowed) return;
+
+            const nextDays = result.next.days;
+            const nextDayKeys = Object.keys(nextDays).sort();
+
+            // Collect expected days: those from state.days that are "2026-12-09" or "2026-12-11", plus "2026-12-10"
+            const expectedDays = new Set<string>();
+            if ("2026-12-09" in state.days) expectedDays.add("2026-12-09");
+            if ("2026-12-11" in state.days) expectedDays.add("2026-12-11");
+            expectedDays.add("2026-12-10");
+
+            // Check: exactly these days are in nextDays
+            expect(nextDayKeys.sort()).toEqual(Array.from(expectedDays).sort());
+
+            // Check: counts for "2026-12-09" and "2026-12-11" are unchanged (if present)
+            if ("2026-12-09" in state.days) {
+              expect(nextDays["2026-12-09"].calls).toBe(state.days["2026-12-09"].calls);
+            }
+            if ("2026-12-11" in state.days) {
+              expect(nextDays["2026-12-11"].calls).toBe(state.days["2026-12-11"].calls);
+            }
+
+            // Check: "2026-12-10" count is stored count + 1 (or 1 if not stored)
+            const expectedCount = (state.days["2026-12-10"]?.calls ?? 0) + 1;
+            expect(nextDays["2026-12-10"].calls).toBe(expectedCount);
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
   });
 });
