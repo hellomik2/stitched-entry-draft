@@ -427,6 +427,18 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 28 (MUST): Small Guards on Requests, CSV Cells and Day Counts
+
+**User Story:** As an operator, I want other sites unable to spend the demo's AI reads, spreadsheet formulas unable to run from a document's text, and a server with a late clock unable to erase today's count.
+
+#### Acceptance Criteria
+
+1. THE read route SHALL refuse a request before reading its body: with 415 "Send the documents as JSON." when its `content-type` (lower case, the part before ";", trimmed) is not "application/json", and with 403 "Requests from other sites are not accepted." when a `sec-fetch-site` header is present and is neither "same-origin" nor "none". THE check is the exported function `readRequestRefusal(headers)` in `src/server/requestGuard.ts`, which returns `{ status, message }` or null. Browsers cannot send "application/json" to another site without asking first, so a page on another site cannot use a visitor's browser to spend the reads.
+2. `draftToCsv` SHALL put a single quote (') in front of a cell that starts with "=", "+", "-", "@", a tab or a carriage return, before the usual quoting, so a spreadsheet shows the text instead of running it as a formula. THE sample and upload test CSVs have no such cell and do not change.
+3. `decideCall` SHALL keep the counts of the previous, the current and the next UTC day of `nowIso` (today it keeps the previous and the current day), so a server whose clock is a little behind does not erase the count of a day that another server has already started.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -458,6 +470,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 25. (MUST) The Reader Uses Only the App's Own Key and the Anthropic Address
 26. (MUST) Values Computed from Image Readings Wait for a Person
 27. (MUST) Missing Amounts, Currency and Gross Weight Go to a Person
+28. (MUST) Small Guards on Requests, CSV Cells and Day Counts
 
 **NICE (if time is left):**
 

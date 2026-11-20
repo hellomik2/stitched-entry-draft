@@ -969,17 +969,19 @@ export default function StitchBoard(...) {
 
 **Requirement 24 (The Worst Case Counts Every Byte, and the Ledger Gets the Actual Cost):** `intakeConfig.ts` adds `perCall.perPageOverheadTokens: 160`. `budget.ts` adds `utf8Bytes(s)` function (1 byte per code point below U+0080, 2 below U+0800, 3 below U+10000, 4 otherwise); byte-based `estimateReaderCall(input)` computing inputTokens from UTF-8 bytes of every text and file name in the request plus image page overhead; `addReservedCost(state, extraNanoUsd)` returning new state with incremented `reservedCostNanoUsd` without mutating input. `intakeService.ts` true-up logic after every call with token usage: compute actual cost, if above worst case add difference to `reservedCostNanoUsd`, read-apply-write up to 3 tries, log "usage cost top-up not written" (no document text) if all fail.
 
-**Requirement 25 (The Reader Uses Only the App's Own Key and the Anthropic Address):** `readerEnv.ts` reads the key from `DOCUMENT_INTAKE_ANTHROPIC_KEY` only, never `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` (with only `DOCUMENT_INTAKE_ANTHROPIC_KEY` set, the mode is "off" with reason "no API key"). `claudeReader.ts` exports constant `ANTHROPIC_API_BASE_URL: "https://api.anthropic.com"` and exports function `createAnthropicClient(apiKey)` building the SDK client with `baseURL: ANTHROPIC_API_BASE_URL`, `maxRetries: 0`, `logLevel: "off"`, `openTelemetry: false`. `.kiro/steering/tech.md` references the new variable name `DOCUMENT_INTAKE_ANTHROPIC_KEY`.
+**Requirement 25 (The Reader Uses Only the App's Own Key and the Anthropic Address):** `readerEnv.ts` reads the key from `DOCUMENT_INTAKE_ANTHROPIC_KEY` only, never `ANTHROPIC_API_KEY` or `ANTHROPIC_BASE_URL` (an environment with `ANTHROPIC_API_KEY` but without `DOCUMENT_INTAKE_ANTHROPIC_KEY` gives mode "off" with reason "no API key"). `claudeReader.ts` exports constant `ANTHROPIC_API_BASE_URL: "https://api.anthropic.com"` and exports function `createAnthropicClient(apiKey)` building the SDK client with `baseURL: ANTHROPIC_API_BASE_URL`, `maxRetries: 0`, `logLevel: "off"`, `openTelemetry: false`. `.kiro/steering/tech.md` references the new variable name `DOCUMENT_INTAKE_ANTHROPIC_KEY`.
 
 **Requirement 26 (Values Computed from Image Readings Wait for a Person):** `draft.ts` defines `IMAGE_COMPUTED_REVIEW_REASON: "Computed from values the AI reader read from an image. Check them against the page, then confirm it."`. In the step of 18.1, computed values with image-origin sources get `needsReview` with this reason; confirming (applying own value) returns to "computed" with reason null and note "Confirmed by a person against the page.". After `recomputeTotals` and before Needs review list, a pass marks fields with "computed" or "copied" status that depend on image-waiting fields (those with `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON`) as `needsReview` with reason "Waiting on <ids>: values read from an image are not confirmed yet." where <ids> are the waiting fields in draft order, joined by ", ". `StitchBoard.tsx` shows the confirm button for both `IMAGE_REVIEW_REASON` and `IMAGE_COMPUTED_REVIEW_REASON`.
 
 **Requirement 27 (Missing Amounts, Currency and Gross Weight Go to a Person):** `draft.ts` adds three cases in `buildDraft`: (1) no accepted invoice currency reading → all 36A get `needsReview` with "No invoice currency was read. A person checks that the amounts are in USD and enters the entered value." (2) no accepted amount for a 7501 line after currency is read and no P1 check failed → 36A for that line gets `needsReview` with "No accepted amount for invoice line <n>[, <m> ...]. A person enters the entered value." (3) no accepted packing-list total gross weight → all 34A get `needsReview` with "No total gross weight was read from the packing list. A person enters the gross weight."
 
+**Requirement 28 (Small Guards on Requests, CSV Cells and Day Counts):** `src/server/requestGuard.ts` (`readRequestRefusal`, called first in `src/app/api/read/route.ts`), `csv.ts` (`escapeCsvCell` puts ' in front of =, +, -, @, tab, CR), `budget.ts` (`decideCall` keeps the previous, current and next UTC day).
+
 ---
 
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 44 are defined below (44 in total).*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 45 are defined below (45 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1225,6 +1227,12 @@ Removing any non-empty set of invoice line amounts, the invoice currency, or the
 
 **Validates: Requirements 27.1 to 27.5**
 
+### Property 45: Small Guards Hold
+
+For any content type other than "application/json" (with or without parameters) `readRequestRefusal` gives 415, for any `sec-fetch-site` other than "same-origin" and "none" it gives 403, and a same-origin JSON request gives null; for any string, the CSV cell `draftToCsv` writes never starts with =, +, -, @, tab or CR; for any state and any time, `decideCall` keeps every stored count of the previous, current and next UTC day.
+
+**Validates: Requirements 28.1, 28.2, 28.3**
+
 ---
 
 ## Error Handling
@@ -1331,6 +1339,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (44 properties: 1 to 28, 33 to 44 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (45 properties: 1 to 28, 33 to 45 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 44
+**Total Correctness Properties:** 45

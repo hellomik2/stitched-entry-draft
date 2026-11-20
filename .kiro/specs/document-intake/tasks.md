@@ -262,6 +262,13 @@
   - [ ] 35.1 Verifier: new items for Requirements 23 to 27; existing items use `DOCUMENT_INTAKE_ANTHROPIC_KEY`; the off-mode screen check accepts "no API key" and "no durable usage store configured"
   - _Requirements: 23, 24, 25, 26, 27_
 
+- [ ] 36. Small guards on requests, CSV cells and day counts
+  - [ ] 36.1 `readRequestRefusal` in `src/server/requestGuard.ts`, used first in the read route
+  - [ ] 36.2 `escapeCsvCell` puts ' in front of formula characters
+  - [ ] 36.3 `decideCall` keeps the previous, current and next UTC day
+  - [ ] 36.4 Property 45 test
+  - _Requirements: 28_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -300,5 +307,6 @@
 33. Values computed from image readings wait for a person
 34. Missing amounts, currency and gross weight go to a person
 35. (maintainer) Verifier items for the cross-check fixes; reproduction scripts fail before and pass after
+36. Small guards on requests, CSV cells and day counts
 
-**Total Sub-Tasks:** 177
+**Total Sub-Tasks:** 181
