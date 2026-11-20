@@ -234,39 +234,39 @@
   - [x] 29.1 Update `package.json` and the lock file; type check, tests, build, sample and upload checks
   - _Requirements: 12.5_
 
-- [ ] 30. A cap reservation counts only when the store confirms it
-  - [ ] 30.1 `writeState` requires `modified: true` and a non-empty `etag`
-  - [ ] 30.2 Property 39 test
+- [x] 30. A cap reservation counts only when the store confirms it
+  - [x] 30.1 `writeState` requires `modified: true` and a non-empty `etag`
+  - [x] 30.2 Property 39 test
   - _Requirements: 23_
-- [ ] 31. Byte-based worst case and the actual cost in the ledger
-  - [ ] 31.1 `utf8Bytes`, `perPageOverheadTokens` and the byte-based `estimateReaderCall`
-  - [ ] 31.2 `addReservedCost` and the true-up after the call in `intakeService`
-  - [ ] 31.3 Property 40 and Property 41 tests
+- [x] 31. Byte-based worst case and the actual cost in the ledger
+  - [x] 31.1 `utf8Bytes`, `perPageOverheadTokens` and the byte-based `estimateReaderCall`
+  - [x] 31.2 `addReservedCost` and the true-up after the call in `intakeService`
+  - [x] 31.3 Property 40 and Property 41 tests
   - _Requirements: 24_
-- [ ] 32. The app's own key and the Anthropic address
-  - [ ] 32.1 `readerEnv`: key from `DOCUMENT_INTAKE_ANTHROPIC_KEY` only
-  - [ ] 32.2 `createAnthropicClient` with fixed `baseURL`, `maxRetries: 0`, `logLevel: "off"`, `openTelemetry: false`
-  - [ ] 32.3 Steering `tech.md` names the new variable
-  - [ ] 32.4 Property 42 test
+- [x] 32. The app's own key and the Anthropic address
+  - [x] 32.1 `readerEnv`: key from `DOCUMENT_INTAKE_ANTHROPIC_KEY` only
+  - [x] 32.2 `createAnthropicClient` with fixed `baseURL`, `maxRetries: 0`, `logLevel: "off"`, `openTelemetry: false`
+  - [x] 32.3 Steering `tech.md` names the new variable
+  - [x] 32.4 Property 42 test
   - _Requirements: 25_
-- [ ] 33. Values computed from image readings wait for a person
-  - [ ] 33.1 `IMAGE_COMPUTED_REVIEW_REASON`, confirm back to "computed", waiting pass after `recomputeTotals`
-  - [ ] 33.2 Board confirm button for both image reasons
-  - [ ] 33.3 Property 35 test updated; Property 43 test
+- [x] 33. Values computed from image readings wait for a person
+  - [x] 33.1 `IMAGE_COMPUTED_REVIEW_REASON`, confirm back to "computed", waiting pass after `recomputeTotals`
+  - [x] 33.2 Board confirm button for both image reasons
+  - [x] 33.3 Property 35 test updated; Property 43 test
   - _Requirements: 26_
-- [ ] 34. Missing amounts, currency and gross weight go to a person
-  - [ ] 34.1 36A currency and amount cases; 34A without a total gross weight
-  - [ ] 34.2 Property 44 test
+- [x] 34. Missing amounts, currency and gross weight go to a person
+  - [x] 34.1 36A currency and amount cases; 34A without a total gross weight
+  - [x] 34.2 Property 44 test
   - _Requirements: 27_
-- [ ] 35. (maintainer) Verifier items for the cross-check fixes; reproduction scripts fail before and pass after
-  - [ ] 35.1 Verifier: new items for Requirements 23 to 27; existing items use `DOCUMENT_INTAKE_ANTHROPIC_KEY`; the off-mode screen check accepts "no API key" and "no durable usage store configured"
+- [x] 35. (maintainer) Verifier items for the cross-check fixes; reproduction scripts fail before and pass after
+  - [x] 35.1 Verifier: new items for Requirements 23 to 27; existing items use `DOCUMENT_INTAKE_ANTHROPIC_KEY`; the off-mode screen check accepts "no API key" and "no durable usage store configured"
   - _Requirements: 23, 24, 25, 26, 27_
 
-- [ ] 36. Small guards on requests, CSV cells and day counts
-  - [ ] 36.1 `readRequestRefusal` in `src/server/requestGuard.ts`, used first in the read route
-  - [ ] 36.2 `escapeCsvCell` puts ' in front of formula characters
-  - [ ] 36.3 `decideCall` keeps the previous, current and next UTC day
-  - [ ] 36.4 Property 45 test
+- [x] 36. Small guards on requests, CSV cells and day counts
+  - [x] 36.1 `readRequestRefusal` in `src/server/requestGuard.ts`, used first in the read route
+  - [x] 36.2 `escapeCsvCell` puts ' in front of formula characters
+  - [x] 36.3 `decideCall` keeps the previous, current and next UTC day
+  - [x] 36.4 Property 45 test
   - _Requirements: 28_
 
 ## Summary
