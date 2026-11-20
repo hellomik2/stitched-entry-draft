@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { verifyReadings } from "./reading";
 import type { ReadingAnswer, VerifiedReading } from "./reading";
-import { buildDraft, IMAGE_REVIEW_REASON, CONFIRMED_NOTE } from "./draft";
+import { buildDraft, IMAGE_REVIEW_REASON, IMAGE_COMPUTED_REVIEW_REASON, IMAGE_WAITING_SUFFIX, CONFIRMED_NOTE, allFields } from "./draft";
 import type { DocumentText } from "./pdfText";
 import type { HtsTable } from "./hts";
 import { loadBundleFromDisk } from "../node/index";
@@ -229,7 +229,7 @@ describe("Draft", () => {
     );
   });
 
-  describe("Feature: document-intake, Property 35: Image Values Wait for a Person (Validates: Requirements 18.1, 18.2, 18.3)", () => {
+  describe("Feature: document-intake, Property 35: Image Values Wait for a Person (Validates: Requirements 18.1, 18.3, 26.1, 26.2, 26.3)", () => {
     it(
       "Property 35: Image Values Wait for a Person",
       async () => {
@@ -268,12 +268,12 @@ describe("Draft", () => {
                 hts: bundleHts,
               });
 
-              // No field of img should have status "copied" with a document source with origin "imageTranscript"
+              // No field of img should have status "copied" or "computed" with a document source with origin "imageTranscript"
               for (const field of [...img.header, ...img.totals, ...img.lines.flatMap((l) => l.fields)]) {
-                if (field.status === "copied") {
+                if (field.status === "copied" || field.status === "computed") {
                   for (const source of field.sources) {
                     if (source.kind === "document" && source.origin === "imageTranscript") {
-                      throw new Error(`Field ${field.id} has status "copied" but document source with origin "imageTranscript"`);
+                      throw new Error(`Field ${field.id} has status "${field.status}" but document source with origin "imageTranscript"`);
                     }
                   }
                 }
@@ -300,8 +300,24 @@ describe("Draft", () => {
                   expect(imgField.reason).toBe(IMAGE_REVIEW_REASON);
                   expect(imgField.value).toBe(plainField.value);
                   expect(imgField.rule).toBe(plainField.rule);
+                } else if (plainField.status === "computed" && imgHasImageSource) {
+                  // img field must have status "needsReview" and reason IMAGE_COMPUTED_REVIEW_REASON
+                  expect(imgField.status).toBe("needsReview");
+                  expect(imgField.reason).toBe(IMAGE_COMPUTED_REVIEW_REASON);
+                  expect(imgField.value).toBe(plainField.value);
+                  expect(imgField.rule).toBe(plainField.rule);
+                } else if (imgField.reason && imgField.reason.endsWith(IMAGE_WAITING_SUFFIX)) {
+                  // Field waits on image-waiting dependencies
+                  expect(imgField.status).toBe("needsReview");
+                  expect(plainField.status === "computed" || plainField.status === "copied").toBe(true);
+                  expect(imgField.value).toBe(plainField.value);
+                  expect(imgField.rule).toBe(plainField.rule);
                 } else {
-                  // Otherwise, status/value/reason/rule should be the same
+                  // Skip fields that have IMAGE_REVIEW_REASON or IMAGE_COMPUTED_REVIEW_REASON with null value
+                  if ((imgField.reason === IMAGE_REVIEW_REASON || imgField.reason === IMAGE_COMPUTED_REVIEW_REASON) && imgField.value === null) {
+                    continue;
+                  }
+                  // Otherwise, expect imgField status, value, reason and rule to equal plainField's
                   expect(imgField.status).toBe(plainField.status);
                   expect(imgField.value).toBe(plainField.value);
                   expect(imgField.reason).toBe(plainField.reason);
@@ -309,13 +325,13 @@ describe("Draft", () => {
                 }
               }
 
-              // Build overrides: for each image field with reason === IMAGE_REVIEW_REASON, apply confirmation
+              // Build overrides: for each image field with reason === IMAGE_REVIEW_REASON or IMAGE_COMPUTED_REVIEW_REASON, apply confirmation
               const overrides = [
                 ...img.header,
                 ...img.totals,
                 ...img.lines.flatMap((l) => l.fields),
               ]
-                .filter((f) => f.reason === IMAGE_REVIEW_REASON && f.value !== null)
+                .filter((f) => (f.reason === IMAGE_REVIEW_REASON || f.reason === IMAGE_COMPUTED_REVIEW_REASON) && f.value !== null)
                 .map((f) => ({ fieldId: f.id, value: f.value as string }));
 
               const conf = buildDraft({
@@ -340,12 +356,14 @@ describe("Draft", () => {
 
                 if (!imgField || !plainField) continue;
 
-                if (imgField.reason === IMAGE_REVIEW_REASON && imgField.value !== null) {
+                if ((imgField.reason === IMAGE_REVIEW_REASON || imgField.reason === IMAGE_COMPUTED_REVIEW_REASON) && imgField.value !== null) {
                   // This field was confirmed; it should have:
-                  // - status "copied", same value, rule and sources as in img
+                  // - status "copied" (for IMAGE_REVIEW_REASON) or "computed" (for IMAGE_COMPUTED_REVIEW_REASON)
+                  // - same value, rule and sources as in img
                   // - note CONFIRMED_NOTE
                   // - same status, value, reason and rule as in plain
-                  expect(confField.status).toBe("copied");
+                  const expectedStatus = imgField.reason === IMAGE_REVIEW_REASON ? "copied" : "computed";
+                  expect(confField.status).toBe(expectedStatus);
                   expect(confField.value).toBe(imgField.value);
                   expect(confField.rule).toBe(imgField.rule);
                   expect(confField.sources).toEqual(imgField.sources);
@@ -355,12 +373,17 @@ describe("Draft", () => {
                   expect(confField.value).toBe(plainField.value);
                   expect(confField.reason).toBe(plainField.reason);
                   expect(confField.rule).toBe(plainField.rule);
+                } else if (
+                  (imgField.reason === IMAGE_REVIEW_REASON || imgField.reason === IMAGE_COMPUTED_REVIEW_REASON) &&
+                  imgField.value === null
+                ) {
+                  // An image value without a value cannot be confirmed with its own value; nothing to compare.
                 } else {
-                  // Otherwise, conf field should have the same status/value/reason/rule as img field
-                  expect(confField.status).toBe(imgField.status);
-                  expect(confField.value).toBe(imgField.value);
-                  expect(confField.reason).toBe(imgField.reason);
-                  expect(confField.rule).toBe(imgField.rule);
+                  // Confirming every image value clears the fields that waited on them: the draft is the plain one again.
+                  expect(confField.status).toBe(plainField.status);
+                  expect(confField.value).toBe(plainField.value);
+                  expect(confField.reason).toBe(plainField.reason);
+                  expect(confField.rule).toBe(plainField.rule);
                 }
               }
             },

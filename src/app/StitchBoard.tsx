@@ -21,6 +21,7 @@ import {
   readerOutputToAnswer,
   composeDocumentTexts,
   IMAGE_REVIEW_REASON,
+  IMAGE_COMPUTED_REVIEW_REASON,
   CONFIRMED_NOTE,
 } from '../core'
 import UploadPanel, { type UploadResult } from './intake/UploadPanel'
@@ -1291,7 +1292,7 @@ function SourceStrip({
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
                 <span data-testid="strip-status" style={{ color: 'var(--muted)', fontWeight: 500 }}>{statusWords[field.status]}</span>
 
-              {field.status === 'needsReview' && field.value && field.reason === IMAGE_REVIEW_REASON && (
+              {field.status === 'needsReview' && field.value && (field.reason === IMAGE_REVIEW_REASON || field.reason === IMAGE_COMPUTED_REVIEW_REASON) && (
                 <button
                   type="button"
                   data-testid="confirm-image-value"

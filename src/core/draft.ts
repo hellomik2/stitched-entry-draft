@@ -16,6 +16,10 @@ export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
 export const IMAGE_REVIEW_REASON = "Read from an image by the AI reader. Check it against the page, then confirm it.";
 
+export const IMAGE_COMPUTED_REVIEW_REASON = "Computed from values the AI reader read from an image. Check them against the page, then confirm it.";
+
+export const IMAGE_WAITING_SUFFIX = "values read from an image are not confirmed yet.";
+
 export const CONFIRMED_NOTE = "Confirmed by a person against the page.";
 
 export type FieldStatus = "copied" | "computed" | "needsReview" | "personInput" | "personEdited";
@@ -1413,7 +1417,18 @@ export function buildDraft(input: {
         }
       }
 
-      if (!isCurrencyOk) {
+      if (!currencyReading || !currencyReading.value || normalizeSpace(currencyReading.value) === "") {
+        lineFields.push(
+          field_helper({
+            id,
+            block: "36A",
+            line: lineNum,
+            label: "Entered value (USD)",
+            status: "needsReview",
+            reason: "No invoice currency was read. A person checks that the amounts are in USD and enters the entered value.",
+          })
+        );
+      } else if (!isCurrencyOk) {
         lineFields.push(
           field_helper({
             id,
@@ -1443,23 +1458,17 @@ export function buildDraft(input: {
         );
       } else {
         // Sum amounts in cents, round to whole dollars
-        let totalCents = 0;
-        const amountSources: DocSource[] = [];
+        // Check for missing amounts first (Requirement 27.2)
+        const missing = group.invoiceLines.filter((n, i) => group.amountsCents[i] === null);
 
-        for (let i = 0; i < group.invoiceLines.length; i++) {
-          const n = group.invoiceLines[i];
-          const amountCents = group.amountsCents[i];
-
-          if (amountCents !== null) {
-            totalCents += amountCents;
+        if (missing.length > 0) {
+          const amountSources: DocSource[] = [];
+          for (let i = 0; i < group.invoiceLines.length; i++) {
+            const n = group.invoiceLines[i];
+            const r = accepted.get(`invoice.lines.${n}.amount`);
+            if (r) amountSources.push(docSource(r));
           }
 
-          const r = accepted.get(`invoice.lines.${n}.amount`);
-          if (r) amountSources.push(docSource(r));
-        }
-
-        const roundedValue = roundEnteredValue(totalCents);
-        if (!roundedValue.ok) {
           lineFields.push(
             field_helper({
               id,
@@ -1467,24 +1476,54 @@ export function buildDraft(input: {
               line: lineNum,
               label: "Entered value (USD)",
               status: "needsReview",
-              reason: roundedValue.reason,
+              reason: `No accepted amount for invoice line ${missing.join(", ")}. A person enters the entered value.`,
               sources: amountSources,
             })
           );
         } else {
-          lineFields.push(
-            field_helper({
-              id,
-              block: "36A",
-              line: lineNum,
-              label: "Entered value (USD)",
-              value: String(roundedValue.value),
-              status: "computed",
-              rule: "P4",
-              note: "Nothing was deducted. A person confirms the entered value.",
-              sources: amountSources,
-            })
-          );
+          let totalCents = 0;
+          const amountSources: DocSource[] = [];
+
+          for (let i = 0; i < group.invoiceLines.length; i++) {
+            const n = group.invoiceLines[i];
+            const amountCents = group.amountsCents[i];
+
+            if (amountCents !== null) {
+              totalCents += amountCents;
+            }
+
+            const r = accepted.get(`invoice.lines.${n}.amount`);
+            if (r) amountSources.push(docSource(r));
+          }
+
+          const roundedValue = roundEnteredValue(totalCents);
+          if (!roundedValue.ok) {
+            lineFields.push(
+              field_helper({
+                id,
+                block: "36A",
+                line: lineNum,
+                label: "Entered value (USD)",
+                status: "needsReview",
+                reason: roundedValue.reason,
+                sources: amountSources,
+              })
+            );
+          } else {
+            lineFields.push(
+              field_helper({
+                id,
+                block: "36A",
+                line: lineNum,
+                label: "Entered value (USD)",
+                value: String(roundedValue.value),
+                status: "computed",
+                rule: "P4",
+                note: "Nothing was deducted. A person confirms the entered value.",
+                sources: amountSources,
+              })
+            );
+          }
         }
       }
     }
@@ -1712,10 +1751,35 @@ export function buildDraft(input: {
   // Now populate L<nnn>.34A with allocated gross weights
   {
     const totalGrossReading = accepted.get("packingList.totalGrossKg");
-    if (totalGrossReading && totalGrossReading.value) {
+    
+    // Check for missing or invalid total gross weight (Requirement 27.3)
+    if (!totalGrossReading || !totalGrossReading.value || normalizeSpace(totalGrossReading.value) === "") {
+      // No reading at all
+      for (const draftLine of draftLines) {
+        const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+        if (grossField) {
+          grossField.status = "needsReview";
+          grossField.value = null;
+          grossField.reason = "No total gross weight was read from the packing list. A person enters the gross weight.";
+          grossField.sources = [];
+        }
+      }
+    } else {
       const totalGrossResult = parseKgToTenths(normalizeSpace(totalGrossReading.value));
 
-      if (totalGrossResult.ok) {
+      if (!totalGrossResult.ok) {
+        // Reading exists but cannot be parsed
+        for (const draftLine of draftLines) {
+          const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+          if (grossField) {
+            grossField.status = "needsReview";
+            grossField.value = null;
+            grossField.reason = "No total gross weight was read from the packing list. A person enters the gross weight.";
+            grossField.sources = [docSource(totalGrossReading)];
+          }
+        }
+      } else {
+        // Reading is valid, proceed with allocation
         // Build basis for each 7501 line: sum of packing list gross kg for its items
         // Also collect the individual packing list readings for sources
         const basis: number[] = [];
@@ -2268,11 +2332,14 @@ export function buildDraft(input: {
   ];
 
   // A value read from an image page is not final until a person confirms it (Requirement 18.1).
-  // Computed values keep their status (18.2).
+  // Computed values with an image source wait too (Requirement 26.1).
   for (const f of allFieldsList) {
     if (f.status === "copied" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
       f.status = "needsReview";
       f.reason = IMAGE_REVIEW_REASON;
+    } else if (f.status === "computed" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
+      f.status = "needsReview";
+      f.reason = IMAGE_COMPUTED_REVIEW_REASON;
     }
   }
 
@@ -2290,6 +2357,15 @@ export function buildDraft(input: {
     if (oldReason === IMAGE_REVIEW_REASON && oldValue !== null && override.value === oldValue) {
       // Back to "copied": the value is the document's, now checked by a person. Nothing computed from it changes.
       field.status = "copied";
+      field.reason = null;
+      field.note = CONFIRMED_NOTE;
+      continue;
+    }
+
+    // Confirming a computed value from an image (Requirement 26.2).
+    if (oldReason === IMAGE_COMPUTED_REVIEW_REASON && oldValue !== null && override.value === oldValue) {
+      // Back to "computed": the value is confirmed, but still computed.
+      field.status = "computed";
       field.reason = null;
       field.note = CONFIRMED_NOTE;
       continue;
@@ -2850,6 +2926,82 @@ export function buildDraft(input: {
   };
 
   recomputeTotals();
+
+  // Waiting pass (Requirement 26.3): mark computed/copied fields that depend on image-waiting fields as needsReview
+  const isImageWaiting = (f: DraftField): boolean => {
+    return f.status === "needsReview" && (f.reason === IMAGE_REVIEW_REASON || f.reason === IMAGE_COMPUTED_REVIEW_REASON);
+  };
+
+  const depsOf = (f: DraftField): string[] => {
+    const deps = [...f.inputs];
+    if (f.block === "37A" && f.line !== null) {
+      deps.push(`L${f.line}.33A`);
+      deps.push(`L${f.line}.10`);
+    }
+    return deps;
+  };
+
+  const waitsOnMemo = new Map<string, Set<string>>();
+  const visiting = new Set<string>();
+
+  const waitsOn = (id: string): Set<string> => {
+    if (waitsOnMemo.has(id)) {
+      return waitsOnMemo.get(id)!;
+    }
+
+    if (visiting.has(id)) {
+      // Cycle detected, return empty set
+      return new Set();
+    }
+
+    visiting.add(id);
+    const result = new Set<string>();
+
+    const field = allFieldsList.find((f) => f.id === id);
+    if (field) {
+      for (const depId of depsOf(field)) {
+        const depField = allFieldsList.find((f) => f.id === depId);
+        if (depField) {
+          if (isImageWaiting(depField)) {
+            result.add(depId);
+          }
+          // Only follow transitive dependencies if the dep is not personEdited
+          if (depField.status !== "personEdited") {
+            for (const transId of waitsOn(depId)) {
+              result.add(transId);
+            }
+          }
+        }
+      }
+    }
+
+    visiting.delete(id);
+    waitsOnMemo.set(id, result);
+    return result;
+  };
+
+  // Pre-compute waitsOn for all fields
+  for (const f of allFieldsList) {
+    waitsOn(f.id);
+  }
+
+  // Mark fields that wait on image-waiting fields
+  for (const field of allFieldsList) {
+    if ((field.status === "computed" || field.status === "copied") && !isImageWaiting(field)) {
+      const deps = waitsOn(field.id);
+      if (deps.size > 0) {
+        // Sort deps by position in allFieldsList
+        const sortedDeps = Array.from(deps).sort((a, b) => {
+          const indexA = allFieldsList.findIndex((f) => f.id === a);
+          const indexB = allFieldsList.findIndex((f) => f.id === b);
+          return indexA - indexB;
+        });
+        field.status = "needsReview";
+        field.reason = `Waiting on ${sortedDeps.join(", ")}: ${IMAGE_WAITING_SUFFIX}`;
+        // Value, sources, rule, note, inputs stay
+      }
+    }
+  }
 
   // Collect needsReview and personInput lists
   const needsReviewList: ReviewItem[] = [];
