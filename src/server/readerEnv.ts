@@ -126,7 +126,9 @@ export function resolveReaderSetup(env: Record<string, string | undefined>): Rea
   }
 
   // 6. Check for Claude mode
-  const apiKey = trimEnv(env.ANTHROPIC_API_KEY);
+  // The key comes only from DOCUMENT_INTAKE_ANTHROPIC_KEY (Requirement 25). ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL
+  // are never read: a hosting platform may set them by itself for its own AI gateway.
+  const apiKey = trimEnv(env.DOCUMENT_INTAKE_ANTHROPIC_KEY);
 
   if (!apiKey) {
     return {

@@ -212,7 +212,7 @@ describe("Feature: document-intake, Property 29: Blobs Store Never Lets Concurre
 
           // Create test setup
           const setup = resolveReaderSetup({
-            ANTHROPIC_API_KEY: "test-key-not-real",
+            DOCUMENT_INTAKE_ANTHROPIC_KEY: "test-key-not-real",
             DOCUMENT_INTAKE_STORE: "netlify-blobs",
             DOCUMENT_INTAKE_TOTAL_CAP: String(total),
             DOCUMENT_INTAKE_DAILY_CAP: "0",
@@ -330,7 +330,7 @@ describe("Feature: document-intake, Property 39: Unconfirmed Cap Writes Stop the
     };
 
     const setup = resolveReaderSetup({
-      ANTHROPIC_API_KEY: "test-key-not-real",
+      DOCUMENT_INTAKE_ANTHROPIC_KEY: "test-key-not-real",
       DOCUMENT_INTAKE_STORE: "netlify-blobs",
       DOCUMENT_INTAKE_TOTAL_CAP: "1",
       DOCUMENT_INTAKE_DAILY_CAP: "0",
@@ -376,7 +376,7 @@ describe("Feature: document-intake, Property 39: Unconfirmed Cap Writes Stop the
           const blobs = createFakeBlobs();
 
           const setup = resolveReaderSetup({
-            ANTHROPIC_API_KEY: "test-key-not-real",
+            DOCUMENT_INTAKE_ANTHROPIC_KEY: "test-key-not-real",
             DOCUMENT_INTAKE_STORE: "netlify-blobs",
             DOCUMENT_INTAKE_TOTAL_CAP: String(total),
             DOCUMENT_INTAKE_DAILY_CAP: "0",

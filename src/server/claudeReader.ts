@@ -12,6 +12,21 @@ export const SDK_ERRORS = {
   APIConnectionTimeoutError: Anthropic.APIConnectionTimeoutError,
 };
 
+// Requirement 25: the address is fixed in code, so no environment variable can route the calls elsewhere.
+export const ANTHROPIC_API_BASE_URL = "https://api.anthropic.com";
+
+// The only place that builds the SDK client. The key is passed in; the SDK reads no key, address, log level or
+// tracing setting from the environment.
+export function createAnthropicClient(apiKey: string): Anthropic {
+  return new Anthropic({
+    apiKey,
+    baseURL: ANTHROPIC_API_BASE_URL,
+    maxRetries: 0,
+    logLevel: "off",
+    openTelemetry: false,
+  });
+}
+
 // Injection types for testing
 export type ClaudeResponseLike = {
   stop_reason: string | null;
@@ -247,10 +262,7 @@ export function createClaudeReader(config: {
 
       // Initialize lazy client if not provided
       if (!lazyClient) {
-        const sdk = new Anthropic({
-          apiKey: config.apiKey,
-          maxRetries: 0,
-        });
+        const sdk = createAnthropicClient(config.apiKey);
         lazyClient = {
           messages: {
             create: (params, options) =>

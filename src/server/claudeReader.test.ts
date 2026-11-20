@@ -4,6 +4,8 @@ import * as path from "node:path";
 import type { ClaudeClientLike, ClaudeResponseLike } from "./claudeReader";
 import {
   createClaudeReader,
+  createAnthropicClient,
+  ANTHROPIC_API_BASE_URL,
   READER_SYSTEM_PROMPT,
   READER_OUTPUT_SCHEMA,
   buildReaderRequest,
@@ -762,6 +764,46 @@ describe("Claude Reader", () => {
 
       // Check that READER_OUTPUT_SCHEMA is unchanged
       expect(READER_OUTPUT_SCHEMA.properties.fields.items.properties.doc).toEqual({ type: "string" });
+    });
+  });
+
+  describe("Feature: document-intake, Property 42: Platform Variables Cannot Turn the Reader On (client) (Validates: Requirements 25.2)", () => {
+    it("createAnthropicClient ignores environment variables for baseURL, logLevel, and openTelemetry", () => {
+      const originalBaseUrl = process.env.ANTHROPIC_BASE_URL;
+      const originalLogLevel = process.env.ANTHROPIC_LOG;
+
+      try {
+        process.env.ANTHROPIC_BASE_URL = "https://gateway.invalid/anthropic";
+        process.env.ANTHROPIC_LOG = "debug";
+
+        const client = createAnthropicClient("test-key-not-real");
+
+        expect(client.baseURL).toBe(ANTHROPIC_API_BASE_URL);
+        expect(client.maxRetries).toBe(0);
+        expect(client.apiKey).toBe("test-key-not-real");
+        expect(client.logLevel).toBe("off");
+      } finally {
+        if (originalBaseUrl === undefined) {
+          delete process.env.ANTHROPIC_BASE_URL;
+        } else {
+          process.env.ANTHROPIC_BASE_URL = originalBaseUrl;
+        }
+        if (originalLogLevel === undefined) {
+          delete process.env.ANTHROPIC_LOG;
+        } else {
+          process.env.ANTHROPIC_LOG = originalLogLevel;
+        }
+      }
+    });
+
+    it("source code builds the client with the fixed address and the required settings", async () => {
+      const sourceFile = path.join(process.cwd(), "src", "server", "claudeReader.ts");
+      const source = await fs.readFile(sourceFile, "utf-8");
+
+      expect(source).toContain("baseURL: ANTHROPIC_API_BASE_URL");
+      expect(source).toContain('logLevel: "off"');
+      expect(source).toContain("openTelemetry: false");
+      expect(source).not.toContain("process.env");
     });
   });
 });

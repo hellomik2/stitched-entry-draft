@@ -8,7 +8,7 @@ const envArb = fc.record({
   DOCUMENT_INTAKE_KILL_SWITCH: optional(["", "  ", "1"]),
   DOCUMENT_INTAKE_MODE: optional(["fake", "claude", "x", ""]),
   DOCUMENT_INTAKE_STORE: optional(["file", "netlify-blobs", "blobs", ""]),
-  ANTHROPIC_API_KEY: optional(["", "test-key-not-real"]),
+  DOCUMENT_INTAKE_ANTHROPIC_KEY: optional(["", "test-key-not-real"]),
   DOCUMENT_INTAKE_TOTAL_CAP: optional(["5", "abc", ""]),
   DOCUMENT_INTAKE_DAILY_CAP: optional(["0", "7", "x1"]),
   DOCUMENT_INTAKE_VISITOR_DAILY_CAP: optional(["3", "-1"]),
@@ -63,7 +63,7 @@ describe("Feature: document-intake, Property 15: Resolver Mode Claude Needs Key 
           !isSet(env.DOCUMENT_INTAKE_KILL_SWITCH) &&
           capsValid(env) &&
           env.DOCUMENT_INTAKE_MODE?.trim() !== "fake" &&
-          isSet(env.ANTHROPIC_API_KEY) &&
+          isSet(env.DOCUMENT_INTAKE_ANTHROPIC_KEY) &&
           (storeTrimmed === "file" || storeTrimmed === "netlify-blobs");
         expect((s.mode === "claude") === shouldBeClaude).toBe(true);
         expect((s.apiKey !== null) === (s.mode === "claude")).toBe(true);
@@ -121,3 +121,46 @@ describe("Feature: document-intake, Property 30: Public Site Caps Default (Valid
   });
 });
 
+describe("Feature: document-intake, Property 42: Platform Variables Cannot Turn the Reader On (Validates: Requirements 25.1)", () => {
+  it("property: ANTHROPIC_API_KEY and ANTHROPIC_BASE_URL never affect the result", () => {
+    fc.assert(
+      fc.property(
+        envArb,
+        fc.record({
+          ANTHROPIC_API_KEY: fc.option(fc.constantFrom("platform-gateway-key", ""), { nil: undefined }),
+          ANTHROPIC_BASE_URL: fc.option(fc.constantFrom("https://gateway.invalid/anthropic", ""), { nil: undefined }),
+        }),
+        (env, extra) => {
+          const withoutExtra = resolveReaderSetup(env);
+          const withExtra = resolveReaderSetup({ ...env, ...extra });
+
+          expect(withExtra.mode).toBe(withoutExtra.mode);
+          expect(withExtra.reason).toBe(withoutExtra.reason);
+          expect(withExtra.apiKey).toBe(withoutExtra.apiKey);
+        },
+      ),
+      { numRuns: 300 },
+    );
+  });
+
+  it("example: ANTHROPIC_API_KEY with no DOCUMENT_INTAKE_ANTHROPIC_KEY gives mode off", () => {
+    const result = resolveReaderSetup({
+      ANTHROPIC_API_KEY: "platform-gateway-key",
+      DOCUMENT_INTAKE_STORE: "netlify-blobs",
+    });
+    expect(result.mode).toBe("off");
+    expect(result.reason).toBe("no API key");
+    expect(result.apiKey).toBeNull();
+  });
+
+  it("example: both ANTHROPIC_* and DOCUMENT_INTAKE_ANTHROPIC_KEY set, DOCUMENT_INTAKE_ANTHROPIC_KEY wins", () => {
+    const result = resolveReaderSetup({
+      ANTHROPIC_API_KEY: "platform-gateway-key",
+      ANTHROPIC_BASE_URL: "https://gateway.invalid/anthropic",
+      DOCUMENT_INTAKE_ANTHROPIC_KEY: "test-key-not-real",
+      DOCUMENT_INTAKE_STORE: "netlify-blobs",
+    });
+    expect(result.mode).toBe("claude");
+    expect(result.apiKey).toBe("test-key-not-real");
+  });
+});
