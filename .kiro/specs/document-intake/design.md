@@ -1317,6 +1317,14 @@ For the sample bundle with text pages and any set of invoice lines whose origin 
 For any weight from 0 to 99,999,999.9 kg written with or without thousands commas, with or without " kg", `parseKgToTenths` gives the same tenths; a comma before the last two digits of the integer part is never read.
 **Validates: Requirements 40.1**
 
+### Property 57: A Paid Call Leaves a Record or a Log Line
+For any outcome of a claude-mode call (valid answer, invalid answer, reader error with or without usage), any token counts (non-negative integers, fractions, negative numbers, missing) and a record store that confirms or refuses the write, the answer has the status and body it has with a working store, and either exactly one record is saved or exactly one line starting "usage record not written: " is logged; the record's cost is the cost of its tokens when they are non-negative safe integers and the reserved worst case when they are not.
+**Validates: Requirements 41.1, 41.2, 41.3**
+
+### Property 58: The Ledger Keeps the Actual Cost After Conflicts
+For any number k from 0 to 5 of top-up tries that meet a changed state before a write that succeeds, `reservedCostNanoUsd` ends at the reservation plus (actual cost - reserved worst case), added once; for k = 6 or more it ends at the reservation and "usage cost top-up not written" is logged once; a try that fails with another error ends the top-up after that try.
+**Validates: Requirements 42.1**
+
 ---
 
 ## Error Handling

@@ -402,7 +402,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 1. `estimateReaderCall` SHALL count every text the uploader controls at one token per UTF-8 byte (a token always covers at least one byte, so this bounds any text, also characters outside the Basic Multilingual Plane). inputTokens = `promptOverheadTokens` (10,000: the fixed system prompt, field list and output schema) + for every page: `perPageOverheadTokens` (160: the fixed words the request puts around a page) + utf8Bytes(fileName) + 4 x utf8Bytes(docId) (the request repeats the file name and the document id on every page, and the output schema lists the document id twice) + utf8Bytes(text) for a text page or `imageTokensPerPage` (5,000) for an image page. utf8Bytes counts, for each code point, 1 byte below U+0080, 2 below U+0800, 3 below U+10000 (lone surrogates included), 4 otherwise.
 2. Any input that passes the per-call line (0.0108 USD, with at least 8,000 output tokens of room, Requirement 29.4) therefore has at most 68,000 input tokens, under the 100,000-token price step.
-3. AFTER a reader call that reports token usage (a valid answer, an invalid answer, or a ReaderError that carries usage), THE server SHALL compute the actual cost with `estimateCostNanoUsd(inputTokens, outputTokens)`. IF it is above the worst case reserved for the call, THE server SHALL add the difference to `reservedCostNanoUsd`: read the state, apply `addReservedCost`, write it, up to 3 tries; if all fail, log "usage cost top-up not written" (no document text). The answer to the person does not change.
+3. AFTER a reader call that reports token usage (a valid answer, an invalid answer, or a ReaderError that carries usage), THE server SHALL compute the actual cost with `estimateCostNanoUsd(inputTokens, outputTokens)`. IF it is above the worst case reserved for the call, THE server SHALL add the difference to `reservedCostNanoUsd`: read the state, apply `addReservedCost`, write it, with the tries of Requirement 42.1; if they fail, log "usage cost top-up not written" (no document text). The answer to the person does not change.
 4. `addReservedCost(state, extraNanoUsd)` in `budget.ts` SHALL return a new state with `reservedCostNanoUsd` = (old value or 0) + extraNanoUsd and every other part unchanged; it never changes its input.
 
 ---
@@ -629,6 +629,46 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 41 (MUST): A Paid Call Always Leaves a Usage Record
+
+**User Story:** As an operator, I want every paid reader call to leave its usage record, so that the paid-call ledger counted from these records is never short.
+
+**Background:** The installed `@netlify/blobs` answers a conditional PUT with `{ modified: true, etag: "" }` for 403, 429 and 5xx, and `appendRecord` did not look at the result, so a refused record write left no record and no log line. Token counts from the reader that are not integers made the record's cost throw after the reader was called, so the server answered 500 and wrote no record.
+
+#### Acceptance Criteria
+
+1. `createBlobsUsageStore().appendRecord` SHALL treat the record as saved only when the result has `modified: true` and a non-empty string `etag`; otherwise it SHALL throw "usage record write was not confirmed by the store; not written".
+2. WHEN `appendRecord` throws in claude mode (success, error and cap-exceeded records), THE server SHALL log one line: `usage record not written: ` followed by the JSON of `{ timestamp, model, outcome, inputTokens, outputTokens, estimatedCostNanoUsd }` of that record (no file hashes, no error message, no document text). The status and body of the answer are the same as with a working store. The record is not written again (the library has already retried 429 and 5xx).
+3. WHEN the reader reports `inputTokens` or `outputTokens` that is not a non-negative safe integer, THE server SHALL NOT throw: the record has `inputTokens: null`, `outputTokens: null` and `estimatedCostNanoUsd` = the worst case reserved for the call (`estimateReaderCall(input).worstCaseCostNanoUsd`), the ledger gets no top-up, and the answer is the one for that outcome (200 with the output for a valid answer, 502 for an invalid answer or a reader error).
+
+---
+
+### Requirement 42 (MUST): The Cost Top-Up Waits and Tries Again, and a Store Error Is Judged by Its Status
+
+**User Story:** As an operator, I want the cost ledger to keep the actual cost when two requests write at the same moment, and a store error never to count as a saved write, so that the cost cap holds.
+
+**Background:** The top-up of Requirement 24.3 tried 3 times without waiting, so when other requests reserved at the same moment all 3 tries met a changed state and the ledger kept less than the actual cost (10 staggered calls: 0.985 USD in the ledger, 1.12 USD spent). It also tried again after a store error that the library had already retried 5 times. A conditional PUT answered 503 with an `etag` header counted as confirmed.
+
+#### Acceptance Criteria
+
+1. THE top-up (Requirement 24.3) SHALL make up to 6 tries; each try reads the state, applies `addReservedCost` and writes it. A try that fails because the state changed (`writeState` throws `UsageStateConflictError`, exported from `usageStore.ts`, message "usage state changed by another request; not written", thrown by the Blobs store for `modified: false`) is followed by a wait and the next try: before try n (n = 2 to 6) the server waits 50 x (n - 1) ms plus a random part below 50 x (n - 1) ms (at most 1.5 s in all). A try that fails for any other reason ends the top-up. WHEN the top-up is not written, THE server logs "usage cost top-up not written" (as today). The answer does not change. `ReadDeps.sleep?: (ms: number) => Promise<void>` (default: a `setTimeout` promise) does the waiting, so tests do not wait.
+2. `openNetlifyBlobs` SHALL pass `getStore` the option `fetch: dropEtagOnError()`. `dropEtagOnError(base?)`, exported from `usageStoreBlobs.ts`, returns a fetch that calls `base` (default: `globalThis.fetch` at the time of each request) and, WHEN the response status is not 200 to 299, returns the same response without its `etag` header (status, other headers and body unchanged); responses 200 to 299 pass unchanged. So a conditional PUT answered 403, 429 or 5xx counts as not confirmed even when the answer carries an ETag (Requirement 23.1).
+
+---
+
+### Requirement 43 (MUST): The "AI estimate" Label Does Not Cover the Page Text
+
+**User Story:** As an entry writer, I want the "AI estimate" label beside the selected box, so that it does not hide the words of the line above.
+
+**Background:** The label sat above the top left corner of the selected box and covered the first characters of the line above it (on a scanned bill of lading, "Consignee:" above the "Vessel:" line of Block 8).
+
+#### Acceptance Criteria
+
+1. THE "approx-label" (Requirement 39.2) SHALL stay a child of the selected box element and sit beside the box: to the right of the box, vertically centred, WHEN the page view has at least 96 px to the right of the box; otherwise to the left of the box, vertically centred, WHEN it has at least 96 px to the left; otherwise above the box as before. The label has `data-label-side` = "right", "left" or "above".
+2. Everything else on the board stays as it is.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -673,6 +713,9 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 38. (MUST) A Draft Value Waits for What Was Not Read, With the Right Reason
 39. (MUST) A Box on a Photo or Scan Shows the AI Reader's Estimated Place
 40. (MUST) A Weight or Package Count With Thousands Commas Is Read
+41. (MUST) A Paid Call Always Leaves a Usage Record
+42. (MUST) The Cost Top-Up Waits and Tries Again, and a Store Error Is Judged by Its Status
+43. (MUST) The "AI estimate" Label Does Not Cover the Page Text
 
 **NICE (if time is left):**
 
