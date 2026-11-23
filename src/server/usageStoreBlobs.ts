@@ -3,19 +3,34 @@ import type { UsageState } from "../core/budget";
 import { emptyUsageState } from "../core/budget";
 import type { UsageRecord } from "./readerTypes";
 import type { UsageStore } from "./usageStore";
-import { parseUsageState } from "./usageStore";
+import { parseUsageState, UsageStateConflictError } from "./usageStore";
 
 export type BlobsLike = {
   getWithMetadata(key: string): Promise<{ data: unknown; etag?: string } | null>;
   setJSON(key: string, data: unknown, options?: { onlyIfMatch?: string; onlyIfNew?: boolean }): Promise<{ modified: boolean; etag?: string }>;
 };
 
+export type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
+
+// Requirement 42.2: an answer that is not 2xx never carries an ETag, so the library cannot report it as a confirmed write.
+export function dropEtagOnError(base?: FetchLike): FetchLike {
+  return async (input, init) => {
+    const res = await (base ?? globalThis.fetch)(input, init);
+    if ((res.status >= 200 && res.status <= 299) || !res.headers.has("etag")) {
+      return res;
+    }
+    const headers = new Headers(res.headers);
+    headers.delete("etag");
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+  };
+}
+
 export const BLOBS_STORE_NAME = "document-intake-usage";
 export const BLOBS_STATE_KEY = "caps-state";
 
 async function openNetlifyBlobs(name: string): Promise<BlobsLike> {
   const { getStore } = await import("@netlify/blobs");
-  const store = getStore({ name, consistency: "strong" });
+  const store = getStore({ name, consistency: "strong", fetch: dropEtagOnError() as typeof fetch });
   return {
     getWithMetadata: (key) => store.getWithMetadata(key, { type: "json" }),
     setJSON: (key, data, options) =>
@@ -73,7 +88,7 @@ export function createBlobsUsageStore(options: { blobs?: BlobsLike; storeName?: 
       }
 
       if (!r.modified) {
-        throw new Error("usage state changed by another request; not written");
+        throw new UsageStateConflictError();
       }
 
       // Requirement 23: the installed @netlify/blobs answers a conditional write with
@@ -89,7 +104,11 @@ export function createBlobsUsageStore(options: { blobs?: BlobsLike; storeName?: 
     async appendRecord(r: UsageRecord): Promise<void> {
       const blobs = await getBlobs();
       const key = `usage/${r.timestamp.replace(/[^0-9]/g, "")}-${randomUUID()}`;
-      await blobs.setJSON(key, r, { onlyIfNew: true });
+      const result = await blobs.setJSON(key, r, { onlyIfNew: true });
+      
+      if (!result.modified || typeof result.etag !== "string" || result.etag.length === 0) {
+        throw new Error("usage record write was not confirmed by the store; not written");
+      }
     },
   };
 }

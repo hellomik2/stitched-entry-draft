@@ -4,6 +4,13 @@ import type { UsageState, Caps } from "../core/budget";
 import { emptyUsageState } from "../core/budget";
 import type { UsageRecord } from "./readerTypes";
 
+export class UsageStateConflictError extends Error {
+  constructor() {
+    super("usage state changed by another request; not written");
+    this.name = "UsageStateConflictError";
+  }
+}
+
 export interface UsageStore {
   readState(): Promise<UsageState>;
   writeState(s: UsageState): Promise<void>;

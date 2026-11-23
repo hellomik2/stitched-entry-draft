@@ -765,22 +765,33 @@ export function buildDraft(input: {
     );
   }
 
-  // B9: computed "11" with rule "7501 p.8", source from billOfLading.containerNo when present
+  // B9 (Requirement 44.3): "11" computed only when a container number was accepted; otherwise it waits for a person
   const containerReading = accepted.get("billOfLading.containerNo");
-  const b9Sources = containerReading ? [docSource(containerReading)] : [];
-  headerFields.push(
-    field_helper({
-      id: "B9",
-      block: "9",
-      label: "Mode of transport",
-      value: "11",
-      unit: null,
-      status: "computed",
-      rule: "7501 p.8",
-      note: "Vessel, containerized: the B/L lists a container.",
-      sources: b9Sources,
-    })
-  );
+  if (containerReading) {
+    headerFields.push(
+      field_helper({
+        id: "B9",
+        block: "9",
+        label: "Mode of transport",
+        value: "11",
+        unit: null,
+        status: "computed",
+        rule: "7501 p.8",
+        note: "Vessel, containerized: the B/L lists a container.",
+        sources: [docSource(containerReading)],
+      })
+    );
+  } else {
+    headerFields.push(
+      field_helper({
+        id: "B9",
+        block: "9",
+        label: "Mode of transport",
+        status: "needsReview",
+        reason: "The container number on the bill of lading was not read, so the mode of transport is not known. A person checks the bill of lading.",
+      })
+    );
+  }
 
   // B11: needsReview
   headerFields.push(

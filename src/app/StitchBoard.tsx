@@ -55,6 +55,14 @@ interface LoadedDocument {
 
 const CANVAS_SCALE = 0.95
 
+// Requirement 43: the "AI estimate" label sits beside its box so it does not cover the line above.
+const APPROX_LABEL_ROOM_PX = 96
+function approxLabelSide(left: number, width: number, pageWidthPx: number): 'right' | 'left' | 'above' {
+  if (pageWidthPx - (left + width) >= APPROX_LABEL_ROOM_PX) return 'right'
+  if (left >= APPROX_LABEL_ROOM_PX) return 'left'
+  return 'above'
+}
+
 /** Thread colours: blue to a document line, gold to the values a field is computed from. */
 const THREAD_DOC_COLOR = '#2563eb'
 const THREAD_CALC_COLOR = '#b8860b'
@@ -797,7 +805,7 @@ export default function StitchBoard({
                   {reading.origin === 'imageTranscript' && selectedField && fieldMap.get(selectedField)?.sources.some(
                     (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
                   ) && (
-                    <div data-testid="approx-label">AI estimate</div>
+                    <div data-testid="approx-label" data-label-side={approxLabelSide(left, width, pageWidth * pageScale)}>AI estimate</div>
                   )}
                 </div>
               )
@@ -833,7 +841,7 @@ export default function StitchBoard({
                     {reading.origin === 'imageTranscript' && selectedField && fieldMap.get(selectedField)?.sources.some(
                       (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
                     ) && (
-                      <div data-testid="approx-label">AI estimate</div>
+                      <div data-testid="approx-label" data-label-side={approxLabelSide(left, width, pageWidth * pageScale)}>AI estimate</div>
                     )}
                   </div>
                 )

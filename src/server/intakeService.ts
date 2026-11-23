@@ -7,8 +7,41 @@ import type { ReaderSetup } from "./readerEnv";
 import type { UsageRecord, IntakeReader } from "./readerTypes";
 import { ReaderError } from "./readerTypes";
 import type { UsageStore } from "./usageStore";
+import { UsageStateConflictError } from "./usageStore";
 
 export type ServiceResponse = { status: number; json: Record<string, unknown> };
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function isTokenCount(v: unknown): v is number {
+  return typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
+}
+
+// Requirement 41.3: counts that are not non-negative safe integers give null tokens and the reserved worst case.
+function recordUsage(
+  usage: { inputTokens: unknown; outputTokens: unknown } | null,
+  reservedNanoUsd: number,
+): { inputTokens: number | null; outputTokens: number | null; estimatedCostNanoUsd: number | null } {
+  if (usage === null) {
+    return { inputTokens: null, outputTokens: null, estimatedCostNanoUsd: null };
+  }
+  if (!isTokenCount(usage.inputTokens) || !isTokenCount(usage.outputTokens)) {
+    return { inputTokens: null, outputTokens: null, estimatedCostNanoUsd: reservedNanoUsd };
+  }
+  return { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, estimatedCostNanoUsd: estimateCostNanoUsd(usage.inputTokens, usage.outputTokens) };
+}
+
+// Requirement 41.2: a record the store did not confirm is logged with its counts (no file hashes, no error text, no document text).
+async function writeRecord(store: UsageStore, record: UsageRecord, log?: (message: string) => void): Promise<void> {
+  try {
+    await store.appendRecord(record);
+  } catch {
+    log?.(
+      "usage record not written: " +
+        JSON.stringify({ timestamp: record.timestamp, model: record.model, outcome: record.outcome, inputTokens: record.inputTokens, outputTokens: record.outputTokens, estimatedCostNanoUsd: record.estimatedCostNanoUsd }),
+    );
+  }
+}
 
 export type ReadDeps = {
   setup: ReaderSetup;
@@ -20,16 +53,22 @@ export type ReadDeps = {
   bodyBytes: number;
   body: unknown;
   log?: (message: string) => void; // server log; never pass document text, images or the key
+  sleep?: (ms: number) => Promise<void>; // Requirement 42.1; default waits with setTimeout
 };
 
 // Requirement 24.3: the ledger gets the actual cost when it is above the reserved worst case.
 async function topUpCost(
   store: UsageStore,
-  usage: { inputTokens: number; outputTokens: number } | null,
+  usage: { inputTokens: unknown; outputTokens: unknown } | null,
   reservedNanoUsd: number,
   log?: (message: string) => void,
+  sleep: (ms: number) => Promise<void> = defaultSleep,
 ): Promise<void> {
   if (usage === null) {
+    return;
+  }
+
+  if (!isTokenCount(usage.inputTokens) || !isTokenCount(usage.outputTokens)) {
     return;
   }
 
@@ -45,23 +84,27 @@ async function topUpCost(
     return;
   }
 
-  let attempts = 0;
-  while (attempts < 3) {
+  const extra = actual - reservedNanoUsd;
+  for (let n = 1; n <= 6; n++) {
+    if (n > 1) {
+      const base = 50 * (n - 1);
+      await sleep(base + Math.floor(Math.random() * base));
+    }
     try {
-      attempts++;
       const s = await store.readState();
-      await store.writeState(addReservedCost(s, actual - reservedNanoUsd));
+      await store.writeState(addReservedCost(s, extra));
       return;
-    } catch {
-      // Continue to next attempt
+    } catch (e) {
+      if (!(e instanceof UsageStateConflictError)) {
+        break;
+      }
     }
   }
-
   log?.("usage cost top-up not written");
 }
 
 export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse> {
-  const { setup, store, fakeStore, readers, nowIso, ip, bodyBytes, body, log } = deps;
+  const { setup, store, fakeStore, readers, nowIso, ip, bodyBytes, body, log, sleep } = deps;
 
   // 1. Check if mode is off
   if (setup.mode === "off") {
@@ -137,13 +180,7 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
         errorMessage: null,
       };
 
-      try {
-        await fakeStore.appendRecord(record);
-      } catch (e) {
-        if (log) {
-          log("usage record not written (fake mode)");
-        }
-      }
+      await writeRecord(fakeStore, record, log);
 
       return {
         status: 200,
@@ -213,13 +250,7 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
         errorMessage: decision.reason,
       };
 
-      try {
-        await store.appendRecord(record);
-      } catch (e) {
-        if (log) {
-          log("usage record not written (cap exceeded)");
-        }
-      }
+      await writeRecord(store, record, log);
 
       let message: string;
       if (decision.reason === "total_cap") {
@@ -257,7 +288,7 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
 
     // Call the reader
     let output: ReaderOutput;
-    let usage: { inputTokens: number; outputTokens: number } | null = null;
+    let usage: { inputTokens: unknown; outputTokens: unknown } | null = null;
 
     try {
       const result = await readers.claude.read(input);
@@ -267,29 +298,19 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
       const errorMessage = e instanceof ReaderError ? e.message : "The AI reader failed.";
       const errorUsage = e instanceof ReaderError ? e.usage : null;
 
-      await topUpCost(store, errorUsage, estimate.worstCaseCostNanoUsd, log);
+      await topUpCost(store, errorUsage, estimate.worstCaseCostNanoUsd, log, sleep ?? defaultSleep);
 
       const record: UsageRecord = {
         timestamp: nowIso,
         model: intakeConfig.readerModel,
-        inputTokens: errorUsage?.inputTokens ?? null,
-        outputTokens: errorUsage?.outputTokens ?? null,
-        estimatedCostNanoUsd: errorUsage
-          ? estimateCostNanoUsd(errorUsage.inputTokens, errorUsage.outputTokens)
-          : null,
+        ...recordUsage(errorUsage, estimate.worstCaseCostNanoUsd),
         filesSha256,
         readerMode: "claude",
         outcome: "error",
         errorMessage: e instanceof ReaderError ? e.message : "reader failed",
       };
 
-      try {
-        await store.appendRecord(record);
-      } catch (recordErr) {
-        if (log) {
-          log("usage record not written (reader error)");
-        }
-      }
+      await writeRecord(store, record, log);
 
       return {
         status: 502,
@@ -303,29 +324,19 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
     // Validate output
     const outputValidation = validateReaderOutput(output, input);
     if (!outputValidation.ok) {
-      await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log);
+      await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log, sleep ?? defaultSleep);
 
       const record: UsageRecord = {
         timestamp: nowIso,
         model: intakeConfig.readerModel,
-        inputTokens: usage?.inputTokens ?? null,
-        outputTokens: usage?.outputTokens ?? null,
-        estimatedCostNanoUsd: usage
-          ? estimateCostNanoUsd(usage.inputTokens, usage.outputTokens)
-          : null,
+        ...recordUsage(usage, estimate.worstCaseCostNanoUsd),
         filesSha256,
         readerMode: "claude",
         outcome: "error",
         errorMessage: `The reader answer was not valid: ${outputValidation.reason}`,
       };
 
-      try {
-        await store.appendRecord(record);
-      } catch (e) {
-        if (log) {
-          log("usage record not written (output validation error)");
-        }
-      }
+      await writeRecord(store, record, log);
 
       return {
         status: 502,
@@ -337,28 +348,19 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
     }
 
     // Success: append record
-    await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log);
+    await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log, sleep ?? defaultSleep);
 
-    const cost = usage ? estimateCostNanoUsd(usage.inputTokens, usage.outputTokens) : null;
     const record: UsageRecord = {
       timestamp: nowIso,
       model: intakeConfig.readerModel,
-      inputTokens: usage?.inputTokens ?? null,
-      outputTokens: usage?.outputTokens ?? null,
-      estimatedCostNanoUsd: cost,
+      ...recordUsage(usage, estimate.worstCaseCostNanoUsd),
       filesSha256,
       readerMode: "claude",
       outcome: "success",
       errorMessage: null,
     };
 
-    try {
-      await store.appendRecord(record);
-    } catch (e) {
-      if (log) {
-        log("usage record not written");
-      }
-    }
+    await writeRecord(store, record, log);
 
     return {
       status: 200,

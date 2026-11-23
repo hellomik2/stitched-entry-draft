@@ -1486,7 +1486,7 @@ describe("Per-call size and cost line (Requirement 17)", () => {
             // First call (reservation) succeeds
             return;
           }
-          // All later calls (top-up attempts) fail
+          // All later calls (top-up attempt) fail
           throw new Error("write failed");
         },
         async appendRecord(r: UsageRecord) {
@@ -1518,14 +1518,14 @@ describe("Per-call size and cost line (Requirement 17)", () => {
         log: (msg) => logMessages.push(msg),
       });
 
-      // Expect status 200 despite top-up failures
+      // Expect status 200 despite top-up failure
       expect(result.status).toBe(200);
 
       // Expect exactly 1 log message about top-up not written
       expect(logMessages.filter((m) => m === "usage cost top-up not written").length).toBe(1);
 
-      // Expect 4 writeState calls: 1 reserve + 3 top-up attempts
-      expect(writeStateCallCount).toBe(4);
+      // Expect 2 writeState calls: 1 reserve + 1 top-up try
+      expect(writeStateCallCount).toBe(2);
 
       // Run the same request with a working store to compare responses
       const workingLogMessages: string[] = [];
@@ -1545,7 +1545,7 @@ describe("Per-call size and cost line (Requirement 17)", () => {
       expect(result.json).toEqual(workingResult.json);
     });
 
-    it("store writeState succeeds reserve, then fails all 3 top-up attempts: status 200, log receives 'not written', response same as success", async () => {
+    it("store writeState succeeds reserve, then fails one top-up try: status 200, log receives 'not written', response same as success", async () => {
       const input = createTestInput();
 
       const setup: ReaderSetup = {
@@ -1569,7 +1569,7 @@ describe("Per-call size and cost line (Requirement 17)", () => {
         async writeState(s: UsageState) {
           this.events.push("writeState");
           writeAttempts++;
-          // First call succeeds (reserve), rest fail (top-up attempts)
+          // First call succeeds (reserve), rest fail (top-up try)
           if (writeAttempts > 1) {
             throw new Error("top-up write fails");
           }
@@ -1601,13 +1601,13 @@ describe("Per-call size and cost line (Requirement 17)", () => {
         log: (msg) => logMessages.push(msg),
       });
 
-      // Reserve succeeds, reader is called, top-up fails 3 times
+      // Reserve succeeds, reader is called, top-up fails once
       expect(result.status).toBe(200);
       expect(result.json.ok).toBe(true);
       expect(logMessages).toContain("usage cost top-up not written");
 
-      // writeState was called 4 times: 1 reserve + 3 top-up attempts
-      expect(faultyStore.events.filter((e) => e === "writeState").length).toBe(4);
+      // writeState was called 2 times: 1 reserve + 1 top-up try
+      expect(faultyStore.events.filter((e) => e === "writeState").length).toBe(2);
     });
   });
 });

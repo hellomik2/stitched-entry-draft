@@ -44,9 +44,12 @@ export function formatSource(s: Source): string {
  * Escape a cell value for RFC 4180 CSV.
  * If the cell contains comma, quote, CR, or LF, wrap in double quotes and escape inner quotes.
  * Requirement 28.2: a cell that starts with a formula character gets a leading quote, so a spreadsheet shows the text instead of running it.
+ * Requirement 44.1: a plain number keeps its sign without the quote.
  */
 function escapeCsvCell(value: string): string {
-  const v = /^[=+\-@\t\r]/.test(value) ? "'" + value : value;
+  // Requirement 44.1: a plain number (optional sign, digits or thousands groups, optional decimals) keeps its sign without the quote.
+  const PLAIN_NUMBER = /^[+-]?(\d+|\d{1,3}(,\d{3})+)(\.\d+)?$/;
+  const v = /^[=+\-@\t\r]/.test(value) && !PLAIN_NUMBER.test(value) ? "'" + value : value;
   if (v.includes(",") || v.includes('"') || v.includes("\r") || v.includes("\n")) {
     return `"${v.replace(/"/g, '""')}"`;
   }
