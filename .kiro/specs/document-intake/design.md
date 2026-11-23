@@ -993,11 +993,13 @@ export default function StitchBoard(...) {
 
 **Requirement 32 (A Value That Cannot Be Computed From What the Draft Has Now Waits):** `draft.ts`: B39 and B41 wait with a fixed reason when there is no 7501 line (first build and `recomputeTotals`); `recomputeTotals` gives a line's 38 the rule of its first build, where an input that waits only for a person's image check counts as having its value; the computed 36A, 34A and 35 add the currency, total gross weight and unit readings to their sources only when those came from an image page, so text-page drafts keep their sources.
 
+**Requirement 33 (A Quantity That Was Not Read Is Not Zero):** `draft.ts`: next to the packing list quantities by item number, the draft keeps the packing list lines that are not fully read (with the accepted item number, if any). `deriveNetQuantity` and the `P3.qty` check use them before they report a difference, and `deriveNetQuantity` waits instead of adding up part of the invoice lines. The packing list map of the 34A allocation no longer needs the quantity.
+
 ---
 
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 49 are defined below (49 in total).*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 50 are defined below (50 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1267,6 +1269,10 @@ For the sample bundle and any line and any number of the HTS subset (the line's 
 For the sample bundle with text pages or with every page an image, and any one person value drawn from a line's 36A (a refused value or a whole-dollar amount), a line's 37A ("5 cents/kg" or a simple percentage) or a line's 33A (a number of the subset), every line's 38 that is "computed" has values in its 36A and 37A and equals `computeDuty` of them; with no invoice line read, B39 and B41 have no value; and with only one of the readings invoice currency, packing list total gross weight or an invoice line's unit coming from an image page, every 36A, 34A or 35 computed with that reading has it among its sources and waits.
 **Validates: Requirements 32.1, 32.2, 32.3**
 
+### Property 50: A Quantity That Was Not Read Is Not Zero
+For the sample bundle with text pages and any set of the readings `packingList.lines.<n>.itemNo`, `packingList.lines.<n>.quantity`, `invoice.lines.<n>.itemNo`, `invoice.lines.<n>.quantity` and `invoice.lines.<n>.unit` given low confidence: no field reason contains "says 0 PCS"; every 35 with status "computed" has, for each of its invoice lines, accepted quantity, unit and item number readings, no not fully read packing list line with that item number, and fully read packing list lines with that item number whose quantities add up to the invoice quantity, and its value is the sum of its invoice quantities in its unit; when only packing list quantities were given low confidence, every 34A has the same status and value as without any change.
+**Validates: Requirements 33.1, 33.2, 33.3, 33.4**
+
 ---
 
 ## Error Handling
@@ -1373,6 +1379,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (49 properties: 1 to 28, 33 to 49 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (50 properties: 1 to 28, 33 to 50 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 49
+**Total Correctness Properties:** 50

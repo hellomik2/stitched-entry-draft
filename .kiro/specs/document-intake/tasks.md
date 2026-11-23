@@ -296,6 +296,14 @@
 - [x] 43. (maintainer) Verifier items for Requirements 31 and 32; reproduction scripts fail before and pass after
   - _Requirements: 31, 32_
 
+- [ ] 44. A quantity that was not read is not zero
+  - [ ] 44.1 Tests that fail on the current code: packing list line 5 quantity rejected, a packing list item number rejected, no packing list line for an item, invoice line 8 quantity or unit rejected, 34A with a packing list quantity rejected; Property 50 test
+  - [ ] 44.2 `draft.ts`: not fully read packing list lines in the quantity check of 35 and `P3.qty`, 35 waits when an invoice quantity or unit was not read, the 34A packing list map without the quantity
+  - _Requirements: 33_
+
+- [ ] 45. (maintainer) Verifier item for Requirement 33; the real read of a test bundle (recorded answer) reproduces before and passes after
+  - _Requirements: 33_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -342,5 +350,7 @@
 41. A value that cannot be computed from what the draft has now waits
 42. Property 2 test does the same checks in less time
 43. (maintainer) Verifier items for Requirements 31 and 32; reproduction scripts fail before and pass after
+44. A quantity that was not read is not zero
+45. (maintainer) Verifier item for Requirement 33; the real read of a test bundle (recorded answer) reproduces before and passes after
 
-**Total Sub-Tasks:** 192
+**Total Sub-Tasks:** 194

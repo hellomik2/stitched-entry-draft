@@ -297,6 +297,26 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 33 (MUST): A Quantity That Was Not Read Is Not Zero
+
+**User Story:** As an entry writer, I want the draft to tell me when a packing list or invoice quantity was not read, instead of comparing or adding it as zero, so that I check the right thing.
+
+**Background:** In a real read of a test bundle, the quantity of packing list line 5 (item MCA-105) was rejected for low confidence while its item number was accepted. The draft left the line out of the packing list quantities and showed L005.35 "says 480 PCS, the packing list says 0 PCS. A person decides." and the check "invoice qty = 480, packing sum = 0". In the same way, when one invoice line of a 7501 line has no accepted quantity or unit, 35 is the sum of the other invoice lines, and the allocation of 34A leaves out a packing list line whose quantity was not read although the allocation uses only gross weights.
+
+#### Acceptance Criteria
+
+1. A packing list line is "not fully read" when the verified readings hold at least one reading of `packingList.lines.<n>.` (accepted or rejected) but no accepted item number, or no accepted quantity that parses as a count. The packing list quantities of an item number are, as today, the quantities of its fully read lines.
+
+2. For each invoice line n of a 7501 line with an accepted quantity q, the quantity check of the line's 35 and of the check `P3.qty.<item>` SHALL be, in this order: (a) the invoice line has no accepted item number: 35 waits with the reason "The item number of invoice line <n> was not read, so its quantity was not compared with the packing list. A person compares them."; (b) a not fully read packing list line has the item number X of invoice line n: 35 waits with the reason "Packing list line <list> was not fully read (item number or quantity), so invoice line <n> (<q> PCS) was not compared with the packing list. A person compares them." and the check detail "packing list line <list> not fully read"; (c) the packing list quantities of X do not add up to q and some not fully read packing list line has no accepted item number: the same reason and detail with those lines; (d) no packing list line has the item number X: the reason "Invoice line <n> (<X>) says <q> PCS; no packing list line for <X> was read. A person decides." and the detail "no packing list line for <X> was read"; (e) the quantities of X do not add up to q: the reason and detail of today ("says <q> PCS, the packing list says <sum> PCS. A person decides."). In (a) to (e), 35 has status "needsReview", no value and the unit of the HTS number, and the check is not ok. <list> is the packing list line numbers joined with ", ".
+
+3. WHEN there is no such difference and the HTS number is found, but an invoice line of the 7501 line has no accepted quantity, no accepted unit, or a unit the draft does not convert (anything but PCS, PC, EA, PIECES, NO., DZ PCS, DOZ., DZ., KG), 35 SHALL have status "needsReview", no value, the unit of the HTS number and the reason "The quantity or unit of invoice line <list> was not read or is not a unit the draft counts, so the net quantity is not added up. A person enters it." (instead of the sum of the other lines, or "Could not parse quantities from invoice lines."). <list> is the invoice line numbers joined with ", ".
+
+4. THE gross weight allocation of 34A SHALL use every packing list line with an accepted item number and an accepted gross weight, whether or not its quantity was read (the allocation uses only gross weights).
+
+5. THE sample bundle with or without the demo answers, the upload test recordings and the verifier's expected drafts are unchanged; Properties 35, 43, 47, 48 and 49 still hold.
+
+---
+
 ### Requirement 18 (MUST): Values Read from Images Are Confirmed by a Person
 
 **User Story:** As an entry writer, I want every value the AI read from a photo or scan to wait for my check, so that a misread or a tampered image cannot slip into the draft as a copied value.
@@ -534,6 +554,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 30. (MUST) A Value Computed Again After a Person's Edit Still Waits
 31. (MUST) An Edited HTS Number Derives the Line's Quantity by the First Rule
 32. (MUST) A Value That Cannot Be Computed From What the Draft Has Now Waits
+33. (MUST) A Quantity That Was Not Read Is Not Zero
 
 **NICE (if time is left):**
 
