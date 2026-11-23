@@ -10,6 +10,7 @@ export * from "./fieldCatalog";
 export * from "./transcript";
 export * from "./readerContract";
 export * from "./budget";
+export * from "./partsList";
 
 import type { DocumentText } from "./pdfText";
 import type { DocumentReader } from "./reading";

@@ -8,6 +8,7 @@ import type {
   VerifiedReading,
   Draft,
   DraftField,
+  DocSource,
   HtsTable,
   Override,
 } from '../core'
@@ -33,7 +34,7 @@ export interface BundleJson {
   title: string
   documents: Array<{
     docId: string
-    kind: 'invoice' | 'packingList' | 'billOfLading'
+    kind: 'invoice' | 'packingList' | 'billOfLading' | 'partsList'
     file: string
     label: string
   }>
@@ -73,6 +74,7 @@ const KIND_LABEL = {
   invoice: 'Commercial invoice',
   packingList: 'Packing list',
   billOfLading: 'Bill of lading',
+  partsList: 'Customer parts list',
 }
 
 export default function StitchBoard({
@@ -140,12 +142,22 @@ export default function StitchBoard({
     ? {
         bundle: 'uploaded',
         title: 'Your uploaded documents (not stored)',
-        documents: upload.prepared.views.map((v) => ({
-          docId: v.docId,
-          kind: v.kind,
-          file: v.fileName,
-          label: `${KIND_LABEL[v.kind]}: ${v.fileName}`,
-        })),
+        documents: [
+          ...upload.prepared.views.map((v) => ({
+            docId: v.docId,
+            kind: v.kind as 'invoice' | 'packingList' | 'billOfLading',
+            file: v.fileName,
+            label: `${KIND_LABEL[v.kind]}: ${v.fileName}`,
+          })),
+          ...(upload.partsList
+            ? [{
+                docId: 'partsList',
+                kind: 'partsList' as const,
+                file: upload.partsList.fileName,
+                label: `${KIND_LABEL['partsList']}: ${upload.partsList.fileName}`,
+              }]
+            : []),
+        ],
       }
     : bundle
 
@@ -155,7 +167,7 @@ export default function StitchBoard({
       return { verified: [] as VerifiedReading[], draft: null }
     }
     try {
-      const documentTexts = documents.map((d) => d.documentText)
+      const documentTexts = documents.filter((d) => d.docId !== 'partsList').map((d) => d.documentText)
       const verified = verifyReadings(readingAnswer, documentTexts)
       const draft = buildDraft({
         bundle: activeBundle.bundle,
@@ -164,6 +176,7 @@ export default function StitchBoard({
         hts,
         overrides,
         invoiceLineCount: readingAnswer.invoiceLineCount ?? null,
+        partsList: upload?.partsList?.list ?? null,
       })
       return { verified, draft }
     } catch (e) {
@@ -186,6 +199,7 @@ export default function StitchBoard({
         const loaded: LoadedDocument[] = []
 
         for (const docConfig of bundle.documents) {
+          if (docConfig.kind === 'partsList') continue // a parts list is never a sample PDF
           const pdfUrl = `/samples/${bundle.bundle}/${docConfig.file}`
 
           // Load PDF
@@ -195,7 +209,7 @@ export default function StitchBoard({
           }).promise
 
           // Extract text
-          const documentText = await extractDocumentText(pdfDoc, docConfig.docId, docConfig.kind)
+          const documentText = await extractDocumentText(pdfDoc, docConfig.docId, docConfig.kind as DocumentText['kind'])
 
           loaded.push({
             docId: docConfig.docId,
@@ -257,6 +271,16 @@ export default function StitchBoard({
             pdf: view.pdf,
             image,
             documentText,
+          })
+        }
+
+        // Add parts list document if present
+        if (upload.partsList) {
+          loaded.push({
+            docId: 'partsList',
+            pdf: null,
+            image: null,
+            documentText: { docId: 'partsList', kind: 'invoice', pages: [upload.partsList.list.page] },
           })
         }
 
@@ -653,15 +677,21 @@ export default function StitchBoard({
             ctx.fillStyle = '#111827'
             ctx.font = `${Math.min(10, Math.max(6, pageHeight * 0.05))}px sans-serif`
             ctx.textAlign = 'left'
-            ctx.textBaseline = 'bottom'
-            
+            ctx.textBaseline = 'middle'
+
+            // A text runs on into the empty cells to its right, as in Excel; it stops at the next cell with text in its row
+            const lastCol = grid.cols[grid.cols.length - 1]
+            const gridRight = lastCol ? lastCol.x + lastCol.w : pageWidth
             for (const item of activePageText.items) {
               const box = item.box
+              const clipRight = activePageText.items
+                .filter((o) => o !== item && Math.abs(o.box.y - box.y) < 0.01 && o.box.x > box.x)
+                .reduce((m, o) => Math.min(m, o.box.x), gridRight)
               ctx.save()
               ctx.beginPath()
-              ctx.rect(box.x, box.y - box.h, box.x + box.w, box.y)
+              ctx.rect(box.x, box.y, Math.max(box.w, clipRight - box.x), box.h) // x, y, width, height
               ctx.clip()
-              ctx.fillText(item.str, box.x + 3, box.y - box.h * 0.28)
+              ctx.fillText(item.str, box.x + 3, box.y + box.h / 2)
               ctx.restore()
             }
             
@@ -938,6 +968,51 @@ export default function StitchBoard({
                       <div data-testid="approx-label" data-label-side={approxLabelSide(left, width, pageWidth * pageScale)}>AI estimate</div>
                     )}
                   </div>
+                )
+              })}
+
+            {/* Source boxes for document sources without reading boxes */}
+            {draft && allFields(draft)
+              .flatMap((field) =>
+                field.sources
+                  .filter((s): s is DocSource => s.kind === 'document')
+                  .map((source) => ({ field, source }))
+              )
+              .filter((item) => item.source.doc === activeDocId && item.source.page === activePage)
+              .filter((item) =>
+                !activeReadings.some((r) => r.field === item.source.readingField) &&
+                !rejectedReadings.some((r) => r.field === item.source.readingField)
+              )
+              .reduce((unique, item) => {
+                if (!unique.some((u) => u.source.readingField === item.source.readingField)) {
+                  unique.push(item);
+                }
+                return unique;
+              }, [] as Array<{ field: DraftField; source: DocSource }>)
+              .map((item) => {
+                const scale = pageScale
+                const left = item.source.box.x * scale - 2
+                const top = item.source.box.y * scale - 2
+                const width = item.source.box.w * scale + 4
+                const height = item.source.box.h * scale + 4
+
+                return (
+                  <div
+                    key={`box-${item.source.readingField}`}
+                    data-testid={`box-${item.source.readingField}`}
+                    data-reading={item.source.readingField}
+                    data-source-box="true"
+                    data-selected={selectedField && fieldMap.get(selectedField)?.sources.some(
+                      (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === item.source.readingField
+                    ) ? 'true' : 'false'}
+                    style={{
+                      position: 'absolute',
+                      left: `${left}px`,
+                      top: `${top}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                    }}
+                  />
                 )
               })}
           </div>
@@ -1582,7 +1657,7 @@ function SourceStrip({
                       >
                         {source.kind === 'document' ? (
                           <>
-                            {`${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`}
+                            {`${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"${source.cell ? ` (cell ${source.cell})` : ''}`}
                             {source.origin === 'imageTranscript' && (
                               <> (read from an image by the AI reader){lineText && <> Place estimated by the AI reader. Its transcript line: "{lineText}"</>}</>
                             )}

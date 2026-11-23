@@ -709,3 +709,23 @@ html, body {
   display: flex;
   align-items: center;
 }
+
+.parts-list-section {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px dashed var(--line, #d1d5db);
+  border-radius: 6px;
+}
+
+.parts-list-label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.parts-list-help,
+.parts-list-status {
+  font-size: var(--fs-small);
+  color: var(--muted);
+  margin: 0.25rem 0 0;
+}

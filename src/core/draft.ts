@@ -11,6 +11,7 @@ import {
   formatCents,
 } from "./parse";
 import { roundEnteredValue, computeDuty, allocateGrossWeight, totalEnteredValue, computeMPF, config } from "../rules";
+import { type PartsList, type LineParts, linePartsInfo } from "./partsList";
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
@@ -184,6 +185,7 @@ export function buildDraft(input: {
   hts: HtsTable;
   overrides?: Override[];
   invoiceLineCount?: number | null;
+  partsList?: PartsList | null;
 }): Draft {
   const { bundle, reader, readings, hts } = input;
   const overrides = input.overrides || [];
@@ -1180,6 +1182,9 @@ export function buildDraft(input: {
     amountsCents: (number | null)[]; // amounts in cents (some may be null if P1 failed)
   }
 
+  const partsList = input.partsList ?? null;
+  const partsByLine = new Map<number, LineParts>();
+
   const lineGroups = new Map<string, LineGroup>();
 
   // Group invoice lines by HTS and origin
@@ -1213,11 +1218,35 @@ export function buildDraft(input: {
       }
     }
 
+    // A customer parts list may give this line's HTS number and origin (Requirement 46)
+    let usedHts = htsRaw;
+    let usedOrigin = originCode;
+    let htsDiffers = false;
+    let originDiffers = false;
+    if (partsList) {
+      const itemValue = accepted.get(`invoice.lines.${n}.itemNo`)?.value ?? null;
+      const code = itemValue ? normalizeSpace(itemValue) : null;
+      const parts = linePartsInfo(partsList, n, code, htsRaw, !!originReading, originCode);
+      partsByLine.set(n, parts);
+      if (parts.hts.kind === "list") usedHts = parts.hts.entry;
+      if (parts.hts.kind === "differs") {
+        usedHts = null;
+        htsDiffers = true;
+      }
+      if (parts.origin.kind === "list") usedOrigin = parts.origin.code;
+      if (parts.origin.kind === "differs") {
+        usedOrigin = null;
+        originDiffers = true;
+      }
+    }
+
     // Build group key
-    const htsKey = htsRaw || `raw:${n}`;
+    const htsKey = htsDiffers ? `differs:${n}` : usedHts || `raw:${n}`;
     let groupKey: string;
-    if (originCode) {
-      groupKey = `${htsKey}|${originCode}`;
+    if (originDiffers) {
+      groupKey = `${htsKey}|origin-differs-${n}`;
+    } else if (usedOrigin) {
+      groupKey = `${htsKey}|${usedOrigin}`;
     } else if (origin) {
       // Origin rejected; give each rejected origin its own group
       groupKey = `${htsKey}|unknown-origin-${n}`;
@@ -1229,8 +1258,8 @@ export function buildDraft(input: {
     if (!lineGroups.has(groupKey)) {
       lineGroups.set(groupKey, {
         key: groupKey,
-        htsRaw,
-        origin: originCode,
+        htsRaw: usedHts,
+        origin: usedOrigin,
         invoiceLines: [],
         descriptions: [],
         amountsCents: [],
@@ -1303,6 +1332,11 @@ export function buildDraft(input: {
         const v = normalizeSpace(r.value ?? "");
         parts.push(`Invoice line ${n}: the AI reader read "${v}" but was not sure.`);
       }
+      // Push parts list sentence if present
+      const partsHts = partsByLine.get(n)?.hts;
+      if (partsHts?.kind === "none" && partsHts.sentence) {
+        parts.push(partsHts.sentence);
+      }
     }
     return parts.join(" ") + " A person reads it on the invoice. The app does not choose a number.";
   };
@@ -1354,10 +1388,20 @@ export function buildDraft(input: {
     } else if (!htsLookup.found) {
       // HTS not found, can't get unit or compute
       // Check if any invoice line has an accepted HTS (Requirement 38.2)
-      const hasAcceptedHts = invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`));
-      const reason = hasAcceptedHts
-        ? "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision."
-        : "Waiting on L" + lineNum + ".33A: the HTS number was not read.";
+      const hasAcceptedHts = invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`) || partsByLine.get(n)?.hts.kind === "list");
+      
+      // Check if any line has differs (conflict)
+      const hasDiffers = invoiceLines.some((n) => partsByLine.get(n)?.hts.kind === "differs");
+      
+      let reason: string;
+      if (hasDiffers) {
+        reason = `Waiting on L${lineNum}.33A: the invoice and the customer parts list give different HTS numbers.`;
+      } else if (hasAcceptedHts) {
+        reason = "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.";
+      } else {
+        reason = "Waiting on L" + lineNum + ".33A: the HTS number was not read.";
+      }
+      
       return field_helper({
         id,
         block: "35",
@@ -1601,6 +1645,31 @@ export function buildDraft(input: {
           })
           .filter((s): s is DocSource => s !== null);
 
+        // Add sources from parts list if any lines have "list" or "same" origin
+        const listOriginSources = group.invoiceLines
+          .flatMap((n) => {
+            const parts = partsByLine.get(n);
+            if (parts?.origin.kind === "list" || parts?.origin.kind === "same") {
+              return [parts.origin.source];
+            }
+            return [];
+          });
+        sources.push(...listOriginSources);
+
+        const note = listOriginSources.length > 0
+          ? group.invoiceLines
+              .filter((n) => {
+                const parts = partsByLine.get(n);
+                return parts?.origin.kind === "list" || parts?.origin.kind === "same";
+              })
+              .map((n) => {
+                const parts = partsByLine.get(n)!;
+                return parts.origin.kind === "list" || parts.origin.kind === "same" ? parts.origin.note : "";
+              })
+              .filter(Boolean)
+              .join(" ")
+          : null;
+
         field = field_helper({
           id,
           block: "10",
@@ -1609,42 +1678,55 @@ export function buildDraft(input: {
           value: group.origin,
           status: "copied",
           sources,
+          note,
         });
       } else {
         // No accepted origin
         const reasons: string[] = [];
+        const listOriginSources: DocSource[] = [];
         for (const n of group.invoiceLines) {
-          const r = accepted.get(`invoice.lines.${n}.origin`);
-          if (r && r.value) {
-            const originStr = normalizeSpace(r.value);
-            const codeResult = countryCode(originStr);
-            if (!codeResult.ok) {
-              reasons.push(
-                `Invoice line ${n}: the reader suggested "${originStr}" but its quote is not on the page, so it was rejected.`
-              );
-            }
+          const parts = partsByLine.get(n);
+          if (parts?.origin.kind === "differs") {
+            reasons.push(parts.origin.reason);
+            // Both sides: the invoice origin reading, then the list cell
+            const invoiceOrigin = accepted.get(`invoice.lines.${n}.origin`);
+            if (invoiceOrigin) listOriginSources.push(docSource(invoiceOrigin));
+            listOriginSources.push(parts.origin.source);
           } else {
-            const originReading = verified.find(
-              (r): r is Extract<VerifiedReading, { status: "rejected" | "uncertain" }> =>
-                r.field === `invoice.lines.${n}.origin` && (r.status === "rejected" || r.status === "uncertain")
-            );
-            if (originReading) {
-              const v = normalizeSpace(originReading.value ?? "");
-              if (originReading.status === "uncertain") {
-                reasons.push(`Invoice line ${n}: the AI reader read "${v}" but was not sure. A person checks it on the invoice.`);
-              } else {
-                // rejected
-                if (originReading.reason === "quote_not_found") {
-                  reasons.push(`Invoice line ${n}: the reader suggested "${v}" but its quote is not on the page, so it was rejected.`);
-                } else {
-                  reasons.push(`Invoice line ${n}: the reader suggested "${v}" but it was rejected: ${originReading.message}`);
-                }
+            const r = accepted.get(`invoice.lines.${n}.origin`);
+            if (r && r.value) {
+              const originStr = normalizeSpace(r.value);
+              const codeResult = countryCode(originStr);
+              if (!codeResult.ok) {
+                reasons.push(
+                  `Invoice line ${n}: the reader suggested "${originStr}" but its quote is not on the page, so it was rejected.`
+                );
               }
             } else {
-              reasons.push(`Line ${n}: no origin reading.`);
+              const originReading = verified.find(
+                (r): r is Extract<VerifiedReading, { status: "rejected" | "uncertain" }> =>
+                  r.field === `invoice.lines.${n}.origin` && (r.status === "rejected" || r.status === "uncertain")
+              );
+              if (originReading) {
+                const v = normalizeSpace(originReading.value ?? "");
+                if (originReading.status === "uncertain") {
+                  reasons.push(`Invoice line ${n}: the AI reader read "${v}" but was not sure. A person checks it on the invoice.`);
+                } else {
+                  // rejected
+                  if (originReading.reason === "quote_not_found") {
+                    reasons.push(`Invoice line ${n}: the reader suggested "${v}" but its quote is not on the page, so it was rejected.`);
+                  } else {
+                    reasons.push(`Invoice line ${n}: the reader suggested "${v}" but it was rejected: ${originReading.message}`);
+                  }
+                }
+              } else {
+                reasons.push(`Line ${n}: no origin reading.`);
+              }
             }
           }
         }
+
+        const sources = listOriginSources;
 
         field = field_helper({
           id,
@@ -1653,6 +1735,7 @@ export function buildDraft(input: {
           label: "Country of origin",
           status: "needsReview",
           reason: reasons.length > 0 ? reasons.join(" ") : "Country of origin missing.",
+          sources,
         });
       }
 
@@ -1719,6 +1802,16 @@ export function buildDraft(input: {
         })
         .filter((s): s is DocSource => s !== null);
 
+      // Collect parts list sources
+      const listHtsSources = group.invoiceLines
+        .flatMap((n) => {
+          const parts = partsByLine.get(n);
+          if (parts && (parts.hts.kind === "list" || parts.hts.kind === "same" || parts.hts.kind === "differs")) {
+            return [parts.hts.source];
+          }
+          return [];
+        });
+
       let field: DraftField;
       if (htsLookup.found) {
         const htsSource: HtsSource = {
@@ -1727,6 +1820,21 @@ export function buildDraft(input: {
           htsno: htsLookup.row.htsno,
         };
         const rowDesc = htsLookup.row.description || "";
+        
+        // Build note with parts list information
+        const listNotes = group.invoiceLines
+          .flatMap((n) => {
+            const parts = partsByLine.get(n);
+            if (parts && (parts.hts.kind === "list" || parts.hts.kind === "same")) {
+              return [parts.hts.note];
+            }
+            return [];
+          });
+        
+        const note = listNotes.length > 0
+          ? `${listNotes.join(" ")} Found in ${hts.revisionTitle}: ${rowDesc}`
+          : `Found in ${hts.revisionTitle}: ${rowDesc}`;
+        
         field = field_helper({
           id,
           block: "33A",
@@ -1735,14 +1843,22 @@ export function buildDraft(input: {
           value: htsLookup.number.entry,
           status: "copied",
           rule: "P15",
-          note: `Found in ${hts.revisionTitle}: ${rowDesc}`,
-          sources: [...htsReadingSources, htsSource],
+          note,
+          sources: [...htsReadingSources, ...listHtsSources, htsSource],
         });
       } else {
         // Check if any invoice line of this 7501 line has an accepted HTS (Requirement 38.2)
-        const hasAcceptedHts = group.invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`));
+        const hasAcceptedHts = group.invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`) || partsByLine.get(n)?.hts.kind === "list");
+        
+        // Check if any line has differs (conflict)
+        const differsList = group.invoiceLines
+          .filter((n) => partsByLine.get(n)?.hts.kind === "differs")
+          .map((n) => partsByLine.get(n)!.hts as Extract<LineParts["hts"], { kind: "differs" }>);
+        
         let reason: string;
-        if (!hasAcceptedHts) {
+        if (differsList.length > 0) {
+          reason = differsList.map(d => d.reason).join(" ");
+        } else if (!hasAcceptedHts) {
           reason = htsNotRead(group.invoiceLines);
         } else {
           reason = `${htsLookup.reason} The app does not choose a number.`;
@@ -1755,7 +1871,7 @@ export function buildDraft(input: {
           status: "needsReview",
           rule: "P15",
           reason,
-          sources: htsReadingSources,
+          sources: [...htsReadingSources, ...listHtsSources],
         });
       }
 
@@ -1910,10 +2026,20 @@ export function buildDraft(input: {
 
       if (!htsLookup.found) {
         // Check if any invoice line has an accepted HTS (Requirement 38.2)
-        const hasAcceptedHts = group.invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`));
-        const reason = hasAcceptedHts
-          ? "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision."
-          : "Waiting on L" + lineNum + ".33A: the HTS number was not read.";
+        const hasAcceptedHts = group.invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`) || partsByLine.get(n)?.hts.kind === "list");
+        
+        // Check if any line has differs (conflict)
+        const hasDiffers = group.invoiceLines.some((n) => partsByLine.get(n)?.hts.kind === "differs");
+        
+        let reason: string;
+        if (hasDiffers) {
+          reason = `Waiting on L${lineNum}.33A: the invoice and the customer parts list give different HTS numbers.`;
+        } else if (hasAcceptedHts) {
+          reason = "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.";
+        } else {
+          reason = "Waiting on L" + lineNum + ".33A: the HTS number was not read.";
+        }
+        
         lineFields.push(
           field_helper({
             id,
@@ -2324,6 +2450,55 @@ export function buildDraft(input: {
     headerFields.splice(b9Index + 1, 0, b10Field);
   } else {
     headerFields.push(b10Field);
+  }
+
+  // B13: Update if parts list has MIDs
+  if (partsList) {
+    const lines = draftLines.flatMap(l => l.invoiceLines).sort((a, b) => a - b);
+    const mids = lines.map(n => partsByLine.get(n)?.mid ?? null);
+    const midSources = mids
+      .flatMap((mid, i) => mid ? [mid.source] : [])
+      .filter((s, i, arr) => arr.findIndex(x => x.readingField === s.readingField) === i); // Deduplicate by readingField
+    
+    const allHaveMid = mids.every(m => m !== null);
+    const allSameMid = allHaveMid && new Set(mids.map(m => m!.value)).size === 1;
+    
+    if (allSameMid) {
+      // All lines have the same MID - fill B13
+      const b13Index = headerFields.findIndex(f => f.id === "B13");
+      if (b13Index >= 0) {
+        headerFields[b13Index] = field_helper({
+          id: "B13",
+          block: "13",
+          label: "Manufacturer ID (MID)",
+          value: mids[0]!.value,
+          status: "copied",
+          note: "From the customer parts list (one MID for every line).",
+          sources: midSources,
+        });
+      }
+    } else if (mids.some(m => m !== null)) {
+      // Some lines have MIDs - keep needsReview and add MID info to reason
+      const b13Index = headerFields.findIndex(f => f.id === "B13");
+      if (b13Index >= 0) {
+        const baseReason = "Invoice names a trading company; manufacturer per line not in bundle.";
+        const midList = lines
+          .map((n, i) => {
+            const m = mids[i];
+            return m ? `invoice line ${n} ${m.value}` : `invoice line ${n} none`;
+          })
+          .join("; ");
+        const reason = `${baseReason} The customer parts list gives: ${midList}. A person checks the manufacturer of each line.`;
+        headerFields[b13Index] = field_helper({
+          id: "B13",
+          block: "13",
+          label: "Manufacturer ID (MID)",
+          status: "needsReview",
+          reason,
+          sources: midSources,
+        });
+      }
+    }
   }
 
   // Build totals section
