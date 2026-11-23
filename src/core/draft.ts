@@ -2927,6 +2927,21 @@ export function buildDraft(input: {
 
   recomputeTotals();
 
+  // A value computed again after a person's edit still waits (Requirement 30.1): recomputeTotals can make a field
+  // "computed" again from image readings (for example a line's 35 after its 33A is edited). Run the image rule of
+  // 18.1 and 26.1 again on every field that a person has not confirmed.
+  for (const f of allFieldsList) {
+    if (f.note === CONFIRMED_NOTE) continue;
+    if (!f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) continue;
+    if (f.status === "copied") {
+      f.status = "needsReview";
+      f.reason = IMAGE_REVIEW_REASON;
+    } else if (f.status === "computed") {
+      f.status = "needsReview";
+      f.reason = IMAGE_COMPUTED_REVIEW_REASON;
+    }
+  }
+
   // Waiting pass (Requirement 26.3): mark computed/copied fields that depend on image-waiting fields as needsReview
   const isImageWaiting = (f: DraftField): boolean => {
     return f.status === "needsReview" && (f.reason === IMAGE_REVIEW_REASON || f.reason === IMAGE_COMPUTED_REVIEW_REASON);
