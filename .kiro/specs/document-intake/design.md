@@ -957,7 +957,7 @@ export default function StitchBoard(...) {
 
 **Requirement 20 (Every Accepted Value Points to Its Place):** Fallback box logic in `reading.ts` (`verifyReadings`) when quote is part of one item: use items that overlap the value. New reject reason "no_source_box" when no items overlap.
 
-**Requirement 21 (Time Limit for the Reader Call) and Requirement 22 (Reader Errors Never Carry Document Text):** Claude reader in `claudeReader.ts` passes `timeout` (45,000 ms) to `messages.create`, maps `APIConnectionTimeoutError` before other connection errors, generates error message "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." Validation reasons in `readerContract.ts` contain only positions and fixed words, never model-provided strings. Output schema in `claudeReader.ts` constrains "doc" field enum to the request document IDs. Configuration: `intakeConfig.ts` defines `readerMaxOutputTokens` (8,000) and `readerTimeoutMs` (45,000 ms). Tests get the SDK error classes through the export `SDK_ERRORS` of `claudeReader.ts`, because the SDK may be imported only in that file.
+**Requirement 21 (Time Limit for the Reader Call) and Requirement 22 (Reader Errors Never Carry Document Text):** Claude reader in `claudeReader.ts` passes `timeout` (45,000 ms) to `messages.create`, maps `APIConnectionTimeoutError` before other connection errors, generates error message "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." Validation reasons in `readerContract.ts` contain only positions and fixed words, never model-provided strings. Output schema in `claudeReader.ts` constrains "doc" field enum to the request document IDs. Configuration: `intakeConfig.ts` defines `readerMaxOutputTokens` (16,000) and `readerMinOutputTokens` (8,000) and `readerTimeoutMs` (45,000 ms). Tests get the SDK error classes through the export `SDK_ERRORS` of `claudeReader.ts`, because the SDK may be imported only in that file.
 
 **UsageState Update:** Add `reservedCostNanoUsd: 52000000` (52 million nano-USD) to the example. Add line: "Cost cap: `setup.costCapNanoUsd` = floor(costKrw x 1e9 / krwPerUsd), 6,666,666,666 for the public site."
 
@@ -979,9 +979,17 @@ export default function StitchBoard(...) {
 
 ---
 
+## First Real Call Fixes (2026-11-23)
+
+**Requirement 29 (The Reader's Answer Fits in One Call):** `intakeConfig.ts`: `readerMaxOutputTokens: 16000`, new `readerMinOutputTokens: 8000`. `budget.ts`: `estimateReaderCall` computes the output room under `perCall.maxCallCostNanoUsd` with the price of its input tokens, clamped to 8,000..16,000. `claudeReader.ts`: `buildReaderRequest` sends `thinking: { type: "disabled" }`, `max_tokens` from `estimateReaderCall`, and a schema whose transcript lines are `{ t, b }` (b: 4 integers, thousandths); the system prompt names "t" and "b" and asks for the JSON on one line; `createClaudeReader` converts `{ t, b }` to `{ text, box }` (each number / 1000) before `validateReaderOutput` and refuses a "b" that is not 4 integers from 0 to 1000.
+
+**Requirement 30 (A Value Computed Again After a Person's Edit Still Waits):** `draft.ts`: after `recomputeTotals` and before the waiting pass of 26.3, the image rule of 18.1 and 26.1 runs again on fields whose note is not `CONFIRMED_NOTE`, so a value computed again from image readings (for example a line's 35 after its 33A is edited) waits. Totals carry no document sources and are not touched by this pass; they wait through 26.3 as before.
+
+---
+
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 45 are defined below (45 in total).*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 47 are defined below (47 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1233,6 +1241,14 @@ For any content type other than "application/json" (with or without parameters) 
 
 **Validates: Requirements 28.1, 28.2, 28.3**
 
+### Property 46: The Answer Room Stays Under the Line
+For any valid reader input, `estimateReaderCall(input).outputTokens` is between 8,000 and 16,000; the worst case is at most `perCall.maxCallCostNanoUsd` exactly when the input tokens are at most 68,000, and then outputTokens is the largest number up to 16,000 that keeps it so; `buildReaderRequest(input).max_tokens` equals outputTokens and the request has `thinking: { type: "disabled" }`; the Claude reader turns any transcript line whose "b" is 4 integers from 0 to 1000 into a box with each number divided by 1000, and refuses any other "b".
+**Validates: Requirements 29.1, 29.2, 29.4**
+
+### Property 47: An Edit Never Makes an Unchecked Image Value Final
+For the sample bundle with every page marked as an image transcript and any single person edit (a line's 33A to another number of the HTS subset, a line's 10 to another country code, or a line's 36A to another whole-dollar amount), no field has status "computed" or "copied" with a document source of origin "imageTranscript" unless its note is "Confirmed by a person against the page."; with the text pages, the same edits give no field the reason `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON`.
+**Validates: Requirements 30.1, 30.3**
+
 ---
 
 ## Error Handling
@@ -1339,6 +1355,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (45 properties: 1 to 28, 33 to 45 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (47 properties: 1 to 28, 33 to 47 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 45
+**Total Correctness Properties:** 47

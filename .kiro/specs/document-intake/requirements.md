@@ -288,7 +288,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 #### Acceptance Criteria
 
 1. THE server SHALL refuse with status 400 (model not called) a reader input with a page text longer than `intakeConfig.perCall.maxPageTextChars` (15,000 characters), page texts totalling more than `maxTotalTextChars` (60,000), or a page image whose base64 text is longer than `maxImageBase64Chars` (1,500,000).
-2. BEFORE the model is called, THE server SHALL estimate the worst case of the call with `estimateReaderCall(input)`: input tokens = `promptOverheadTokens` (10,000: system prompt, field list, output schema) + for every page text and file name ceil(ASCII characters / 2) + 2 x other characters + `imageTokensPerPage` (5,000) per image page; output tokens = `intakeConfig.readerMaxOutputTokens` (8,000, the `max_tokens` of the request); cost from the configured prices. These are upper bounds (Claude scales every image to at most about 4,800 tokens).
+2. BEFORE the model is called, THE server SHALL estimate the worst case of the call with `estimateReaderCall(input)`: input tokens = `promptOverheadTokens` (10,000: system prompt, field list, output schema) + for every page text and file name ceil(ASCII characters / 2) + 2 x other characters + `imageTokensPerPage` (5,000) per image page; output tokens = the output room of Requirement 29.4 (8,000 to 16,000, the `max_tokens` of the request); cost from the configured prices. These are upper bounds (Claude scales every image to at most about 4,800 tokens).
 3. IF the worst-case cost is above `perCall.maxCallCostNanoUsd` (10,800,000 nano-USD = 0.0108 USD), THE server SHALL answer 413 with "These documents are too large to read in one go. Split them and upload fewer pages at a time." and SHALL NOT call the model or write the cap state. The line is 1.5 times the large-call cost assumed when the AI budget was approved (32,000 input and 8,000 output tokens = 0.0072 USD), the same factor used to re-check the first real calls.
 4. THE cap state SHALL keep a running total `reservedCostNanoUsd`. Every allowed call adds its worst-case cost in the same conditional write that reserves the call (before the model is called), so the total can only over-count, also when a call times out or the function is stopped.
 5. THE server SHALL refuse a call with 429 "This demo has used its AI budget." (usage record outcome "cap-exceeded", errorMessage "cost_cap") when the running total plus the call's worst-case cost would exceed the won cap converted at a deliberately high rate: `costKrw` 10,000 for the public site and 20,000 for local use, `krwPerUsd` 1,500. `DOCUMENT_INTAKE_COST_CAP_KRW` overrides the won cap (a positive integer; anything else turns the reader off, like the other caps). The converted cap is `setup.costCapNanoUsd`; `setup.caps` keeps its three call caps unchanged.
@@ -347,7 +347,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 1. THE Claude reader SHALL pass a request timeout of `intakeConfig.readerTimeoutMs` (45,000 ms) to `messages.create` (second argument `{ timeout }`), under the 60-second limit of a synchronous Netlify function.
 2. A timeout SHALL become the ReaderError "The AI reader took longer than 45 seconds and was stopped. Try fewer pages." The usage record has outcome "error", that message and null tokens; the cost was already reserved (Requirement 17.4).
-3. `max_tokens` SHALL be `intakeConfig.readerMaxOutputTokens` (8,000), the output size of the approved cost assumption.
+3. `max_tokens` SHALL be the output tokens of `estimateReaderCall(input)` (Requirement 29.4).
 
 ---
 
@@ -381,7 +381,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 #### Acceptance Criteria
 
 1. `estimateReaderCall` SHALL count every text the uploader controls at one token per UTF-8 byte (a token always covers at least one byte, so this bounds any text, also characters outside the Basic Multilingual Plane). inputTokens = `promptOverheadTokens` (10,000: the fixed system prompt, field list and output schema) + for every page: `perPageOverheadTokens` (160: the fixed words the request puts around a page) + utf8Bytes(fileName) + 4 x utf8Bytes(docId) (the request repeats the file name and the document id on every page, and the output schema lists the document id twice) + utf8Bytes(text) for a text page or `imageTokensPerPage` (5,000) for an image page. utf8Bytes counts, for each code point, 1 byte below U+0080, 2 below U+0800, 3 below U+10000 (lone surrogates included), 4 otherwise.
-2. Any input that passes the per-call line (0.0108 USD with 8,000 output tokens) therefore has at most 68,000 input tokens, under the 100,000-token price step.
+2. Any input that passes the per-call line (0.0108 USD, with at least 8,000 output tokens of room, Requirement 29.4) therefore has at most 68,000 input tokens, under the 100,000-token price step.
 3. AFTER a reader call that reports token usage (a valid answer, an invalid answer, or a ReaderError that carries usage), THE server SHALL compute the actual cost with `estimateCostNanoUsd(inputTokens, outputTokens)`. IF it is above the worst case reserved for the call, THE server SHALL add the difference to `reservedCostNanoUsd`: read the state, apply `addReservedCost`, write it, up to 3 tries; if all fail, log "usage cost top-up not written" (no document text). The answer to the person does not change.
 4. `addReservedCost(state, extraNanoUsd)` in `budget.ts` SHALL return a new state with `reservedCostNanoUsd` = (old value or 0) + extraNanoUsd and every other part unchanged; it never changes its input.
 
@@ -439,6 +439,34 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 29 (MUST): The Reader's Answer Fits in One Call
+
+**User Story:** As an entry writer, I want the AI reader to finish its answer for an ordinary set of three documents with a photo and a scan, so that I get a draft instead of "The AI reader ran out of room for its answer."
+
+**Background:** The first real call (an invoice text PDF, a packing list scan and a bill of lading photo; 12,798 input tokens) stopped at the 8,000-token output limit. An answer of the current shape for the three test bundles, built from their answer keys without a paid call, is about 18,800, 11,800 and 17,300 characters, that is about 6,300, 3,900 and 5,800 tokens at 3 characters per token and up to 9,400 at 2, before any thinking. Claude Haiku 5.5 thinks adaptively when `thinking` is left out, and thinking tokens count toward `max_tokens`.
+
+#### Acceptance Criteria
+
+1. `buildReaderRequest` SHALL send `thinking: { type: "disabled" }` together with `output_config.effort: "low"` (Claude Haiku 5.5 accepts "disabled" at effort low, medium and high). Reading printed values needs no reasoning, and without thinking the size of the answer depends only on the documents.
+2. THE output schema SHALL ask for each transcript line as an object with exactly two properties: "t" (string, the line text) and "b" (array of integers: x, y, w, h of the line box in thousandths of the page width and height, origin top-left). The schema keeps `additionalProperties: false` and uses no `minimum`, `maximum`, `minItems` or `maxItems` (the API does not accept numeric and complex array constraints). `createClaudeReader` SHALL turn every line into the existing `{ text, box: { x, y, w, h } }` with each number divided by 1000 before `validateReaderOutput`. A line whose "b" is not exactly 4 integers from 0 to 1000 makes the answer invalid with the reason "transcripts[<i>].lines[<j>].b: must be 4 integers from 0 to 1000" (positions and fixed words only, Requirement 22.1). `ReaderOutput`, the fake reader, the recordings and every step after the reader stay as they are.
+3. THE system prompt SHALL describe the transcript line as "t" and "b" in thousandths, and SHALL say "Write the JSON on one line, with no indentation." (spaces and line breaks are output tokens too).
+4. `estimateReaderCall` output tokens SHALL be the output room under the per-call line: the largest whole number of tokens o for which `estimateCostNanoUsd(inputTokens, o)` is at most `perCall.maxCallCostNanoUsd`, capped at `intakeConfig.readerMaxOutputTokens` (16,000, the usual limit for a request that is not streamed) and never below the new `intakeConfig.readerMinOutputTokens` (8,000, the output size of the approved cost assumption). `buildReaderRequest(input)` SHALL send this number as `max_tokens`. The 413 rule of Requirement 17.3 does not change: with fewer than 8,000 tokens of room the worst case (with 8,000) is above the line and the call is refused, so an input that passes still has at most 68,000 input tokens and no call's worst case is above 0.0108 USD. Examples: 21,841 input tokens give 16,000; 60,000 give 9,600; 68,000 give 8,000; 68,001 are refused.
+5. THE time limit stays 45 seconds (Requirement 21.1). At the speed of the first call (8,000 tokens in about 28 seconds) about 12,000 output tokens fit in it, so 29.1 to 29.3 keep the answer short; the higher limit of 29.4 is room, not the target.
+
+---
+
+### Requirement 30 (MUST): A Value Computed Again After a Person's Edit Still Waits
+
+**User Story:** As an entry writer, I want a value that the draft computes again from photo readings after I change another field to wait for my check, so that editing one field never makes an unchecked photo value final.
+
+#### Acceptance Criteria
+
+1. AFTER all person values and the recomputation of totals, and before the waiting pass of Requirement 26.3, every field with status "computed" or "copied" that has a document source with origin "imageTranscript" and whose note is not "Confirmed by a person against the page." SHALL get status "needsReview" with reason `IMAGE_COMPUTED_REVIEW_REASON` (for "computed") or `IMAGE_REVIEW_REASON` (for "copied"); value, sources, rule, note and inputs stay. Example: on a draft whose pages are all images, a person edits only L001.33A; L001.35 is computed again from the invoice quantities (216) and today becomes "computed" with no person check; it SHALL wait.
+2. Applying the shown value of such a field through the same "Confirm this value" button SHALL make it final ("computed" with the confirmation note, or "personEdited" with that value); it SHALL NOT stay in Needs review.
+3. Fields from text pages, the sample bundle, the upload test recordings and the verifier's expected drafts are unchanged; Properties 35 and 43 still hold.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -471,6 +499,8 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 26. (MUST) Values Computed from Image Readings Wait for a Person
 27. (MUST) Missing Amounts, Currency and Gross Weight Go to a Person
 28. (MUST) Small Guards on Requests, CSV Cells and Day Counts
+29. (MUST) The Reader's Answer Fits in One Call
+30. (MUST) A Value Computed Again After a Person's Edit Still Waits
 
 **NICE (if time is left):**
 
