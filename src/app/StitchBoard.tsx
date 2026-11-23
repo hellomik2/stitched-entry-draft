@@ -619,7 +619,7 @@ export default function StitchBoard({
   const activeReadings = verified.filter(
     (r): r is Extract<VerifiedReading, { status: 'accepted' }> => r.doc === activeDocId && r.page === activePage && r.status === 'accepted'
   )
-  const rejectedReadings = verified.filter((r): r is Extract<VerifiedReading, { status: 'rejected' }> => r.doc === activeDocId && r.page === activePage && r.status === 'rejected')
+  const rejectedReadings = verified.filter((r): r is Extract<VerifiedReading, { status: 'rejected' | 'uncertain' }> => r.doc === activeDocId && r.page === activePage && (r.status === 'rejected' || r.status === 'uncertain'))
 
   // Get page dimensions for canvas
   const activeDoc = documents.find((d) => d.docId === activeDocId)
@@ -786,7 +786,7 @@ export default function StitchBoard({
               <div key={reading.field}>
                 <span className="field-name">{reading.field}</span>
                 <span className="rejected-tag">rejected, not used in the draft</span>
-                <span className="reason">{reading.status === 'rejected' ? reading.message : ''}</span>
+                <span className="reason">{'message' in reading ? reading.message : ''}</span>
               </div>
             ))}
           </div>

@@ -186,10 +186,10 @@ export function buildDraft(input: {
 
   // Rejected readings
   const rejectedReadings = verified
-    .filter((r) => r.status === "rejected")
+    .filter((r) => r.status === "rejected" || r.status === "uncertain")
     .map((r) => ({
       field: r.field,
-      reason: r.reason,
+      reason: r.status === "rejected" ? r.reason : "low_confidence",
       message: r.message,
     }));
 
@@ -1452,7 +1452,7 @@ export function buildDraft(input: {
             }
           } else {
             const originReading = verified.find(
-              (v) => v.field === `invoice.lines.${n}.origin` && v.status === "rejected"
+              (v) => v.field === `invoice.lines.${n}.origin` && (v.status === "rejected" || v.status === "uncertain")
             );
             if (originReading) {
               reasons.push(

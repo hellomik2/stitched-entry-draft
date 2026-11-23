@@ -322,12 +322,18 @@ export function createClaudeReader(config: {
           if (typeof transcript === "object" && transcript !== null && !Array.isArray(transcript)) {
             const t = transcript as Record<string, unknown>;
             if (Array.isArray(t.lines)) {
+              const transformedLines: Array<Record<string, unknown>> = [];
               for (let j = 0; j < t.lines.length; j++) {
                 const line = t.lines[j];
                 if (typeof line === "object" && line !== null && !Array.isArray(line)) {
                   const l = line as Record<string, unknown>;
-                  // Transform from wire format { t, b: [x, y, w, h] } to { text, box: { x, y, w, h } }
-                  // Requirement 29.2: "b" must be an array of exactly 4 integers from 0 to 1000
+                  
+                  // Check if "t" is a string; if not, skip the line
+                  if (typeof l.t !== "string") {
+                    continue;
+                  }
+                  
+                  // Transform from wire format { t, b: [x, y, w, h] } to { text, box: { x, y, w, h } or null }
                   const b = l.b;
                   if (
                     Array.isArray(b) &&
@@ -347,9 +353,11 @@ export function createClaudeReader(config: {
                     b[2] >= 0 &&
                     b[2] <= 1000 &&
                     b[3] >= 0 &&
-                    b[3] <= 1000
+                    b[3] <= 1000 &&
+                    (b[0] as number) + (b[2] as number) <= 1001 &&
+                    (b[1] as number) + (b[3] as number) <= 1001
                   ) {
-                    // Transform to output format
+                    // Good box: transform to output format
                     (l as Record<string, unknown>).text = l.t;
                     delete (l as Record<string, unknown>).t;
                     (l as Record<string, unknown>).box = {
@@ -360,14 +368,16 @@ export function createClaudeReader(config: {
                     };
                     delete (l as Record<string, unknown>).b;
                   } else {
-                    // Invalid or missing b
-                    throw new ReaderError(
-                      `The reader answer was not valid: transcripts[${i}].lines[${j}].b: must be 4 integers from 0 to 1000`,
-                      usage,
-                    );
+                    // Bad box: set to null
+                    (l as Record<string, unknown>).text = l.t;
+                    delete (l as Record<string, unknown>).t;
+                    (l as Record<string, unknown>).box = null;
+                    delete (l as Record<string, unknown>).b;
                   }
+                  transformedLines.push(l);
                 }
               }
+              t.lines = transformedLines;
             }
           }
         }

@@ -517,11 +517,16 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
       }
 
       // Check box
-      if (!lineObj.box || typeof lineObj.box !== "object") {
+      if (lineObj.box !== null && (typeof lineObj.box !== "object" || Array.isArray(lineObj.box))) {
         return {
           ok: false,
-          reason: `transcripts[${transcriptIndex}].lines[${lineIndex}].box: must be an object`,
+          reason: `transcripts[${transcriptIndex}].lines[${lineIndex}].box: must be an object or null`,
         };
+      }
+
+      // If box is null, skip validation
+      if (lineObj.box === null) {
+        continue;
       }
 
       const boxObj = lineObj.box as Record<string, unknown>;

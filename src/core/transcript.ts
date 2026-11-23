@@ -2,7 +2,7 @@ import { normalizeSpace, PageText, TextItem, Span, Box } from "./pdfText";
 
 export type TranscriptLine = {
   text: string;
-  box: { x: number; y: number; w: number; h: number };
+  box: { x: number; y: number; w: number; h: number } | null;
 };
 
 function round2(v: number): number {
@@ -48,8 +48,12 @@ export function transcriptToPageText(
   for (let i = 0; i < normalizedLines.length; i++) {
     const line = normalizedLines[i];
     const id = `${docId}:p${page}:i${i + 1}`;
-    const clampedBox = clampBox(line.box, width, height);
-    items.push({ id, str: line.text, box: clampedBox });
+    const clampedBox = line.box === null ? { x: 0, y: 0, w: 0, h: 0 } : clampBox(line.box, width, height);
+    const item: TextItem = { id, str: line.text, box: clampedBox };
+    if (line.box === null) {
+      item.noBox = true;
+    }
+    items.push(item);
   }
 
   // Build text and spans

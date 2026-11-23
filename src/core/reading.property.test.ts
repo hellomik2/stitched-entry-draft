@@ -16,9 +16,9 @@ describe("Reading verification with confidence and image origin", () => {
     bundleDocuments = bundle.documents;
   });
 
-  describe("Feature: document-intake, Property 2: Confidence Always Rejects Low (Validates: Requirements 5.1, 5.4)", () => {
+  describe("Feature: document-intake, Property 2: Confidence Always Rejects Low (Validates: Requirements 5.1, 5.4, 36.1)", () => {
     it(
-      "should reject all fields marked with low confidence",
+      "should mark low-confidence accepted fields as uncertain",
       () => {
         fc.assert(
           fc.property(
@@ -44,13 +44,21 @@ describe("Reading verification with confidence and image origin", () => {
               // Verify the modified readings
               const verified = verifyReadings(modifiedAnswer, bundleDocuments);
 
-              // Check that all low-confidence fields are rejected with reason "low_confidence"
+              // Check low-confidence fields: if accepted in original, become uncertain; if rejected in original, stay rejected with same reason
               for (let i = 0; i < verified.length; i++) {
                 if (lowConfidenceIndexes.includes(i)) {
-                  const v = verified[i];
-                  expect(v.status).toBe("rejected");
-                  if (v.status === "rejected") {
-                    expect(v.reason).toBe("low_confidence");
+                  if (original[i].status === "accepted") {
+                    expect(verified[i].status).toBe("uncertain");
+                    if ((verified[i] as any).status === "uncertain") {
+                      expect((verified[i] as any).itemIds).toEqual((original[i] as any).itemIds);
+                      expect((verified[i] as any).box).toEqual((original[i] as any).box);
+                      expect((verified[i] as any).message).toContain("not sure");
+                    }
+                  } else if (original[i].status === "rejected") {
+                    expect(verified[i].status).toBe("rejected");
+                    if (verified[i].status === "rejected") {
+                      expect((verified[i] as any).reason).toBe((original[i] as any).reason);
+                    }
                   }
                 }
               }

@@ -174,10 +174,10 @@ describe("Claude Reader", () => {
         const recordingLine = recordingTranscript.lines[j];
         const resultLine = resultTranscript!.lines[j];
         expect(resultLine!.text).toBe(recordingLine.text);
-        expect(resultLine!.box.x).toBe(Math.round(recordingLine.box.x * 1000) / 1000);
-        expect(resultLine!.box.y).toBe(Math.round(recordingLine.box.y * 1000) / 1000);
-        expect(resultLine!.box.w).toBe(Math.round(recordingLine.box.w * 1000) / 1000);
-        expect(resultLine!.box.h).toBe(Math.round(recordingLine.box.h * 1000) / 1000);
+        expect(resultLine!.box!.x).toBe(Math.round(recordingLine.box.x * 1000) / 1000);
+        expect(resultLine!.box!.y).toBe(Math.round(recordingLine.box.y * 1000) / 1000);
+        expect(resultLine!.box!.w).toBe(Math.round(recordingLine.box.w * 1000) / 1000);
+        expect(resultLine!.box!.h).toBe(Math.round(recordingLine.box.h * 1000) / 1000);
       }
     }
   });
@@ -858,7 +858,7 @@ describe("Claude Reader", () => {
     });
   });
 
-  describe("Feature: document-intake, Property 46: The Answer Room Stays Under the Line (Validates: Requirements 29.1, 29.2, 29.3, 29.4)", () => {
+  describe("Feature: document-intake, Property 46: The Answer Room Stays Under the Line (Validates: Requirements 29.1, 29.2, 29.3, 29.4, 37.1)", () => {
     it("buildReaderRequest sends thinking: { type: 'disabled' }", () => {
       const testInput: ReaderInput = {
         bundle: "test",
@@ -960,7 +960,7 @@ describe("Claude Reader", () => {
       expect(line.box).toEqual({ x: 0.716, y: 0.088, w: 0.172, h: 0.016 });
     });
 
-    it("b = [1, 2, 3] (not 4 elements) rejects with exact error message", async () => {
+    it("b = [1, 2, 3] (not 4 elements) becomes box: null on that line; good line stays", async () => {
       const testInput: ReaderInput = {
         bundle: "test",
         documents: [
@@ -974,8 +974,8 @@ describe("Claude Reader", () => {
                 page: 1,
                 width: 612,
                 height: 792,
-                text: "x",
-                image: null,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
               },
             ],
           },
@@ -993,7 +993,7 @@ describe("Claude Reader", () => {
                 {
                   doc: "invoice",
                   page: 1,
-                  lines: [{ t: "text", b: [1, 2, 3] }],
+                  lines: [{ t: "text", b: [1, 2, 3] }, { t: "Total 10", b: [100, 100, 200, 20] }],
                 },
               ],
               invoiceLineCount: null,
@@ -1004,20 +1004,21 @@ describe("Claude Reader", () => {
       }));
 
       const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
 
-      try {
-        await reader.read(testInput);
-        expect.fail("should have thrown");
-      } catch (e) {
-        if (!(e instanceof ReaderError)) throw e;
-        expect(e.message).toBe(
-          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
-        );
-        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
-      }
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(2);
+      
+      // Bad line becomes box: null
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("text");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toBe(null);
+      
+      // Good line stays
+      expect(result.output.transcripts[0]!.lines[1]!.text).toBe("Total 10");
+      expect(result.output.transcripts[0]!.lines[1]!.box!).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
     });
 
-    it("b = [0, 0, 0, 1001] (1001 out of range) rejects with exact error message", async () => {
+    it("b = [0, 0, 0, 1001] (1001 out of range) becomes box: null on that line; good line stays", async () => {
       const testInput: ReaderInput = {
         bundle: "test",
         documents: [
@@ -1031,8 +1032,8 @@ describe("Claude Reader", () => {
                 page: 1,
                 width: 612,
                 height: 792,
-                text: "x",
-                image: null,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
               },
             ],
           },
@@ -1050,7 +1051,7 @@ describe("Claude Reader", () => {
                 {
                   doc: "invoice",
                   page: 1,
-                  lines: [{ t: "text", b: [0, 0, 0, 1001] }],
+                  lines: [{ t: "text", b: [0, 0, 0, 1001] }, { t: "Total 10", b: [100, 100, 200, 20] }],
                 },
               ],
               invoiceLineCount: null,
@@ -1061,20 +1062,21 @@ describe("Claude Reader", () => {
       }));
 
       const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
 
-      try {
-        await reader.read(testInput);
-        expect.fail("should have thrown");
-      } catch (e) {
-        if (!(e instanceof ReaderError)) throw e;
-        expect(e.message).toBe(
-          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
-        );
-        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
-      }
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(2);
+      
+      // Bad line becomes box: null
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("text");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toBe(null);
+      
+      // Good line stays
+      expect(result.output.transcripts[0]!.lines[1]!.text).toBe("Total 10");
+      expect(result.output.transcripts[0]!.lines[1]!.box!).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
     });
 
-    it("b = [-1, 0, 0, 0] (negative) rejects with exact error message", async () => {
+    it("b = [-1, 0, 0, 0] (negative) becomes box: null on that line; good line stays", async () => {
       const testInput: ReaderInput = {
         bundle: "test",
         documents: [
@@ -1088,8 +1090,8 @@ describe("Claude Reader", () => {
                 page: 1,
                 width: 612,
                 height: 792,
-                text: "x",
-                image: null,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
               },
             ],
           },
@@ -1107,7 +1109,7 @@ describe("Claude Reader", () => {
                 {
                   doc: "invoice",
                   page: 1,
-                  lines: [{ t: "text", b: [-1, 0, 0, 0] }],
+                  lines: [{ t: "text", b: [-1, 0, 0, 0] }, { t: "Total 10", b: [100, 100, 200, 20] }],
                 },
               ],
               invoiceLineCount: null,
@@ -1118,20 +1120,21 @@ describe("Claude Reader", () => {
       }));
 
       const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
 
-      try {
-        await reader.read(testInput);
-        expect.fail("should have thrown");
-      } catch (e) {
-        if (!(e instanceof ReaderError)) throw e;
-        expect(e.message).toBe(
-          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
-        );
-        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
-      }
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(2);
+      
+      // Bad line becomes box: null
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("text");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toBe(null);
+      
+      // Good line stays
+      expect(result.output.transcripts[0]!.lines[1]!.text).toBe("Total 10");
+      expect(result.output.transcripts[0]!.lines[1]!.box!).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
     });
 
-    it("b = [0.5, 0, 0, 0] (not integer) rejects with exact error message", async () => {
+    it("b = [0.5, 0, 0, 0] (not integer) becomes box: null on that line; good line stays", async () => {
       const testInput: ReaderInput = {
         bundle: "test",
         documents: [
@@ -1145,8 +1148,8 @@ describe("Claude Reader", () => {
                 page: 1,
                 width: 612,
                 height: 792,
-                text: "x",
-                image: null,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
               },
             ],
           },
@@ -1164,7 +1167,7 @@ describe("Claude Reader", () => {
                 {
                   doc: "invoice",
                   page: 1,
-                  lines: [{ t: "text", b: [0.5, 0, 0, 0] }],
+                  lines: [{ t: "text", b: [0.5, 0, 0, 0] }, { t: "Total 10", b: [100, 100, 200, 20] }],
                 },
               ],
               invoiceLineCount: null,
@@ -1175,20 +1178,21 @@ describe("Claude Reader", () => {
       }));
 
       const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
 
-      try {
-        await reader.read(testInput);
-        expect.fail("should have thrown");
-      } catch (e) {
-        if (!(e instanceof ReaderError)) throw e;
-        expect(e.message).toBe(
-          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
-        );
-        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
-      }
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(2);
+      
+      // Bad line becomes box: null
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("text");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toBe(null);
+      
+      // Good line stays
+      expect(result.output.transcripts[0]!.lines[1]!.text).toBe("Total 10");
+      expect(result.output.transcripts[0]!.lines[1]!.box!).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
     });
 
-    it("b = '1,2,3,4' (string instead of array) rejects with exact error message", async () => {
+    it("b = '1,2,3,4' (string instead of array) becomes box: null on that line; good line stays", async () => {
       const testInput: ReaderInput = {
         bundle: "test",
         documents: [
@@ -1202,8 +1206,8 @@ describe("Claude Reader", () => {
                 page: 1,
                 width: 612,
                 height: 792,
-                text: "x",
-                image: null,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
               },
             ],
           },
@@ -1221,7 +1225,7 @@ describe("Claude Reader", () => {
                 {
                   doc: "invoice",
                   page: 1,
-                  lines: [{ t: "text", b: "1,2,3,4" }],
+                  lines: [{ t: "text", b: "1,2,3,4" }, { t: "Total 10", b: [100, 100, 200, 20] }],
                 },
               ],
               invoiceLineCount: null,
@@ -1232,20 +1236,21 @@ describe("Claude Reader", () => {
       }));
 
       const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
 
-      try {
-        await reader.read(testInput);
-        expect.fail("should have thrown");
-      } catch (e) {
-        if (!(e instanceof ReaderError)) throw e;
-        expect(e.message).toBe(
-          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
-        );
-        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
-      }
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(2);
+      
+      // Bad line becomes box: null
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("text");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toBe(null);
+      
+      // Good line stays
+      expect(result.output.transcripts[0]!.lines[1]!.text).toBe("Total 10");
+      expect(result.output.transcripts[0]!.lines[1]!.box!).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
     });
 
-    it("old shape { text: 'Total 10', box: { x: 0.1, y: 0.1, w: 0.2, h: 0.02 } } on an image page rejects with exact error message", async () => {
+    it("old shape { text: 'Total 10', box: { x: 0.1, y: 0.1, w: 0.2, h: 0.02 } } is left out; good line stays", async () => {
       const testInput: ReaderInput = {
         bundle: "test",
         documents: [
@@ -1278,9 +1283,114 @@ describe("Claude Reader", () => {
                 {
                   doc: "invoice",
                   page: 1,
-                  lines: [{ text: "Total 10", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.02 } }],
+                  lines: [{ text: "Total 10", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.02 } }, { t: "Line 2", b: [100, 100, 200, 20] }],
                 },
               ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
+
+      expect(result.output.transcripts).toHaveLength(1);
+      // Old shape line is left out, only good line stays
+      expect(result.output.transcripts[0]!.lines).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("Line 2");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
+    });
+
+    it("b = [900, 0, 200, 10] (x + w = 1100, past page) becomes box: null; good line stays", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "text", b: [900, 0, 200, 10] }, { t: "Total 10", b: [100, 100, 200, 20] }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
+
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(2);
+      
+      // Bad line becomes box: null
+      expect(result.output.transcripts[0]!.lines[0]!.text).toBe("text");
+      expect(result.output.transcripts[0]!.lines[0]!.box).toBe(null);
+      
+      // Good line stays
+      expect(result.output.transcripts[0]!.lines[1]!.text).toBe("Total 10");
+      expect(result.output.transcripts[0]!.lines[1]!.box!).toEqual({ x: 0.1, y: 0.1, w: 0.2, h: 0.02 });
+    });
+
+    it("image page without a transcript rejects the whole answer with 'missing transcript' message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 1200,
+                height: 1600,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [], // Missing transcript for the image page
               invoiceLineCount: null,
             }),
           },
@@ -1295,9 +1405,7 @@ describe("Claude Reader", () => {
         expect.fail("should have thrown");
       } catch (e) {
         if (!(e instanceof ReaderError)) throw e;
-        expect(e.message).toBe(
-          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
-        );
+        expect(e.message).toContain("missing transcript");
         expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
       }
     });
