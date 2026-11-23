@@ -44,8 +44,8 @@ export type RejectReason =
 
 export type VerifiedReading = FieldReading &
   (
-    | { status: "accepted"; box: Box; itemIds: string[]; origin?: "imageTranscript" }
-    | { status: "uncertain"; box: Box; itemIds: string[]; origin?: "imageTranscript"; message: string }
+    | { status: "accepted"; box: Box; itemIds: string[]; origin?: "imageTranscript"; lineText?: string }
+    | { status: "uncertain"; box: Box; itemIds: string[]; origin?: "imageTranscript"; message: string; lineText?: string }
     | { status: "rejected"; reason: RejectReason; message: string }
   );
 
@@ -855,6 +855,7 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
 
     if (page.origin === "imageTranscript") {
       (result as any).origin = "imageTranscript" as const;
+      (result as any).lineText = selectedItems.map((item) => item.str).join(" ");
     }
 
     return result;

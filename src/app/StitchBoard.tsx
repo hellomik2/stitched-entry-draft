@@ -22,6 +22,7 @@ import {
   composeDocumentTexts,
   IMAGE_REVIEW_REASON,
   IMAGE_COMPUTED_REVIEW_REASON,
+  LOW_CONFIDENCE_REVIEW_REASON,
   CONFIRMED_NOTE,
 } from '../core'
 import UploadPanel, { type UploadResult } from './intake/UploadPanel'
@@ -739,6 +740,21 @@ export default function StitchBoard({
             </div>
           )}
 
+          {/* Approx note when active page is from image transcript */}
+          {activePageText?.origin === 'imageTranscript' && (
+            <div data-testid="approx-note" style={{
+              padding: '0.5rem 1rem',
+              margin: '1rem 1rem 0',
+              fontSize: 'var(--fs-small)',
+              background: '#fff9e6',
+              border: '1px solid #fcd34d',
+              borderRadius: '4px',
+              color: '#78350f'
+            }}>
+              Boxes on a photo or scan are where the AI reader placed each line. They can be off; check the words.
+            </div>
+          )}
+
           {/* Page view */}
           <div
             data-testid="page-view"
@@ -752,6 +768,7 @@ export default function StitchBoard({
               margin: '1rem',
             }}
           >
+
             {/* Reading boxes overlaid on canvas */}
             {activeReadings.map((reading) => {
               const scale = pageScale
@@ -765,6 +782,7 @@ export default function StitchBoard({
                   key={reading.field}
                   data-testid={`box-${reading.field}`}
                   data-reading={reading.field}
+                  data-approx={reading.origin === 'imageTranscript' ? 'true' : undefined}
                   data-selected={selectedField && fieldMap.get(selectedField)?.sources.some(
                     (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
                   ) ? 'true' : 'false'}
@@ -775,14 +793,73 @@ export default function StitchBoard({
                     width: `${width}px`,
                     height: `${height}px`,
                   }}
-                />
+                >
+                  {reading.origin === 'imageTranscript' && selectedField && fieldMap.get(selectedField)?.sources.some(
+                    (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
+                  ) && (
+                    <div data-testid="approx-label">AI estimate</div>
+                  )}
+                </div>
               )
             })}
+
+            {/* Uncertain reading boxes overlaid on canvas */}
+            {rejectedReadings
+              .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain')
+              .map((reading) => {
+                const scale = pageScale
+                const left = reading.box.x * scale - 2
+                const top = reading.box.y * scale - 2
+                const width = reading.box.w * scale + 4
+                const height = reading.box.h * scale + 4
+
+                return (
+                  <div
+                    key={reading.field}
+                    data-testid={`uncertain-box-${reading.field}`}
+                    data-reading={reading.field}
+                    data-approx={reading.origin === 'imageTranscript' ? 'true' : undefined}
+                    data-selected={selectedField && fieldMap.get(selectedField)?.sources.some(
+                      (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
+                    ) ? 'true' : 'false'}
+                    style={{
+                      position: 'absolute',
+                      left: `${left}px`,
+                      top: `${top}px`,
+                      width: `${width}px`,
+                      height: `${height}px`,
+                    }}
+                  >
+                    {reading.origin === 'imageTranscript' && selectedField && fieldMap.get(selectedField)?.sources.some(
+                      (s) => s.kind === 'document' && s.doc === activeDocId && s.page === activePage && s.readingField === reading.field
+                    ) && (
+                      <div data-testid="approx-label">AI estimate</div>
+                    )}
+                  </div>
+                )
+              })}
+          </div>
+
+          {/* Uncertain readings */}
+          <div data-testid="uncertain-readings">
+            {rejectedReadings
+              .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain')
+              .map((reading) => (
+                <div key={reading.field} style={{ padding: '0.5rem 0.5rem', marginBottom: '0.5rem', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px' }}>
+                  <span className="field-name" style={{ color: '#92400e' }}>{reading.field}</span>
+                  <span style={{ marginLeft: '0.5rem', color: '#78350f' }}>"{reading.value || ''}"</span>
+                  <div style={{ marginTop: '0.25rem', fontSize: 'var(--fs-small)', color: '#78350f' }}>
+                    not sure, not used until a person checks it
+                  </div>
+                </div>
+              ))}
           </div>
 
           {/* Rejected readings */}
           <div data-testid="rejected-readings">
-            {rejectedReadings.map((reading) => (
+            {rejectedReadings
+              .filter((r): r is Extract<VerifiedReading, { status: 'rejected' }> => r.status === 'rejected')
+              .map((reading) => (
               <div key={reading.field}>
                 <span className="field-name">{reading.field}</span>
                 <span className="rejected-tag">rejected, not used in the draft</span>
@@ -1045,6 +1122,7 @@ export default function StitchBoard({
         fieldMap={fieldMap} 
         draft={draft}
         documents={activeBundle.documents}
+        verified={verified}
         onApply={(fieldId, value) => {
           setOverrides((prev) => [...prev.filter((o) => o.fieldId !== fieldId), { fieldId, value }])
         }}
@@ -1235,6 +1313,7 @@ function SourceStrip({
   fieldMap,
   draft,
   documents,
+  verified,
   onApply,
   onUndo,
   onSelect,
@@ -1243,6 +1322,7 @@ function SourceStrip({
   fieldMap: Map<string, DraftField>
   draft: Draft | null
   documents: Array<{ docId: string; label: string }>
+  verified: VerifiedReading[]
   onApply: (fieldId: string, value: string) => void
   onUndo: (fieldId: string) => void
   onSelect: (fieldId: string) => void
@@ -1292,7 +1372,7 @@ function SourceStrip({
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
                 <span data-testid="strip-status" style={{ color: 'var(--muted)', fontWeight: 500 }}>{statusWords[field.status]}</span>
 
-              {field.status === 'needsReview' && field.value && (field.reason === IMAGE_REVIEW_REASON || field.reason === IMAGE_COMPUTED_REVIEW_REASON) && (
+              {field.status === 'needsReview' && field.value && (field.reason === IMAGE_REVIEW_REASON || field.reason === IMAGE_COMPUTED_REVIEW_REASON || field.reason === LOW_CONFIDENCE_REVIEW_REASON) && (
                 <button
                   type="button"
                   data-testid="confirm-image-value"
@@ -1377,22 +1457,40 @@ function SourceStrip({
               {/* Sources */}
               {field.sources.length > 0 && (
                 <div style={{ marginBottom: '0.5rem' }}>
-                  {field.sources.map((source, idx) => (
-                    <div
-                      key={idx}
-                      data-testid="strip-source"
-                      style={{
-                        marginBottom: '0.25rem',
-                        paddingLeft: '0.5rem',
-                        borderLeft: `3px solid ${source.kind === 'document' ? THREAD_DOC_COLOR : '#9ca3af'}`,
-                        color: 'var(--ink)',
-                      }}
-                    >
-                      {source.kind === 'document'
-                        ? `${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"${source.origin === 'imageTranscript' ? ' (read from an image by the AI reader)' : ''}`
-                        : `Tariff schedule ${source.revision}, row ${source.htsno}`}
-                    </div>
-                  ))}
+                  {field.sources.map((source, idx) => {
+                    // Find lineText for image transcript sources
+                    let lineText = ''
+                    if (source.kind === 'document' && source.origin === 'imageTranscript' && source.readingField) {
+                      const reading = verified.find(
+                        (r) => r.field === source.readingField && r.doc === source.doc && r.page === source.page
+                      )
+                      lineText = (reading as any)?.lineText || ''
+                    }
+
+                    return (
+                      <div
+                        key={idx}
+                        data-testid="strip-source"
+                        style={{
+                          marginBottom: '0.25rem',
+                          paddingLeft: '0.5rem',
+                          borderLeft: `3px solid ${source.kind === 'document' ? THREAD_DOC_COLOR : '#9ca3af'}`,
+                          color: 'var(--ink)',
+                        }}
+                      >
+                        {source.kind === 'document' ? (
+                          <>
+                            {`${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"`}
+                            {source.origin === 'imageTranscript' && (
+                              <> (read from an image by the AI reader){lineText && <> Place estimated by the AI reader. Its transcript line: "{lineText}"</>}</>
+                            )}
+                          </>
+                        ) : (
+                          `Tariff schedule ${source.revision}, row ${source.htsno}`
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
 

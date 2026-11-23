@@ -380,7 +380,7 @@ describe("Draft: Image Wait and Missing Values", () => {
           const field34A = line.fields.find((f) => f.id.endsWith(".34A"));
           expect(field34A?.status).toBe("needsReview");
           expect(field34A?.value).toBeNull();
-          expect(field34A?.reason).toBe("No total gross weight was read from the packing list. A person enters the gross weight.");
+          expect(field34A?.reason).toBe("The AI reader read the packing list total gross weight as 286.2 kg but was not sure, so it is not used. A person checks it and enters the gross weight.");
         }
       },
       120000,

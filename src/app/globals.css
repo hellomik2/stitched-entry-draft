@@ -317,6 +317,48 @@ html, body {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
 }
 
+/* Uncertain boxes */
+[data-testid*="uncertain-box-"] {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed #f59e0b;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+[data-testid*="uncertain-box-"]:hover {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+[data-testid*="uncertain-box-"][data-selected="true"] {
+  border: 2px dashed #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+}
+
+/* Approximate boxes (AI estimated positions) */
+[data-testid*="box-"][data-approx="true"],
+[data-testid*="uncertain-box-"][data-approx="true"] {
+  border-style: dashed;
+}
+
+/* AI estimate label */
+[data-testid="approx-label"] {
+  position: absolute;
+  pointer-events: none;
+  font-size: var(--fs-dense);
+  font-weight: 600;
+  color: #f59e0b;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 0.125rem 0.375rem;
+  border-radius: 2px;
+  white-space: nowrap;
+  transform: translate(-2px, -1.75rem);
+  z-index: 11;
+}
+
 /* Rejected readings */
 [data-testid="rejected-readings"] {
   padding: 0.5rem 1rem;

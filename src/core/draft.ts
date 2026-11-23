@@ -14,6 +14,8 @@ import { roundEnteredValue, computeDuty, allocateGrossWeight, totalEnteredValue,
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
+export const LOW_CONFIDENCE_REVIEW_REASON = "The AI reader was not sure of this value. Check it against the page, then confirm it.";
+
 export const IMAGE_REVIEW_REASON = "Read from an image by the AI reader. Check it against the page, then confirm it.";
 
 export const IMAGE_COMPUTED_REVIEW_REASON = "Computed from values the AI reader read from an image. Check them against the page, then confirm it.";
@@ -118,10 +120,12 @@ function fromImagePage(reading: VerifiedReading | undefined): boolean {
 }
 
 /**
- * Helper: create a DocSource from an accepted reading.
+ * Helper: create a DocSource from an accepted or uncertain reading.
  */
 function docSource(reading: VerifiedReading): DocSource {
-  if (reading.status !== "accepted") throw new Error("Cannot create DocSource from rejected reading");
+  if (reading.status !== "accepted" && reading.status !== "uncertain") {
+    throw new Error("Cannot create DocSource from rejected reading");
+  }
   const source: DocSource = {
     kind: "document",
     doc: reading.doc,
@@ -163,6 +167,14 @@ function acceptedReadings(verified: VerifiedReading[]): Map<string, VerifiedRead
     }
   }
   return map;
+}
+
+/**
+ * Helper: parse kg with thousands comma support (e.g., "1,284.0").
+ * Removes thousands commas before parsing.
+ */
+function kgTenthsForCompare(text: string) {
+  return parseKgToTenths(normalizeSpace(text).replace(/,(?=\d{3}(?!\d))/g, ""));
 }
 
 /**
@@ -267,29 +279,56 @@ export function buildDraft(input: {
     }
   }
 
-  // Requirement 33.1: Identify packing list lines that were not fully read
-  const packingNotFullyRead: { line: number; itemNo: string | null }[] = [];
+  // Requirement 33.1 & 36.4b: Identify packing list lines that were not fully read or have uncertain quantities
+  const packingNotFullyRead: { line: number; itemNo: string | null; uncertainQty?: boolean }[] = [];
   for (let n = 1; n <= 8; n++) {
     const hasAnyReading = verified.some((r) => r.field.startsWith(`packingList.lines.${n}.`));
     if (!hasAnyReading) continue;
 
     const itemNoReading = accepted.get(`packingList.lines.${n}.itemNo`);
-    const qtyReading = accepted.get(`packingList.lines.${n}.quantity`);
+    const qtyReading = verified.find((r) => r.field === `packingList.lines.${n}.quantity`);
 
     const itemNoValue = itemNoReading && itemNoReading.value ? normalizeSpace(itemNoReading.value) : null;
-    const qtyOk = qtyReading && qtyReading.value ? parseCount(normalizeSpace(qtyReading.value)).ok : false;
+    const qtyOk = qtyReading && qtyReading.value && qtyReading.status === "accepted" ? parseCount(normalizeSpace(qtyReading.value)).ok : false;
+    const qtyUncertain = qtyReading && qtyReading.status === "uncertain";
 
-    if (!itemNoValue || !qtyOk) {
-      packingNotFullyRead.push({ line: n, itemNo: itemNoValue });
+    if (!itemNoValue || !qtyOk || qtyUncertain) {
+      packingNotFullyRead.push({ 
+        line: n, 
+        itemNo: itemNoValue,
+        uncertainQty: qtyUncertain
+      });
     }
   }
 
-  // Requirement 33.2: One quantity check
+  // Requirement 33.2 & 36.4b: One quantity check
   const packingQuantityProblem = (
     n: number,
     itemNo: string | null,
     q: number
   ): { reason: string; detail: string } | null => {
+    // Check for uncertain-only packing list lines (Requirement 36.4b)
+    const uncertainOnlyLines = packingNotFullyRead.filter(
+      (x) => x.itemNo === itemNo && x.uncertainQty && 
+        // Also check that this line doesn't have a not-fully-read issue for other reasons
+        packingNotFullyRead.filter((y) => y.line === x.line && !y.uncertainQty).length === 0
+    );
+    
+    if (uncertainOnlyLines.length > 0) {
+      const lineList = uncertainOnlyLines.map((x) => x.line).join(", ");
+      const values = uncertainOnlyLines
+        .map((x) => {
+          const r = verified.find((r) => r.field === `packingList.lines.${x.line}.quantity` && r.status === "uncertain");
+          return r ? normalizeSpace(r.value ?? "") : "?";
+        })
+        .join(", ");
+      
+      return {
+        reason: `The AI reader read the quantity of packing list line ${lineList} as ${values} but was not sure, so invoice line ${n} (${q} PCS) was not compared with the packing list. A person compares them.`,
+        detail: `packing list line ${lineList} quantity not sure`,
+      };
+    }
+
     // (a) itemNo is null
     if (itemNo === null) {
       return {
@@ -299,7 +338,7 @@ export function buildDraft(input: {
     }
 
     // (b) lines where packing list line was not fully read with this itemNo
-    const notFullyReadWithItemNo = packingNotFullyRead.filter((x) => x.itemNo === itemNo);
+    const notFullyReadWithItemNo = packingNotFullyRead.filter((x) => x.itemNo === itemNo && !x.uncertainQty);
     if (notFullyReadWithItemNo.length > 0) {
       const lineList = notFullyReadWithItemNo.map((x) => x.line).join(", ");
       return {
@@ -311,7 +350,7 @@ export function buildDraft(input: {
     // (c) sum of packing with itemNo != q and there are not-fully-read lines with itemNo === null
     const sum = (packingByItemNo.get(itemNo) ?? []).reduce((a, b) => a + b, 0);
     if (sum !== q) {
-      const notFullyReadNoItemNo = packingNotFullyRead.filter((x) => x.itemNo === null);
+      const notFullyReadNoItemNo = packingNotFullyRead.filter((x) => x.itemNo === null && !x.uncertainQty);
       if (notFullyReadNoItemNo.length > 0) {
         const lineList = notFullyReadNoItemNo.map((x) => x.line).join(", ");
         return {
@@ -661,18 +700,35 @@ export function buildDraft(input: {
 
   // B8: copied from billOfLading.vessel
   const vesselReading = accepted.get("billOfLading.vessel");
-  if (vesselReading && vesselReading.value) {
-    const vesselValue = normalizeSpace(vesselReading.value);
-    headerFields.push(
-      field_helper({
-        id: "B8",
-        block: "8",
-        label: "Importing carrier (vessel)",
-        value: vesselValue,
-        status: "copied",
-        sources: [docSource(vesselReading)],
-      })
-    );
+  const vesselUncertainReading = verified.find((r) => r.field === "billOfLading.vessel" && r.status === "uncertain");
+  const vesselReadingToUse = vesselReading || vesselUncertainReading;
+  
+  if (vesselReadingToUse && vesselReadingToUse.value) {
+    const vesselValue = normalizeSpace(vesselReadingToUse.value);
+    if (vesselUncertainReading) {
+      headerFields.push(
+        field_helper({
+          id: "B8",
+          block: "8",
+          label: "Importing carrier (vessel)",
+          value: vesselValue,
+          status: "needsReview",
+          reason: LOW_CONFIDENCE_REVIEW_REASON,
+          sources: [docSource(vesselUncertainReading)],
+        })
+      );
+    } else {
+      headerFields.push(
+        field_helper({
+          id: "B8",
+          block: "8",
+          label: "Importing carrier (vessel)",
+          value: vesselValue,
+          status: "copied",
+          sources: [docSource(vesselReadingToUse)],
+        })
+      );
+    }
   } else {
     headerFields.push(
       field_helper({
@@ -715,21 +771,39 @@ export function buildDraft(input: {
 
   // B12: copied from billOfLading.number if valid
   const blReading = accepted.get("billOfLading.number");
-  if (blReading && blReading.value) {
-    const blValue = normalizeSpace(blReading.value);
+  const blUncertainReading = verified.find((r) => r.field === "billOfLading.number" && r.status === "uncertain");
+  const blReadingToUse = blReading || blUncertainReading;
+  
+  if (blReadingToUse && blReadingToUse.value) {
+    const blValue = normalizeSpace(blReadingToUse.value);
     if (isValidBlNumber(blValue)) {
       const carrierCode = blValue.substring(0, 4);
-      headerFields.push(
-        field_helper({
-          id: "B12",
-          block: "12",
-          label: "B/L number",
-          value: blValue,
-          status: "copied",
-          note: `Carrier code ${carrierCode}`,
-          sources: [docSource(blReading)],
-        })
-      );
+      if (blUncertainReading) {
+        headerFields.push(
+          field_helper({
+            id: "B12",
+            block: "12",
+            label: "B/L number",
+            value: blValue,
+            status: "needsReview",
+            reason: LOW_CONFIDENCE_REVIEW_REASON,
+            note: `Carrier code ${carrierCode}`,
+            sources: [docSource(blUncertainReading)],
+          })
+        );
+      } else {
+        headerFields.push(
+          field_helper({
+            id: "B12",
+            block: "12",
+            label: "B/L number",
+            value: blValue,
+            status: "copied",
+            note: `Carrier code ${carrierCode}`,
+            sources: [docSource(blReadingToUse)],
+          })
+        );
+      }
     } else {
       headerFields.push(
         field_helper({
@@ -766,21 +840,39 @@ export function buildDraft(input: {
 
   // B14: copied from countryCode(invoice.countryOfExport)
   const exportCountryReading = accepted.get("invoice.countryOfExport");
-  if (exportCountryReading && exportCountryReading.value) {
-    const codeResult = countryCode(normalizeSpace(exportCountryReading.value));
+  const exportCountryUncertainReading = verified.find((r) => r.field === "invoice.countryOfExport" && r.status === "uncertain");
+  const exportCountryReadingToUse = exportCountryReading || exportCountryUncertainReading;
+  
+  if (exportCountryReadingToUse && exportCountryReadingToUse.value) {
+    const codeResult = countryCode(normalizeSpace(exportCountryReadingToUse.value));
     if (codeResult.ok) {
-      const countryText = normalizeSpace(exportCountryReading.value);
-      headerFields.push(
-        field_helper({
-          id: "B14",
-          block: "14",
-          label: "Exporting country",
-          value: codeResult.value,
-          status: "copied",
-          note: countryText,
-          sources: [docSource(exportCountryReading)],
-        })
-      );
+      const countryText = normalizeSpace(exportCountryReadingToUse.value);
+      if (exportCountryUncertainReading) {
+        headerFields.push(
+          field_helper({
+            id: "B14",
+            block: "14",
+            label: "Exporting country",
+            value: codeResult.value,
+            status: "needsReview",
+            reason: LOW_CONFIDENCE_REVIEW_REASON,
+            note: countryText,
+            sources: [docSource(exportCountryUncertainReading)],
+          })
+        );
+      } else {
+        headerFields.push(
+          field_helper({
+            id: "B14",
+            block: "14",
+            label: "Exporting country",
+            value: codeResult.value,
+            status: "copied",
+            note: countryText,
+            sources: [docSource(exportCountryReadingToUse)],
+          })
+        );
+      }
     } else {
       headerFields.push(
         field_helper({
@@ -788,7 +880,7 @@ export function buildDraft(input: {
           block: "14",
           label: "Exporting country",
           status: "needsReview",
-          reason: `Country not recognized: "${exportCountryReading.value}"`,
+          reason: `Country not recognized: "${exportCountryReadingToUse.value}"`,
         })
       );
     }
@@ -806,20 +898,38 @@ export function buildDraft(input: {
 
   // B15: copied from billOfLading.onBoardDate
   const onBoardReading = accepted.get("billOfLading.onBoardDate");
-  if (onBoardReading && onBoardReading.value) {
-    const dateResult = parseUsDate(normalizeSpace(onBoardReading.value));
+  const onBoardUncertainReading = verified.find((r) => r.field === "billOfLading.onBoardDate" && r.status === "uncertain");
+  const onBoardReadingToUse = onBoardReading || onBoardUncertainReading;
+  
+  if (onBoardReadingToUse && onBoardReadingToUse.value) {
+    const dateResult = parseUsDate(normalizeSpace(onBoardReadingToUse.value));
     if (dateResult.ok) {
-      headerFields.push(
-        field_helper({
-          id: "B15",
-          block: "15",
-          label: "Export date",
-          value: dateResult.value,
-          status: "copied",
-          note: "Shipped on board date",
-          sources: [docSource(onBoardReading)],
-        })
-      );
+      if (onBoardUncertainReading) {
+        headerFields.push(
+          field_helper({
+            id: "B15",
+            block: "15",
+            label: "Export date",
+            value: dateResult.value,
+            status: "needsReview",
+            reason: LOW_CONFIDENCE_REVIEW_REASON,
+            note: "Shipped on board date",
+            sources: [docSource(onBoardUncertainReading)],
+          })
+        );
+      } else {
+        headerFields.push(
+          field_helper({
+            id: "B15",
+            block: "15",
+            label: "Export date",
+            value: dateResult.value,
+            status: "copied",
+            note: "Shipped on board date",
+            sources: [docSource(onBoardReadingToUse)],
+          })
+        );
+      }
     } else {
       headerFields.push(
         field_helper({
@@ -827,7 +937,7 @@ export function buildDraft(input: {
           block: "15",
           label: "Export date",
           status: "needsReview",
-          reason: `Invalid date format: "${onBoardReading.value}"`,
+          reason: `Invalid date format: "${onBoardReadingToUse.value}"`,
         })
       );
     }
@@ -1139,6 +1249,25 @@ export function buildDraft(input: {
     }
   }
 
+  // Helper function: generate reason when no invoice line of a 7501 line has an accepted HTS (Requirement 38.2)
+  const htsNotRead = (invoiceLines: number[]): string => {
+    const parts: string[] = [];
+    for (const n of invoiceLines) {
+      const r = verified.find((v) => v.field === `invoice.lines.${n}.hts`);
+      if (!r) {
+        parts.push(`The HTS number of invoice line ${n} was not read.`);
+      } else if (r.status === "rejected") {
+        const v = normalizeSpace(r.value ?? "");
+        const message = r.message || "not found";
+        parts.push(`Invoice line ${n}: the reader suggested "${v}" but it was rejected: ${message}`);
+      } else if (r.status === "uncertain") {
+        const v = normalizeSpace(r.value ?? "");
+        parts.push(`Invoice line ${n}: the AI reader read "${v}" but was not sure.`);
+      }
+    }
+    return parts.join(" ") + " A person reads it on the invoice. The app does not choose a number.";
+  };
+
   // Helper function: derive net quantity for a 7501 line by the first rule (Requirement 31.1)
   const deriveNetQuantity = (
     lineNum: string,
@@ -1185,6 +1314,11 @@ export function buildDraft(input: {
       });
     } else if (!htsLookup.found) {
       // HTS not found, can't get unit or compute
+      // Check if any invoice line has an accepted HTS (Requirement 38.2)
+      const hasAcceptedHts = invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`));
+      const reason = hasAcceptedHts
+        ? "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision."
+        : "Waiting on L" + lineNum + ".33A: the HTS number was not read.";
       return field_helper({
         id,
         block: "35",
@@ -1192,7 +1326,7 @@ export function buildDraft(input: {
         label: "Net quantity in HTS units",
         status: "needsReview",
         inputs: [`L${lineNum}.33A`],
-        reason: "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.",
+        reason,
       });
     } else {
       // Parse quantities from invoice lines and convert to HTS unit
@@ -1452,12 +1586,21 @@ export function buildDraft(input: {
             }
           } else {
             const originReading = verified.find(
-              (v) => v.field === `invoice.lines.${n}.origin` && (v.status === "rejected" || v.status === "uncertain")
+              (r): r is Extract<VerifiedReading, { status: "rejected" | "uncertain" }> =>
+                r.field === `invoice.lines.${n}.origin` && (r.status === "rejected" || r.status === "uncertain")
             );
             if (originReading) {
-              reasons.push(
-                `Invoice line ${n}: the reader suggested "${normalizeSpace(originReading.value ?? "")}" but its quote is not on the page, so it was rejected.`
-              );
+              const v = normalizeSpace(originReading.value ?? "");
+              if (originReading.status === "uncertain") {
+                reasons.push(`Invoice line ${n}: the AI reader read "${v}" but was not sure. A person checks it on the invoice.`);
+              } else {
+                // rejected
+                if (originReading.reason === "quote_not_found") {
+                  reasons.push(`Invoice line ${n}: the reader suggested "${v}" but its quote is not on the page, so it was rejected.`);
+                } else {
+                  reasons.push(`Invoice line ${n}: the reader suggested "${v}" but it was rejected: ${originReading.message}`);
+                }
+              }
             } else {
               reasons.push(`Line ${n}: no origin reading.`);
             }
@@ -1557,6 +1700,14 @@ export function buildDraft(input: {
           sources: [...htsReadingSources, htsSource],
         });
       } else {
+        // Check if any invoice line of this 7501 line has an accepted HTS (Requirement 38.2)
+        const hasAcceptedHts = group.invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`));
+        let reason: string;
+        if (!hasAcceptedHts) {
+          reason = htsNotRead(group.invoiceLines);
+        } else {
+          reason = `${htsLookup.reason} The app does not choose a number.`;
+        }
         field = field_helper({
           id,
           block: "33A",
@@ -1564,7 +1715,7 @@ export function buildDraft(input: {
           label: "HTS number",
           status: "needsReview",
           rule: "P15",
-          reason: `${htsLookup.reason} The app does not choose a number.`,
+          reason,
           sources: htsReadingSources,
         });
       }
@@ -1719,6 +1870,11 @@ export function buildDraft(input: {
       const id = `L${lineNum}.37A`;
 
       if (!htsLookup.found) {
+        // Check if any invoice line has an accepted HTS (Requirement 38.2)
+        const hasAcceptedHts = group.invoiceLines.some((n) => accepted.get(`invoice.lines.${n}.hts`));
+        const reason = hasAcceptedHts
+          ? "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision."
+          : "Waiting on L" + lineNum + ".33A: the HTS number was not read.";
         lineFields.push(
           field_helper({
             id,
@@ -1727,7 +1883,7 @@ export function buildDraft(input: {
             label: "HTS rate",
             status: "needsReview",
             inputs: [`L${lineNum}.33A`],
-            reason: "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.",
+            reason,
           })
         );
       } else if (!group.origin) {
@@ -1875,103 +2031,177 @@ export function buildDraft(input: {
   {
     const totalGrossReading = accepted.get("packingList.totalGrossKg");
     
-    // Check for missing or invalid total gross weight (Requirement 27.3)
+    // For rule 36.4a, check if there's an uncertain reading too
+    const totalGrossAny = verified.find((r) => r.field === "packingList.totalGrossKg" && (r.status === "accepted" || r.status === "uncertain"));
+    
+    // Rule 38.4(a): total gross weight was not read (rejected or not a weight)
+    // Also rule 36.4(a): "uncertain" reading  
     if (!totalGrossReading || !totalGrossReading.value || normalizeSpace(totalGrossReading.value) === "") {
-      // No reading at all
+      // No accepted reading at all
+      const isUncertain = totalGrossAny?.status === "uncertain";
+      for (const draftLine of draftLines) {
+        const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+        if (grossField) {
+          grossField.status = "needsReview";
+          grossField.value = null;
+          if (isUncertain) {
+            // Requirement 36.4(a): "uncertain" reading - build reason with optional BoL reference
+            const readValue = normalizeSpace(totalGrossAny.value ?? "");
+            let reason = `The AI reader read the packing list total gross weight as ${readValue} kg but was not sure, so it is not used. A person checks it and enters the gross weight.`;
+            
+            // Check for BoL reading (Requirement 36.4a part 2)
+            const bilReading = verified.find((r) => r.field === "billOfLading.grossKg" && (r.status === "accepted" || r.status === "uncertain"));
+            if (bilReading && bilReading.value) {
+              const bilValue = normalizeSpace(bilReading.value ?? "");
+              const bilParsed = kgTenthsForCompare(bilValue);
+              const pkgParsed = kgTenthsForCompare(readValue);
+              if (bilParsed.ok && pkgParsed.ok && Math.abs(bilParsed.value - pkgParsed.value) > 1) {
+                reason = `The AI reader read the packing list total gross weight as ${readValue} kg but was not sure, so it is not used. The bill of lading says ${bilValue} kg. A person checks it and enters the gross weight.`;
+              }
+            }
+            grossField.reason = reason;
+            grossField.sources = [docSource(totalGrossAny)];
+          } else {
+            grossField.reason = "No total gross weight was read from the packing list. A person enters the gross weight.";
+            grossField.sources = totalGrossAny ? [docSource(totalGrossAny)] : [];
+          }
+        }
+      }
+    } else if (!parseKgToTenths(normalizeSpace(totalGrossReading.value)).ok) {
+      // Reading exists but cannot be parsed
+      const tg = totalGrossReading!;
       for (const draftLine of draftLines) {
         const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
         if (grossField) {
           grossField.status = "needsReview";
           grossField.value = null;
           grossField.reason = "No total gross weight was read from the packing list. A person enters the gross weight.";
-          grossField.sources = [];
+          grossField.sources = [docSource(tg)];
         }
       }
     } else {
+      // Reading is valid, proceed with allocation
       const totalGrossResult = parseKgToTenths(normalizeSpace(totalGrossReading.value));
+      if (!totalGrossResult.ok) throw new Error("unreachable: total gross weight checked above");
+      const totalTenths = totalGrossResult.ok ? totalGrossResult.value : 0;
+      
+      // Build basis for each 7501 line: sum of packing list gross kg for its items
+      // Also collect the individual packing list readings for sources
+      const basis: number[] = [];
+      const grossKgSources: DocSource[][] = [];
 
-      if (!totalGrossResult.ok) {
-        // Reading exists but cannot be parsed
+      for (const draftLine of draftLines) {
+        let lineBasis = 0;
+        const lineSources: DocSource[] = [];
+
+        for (const invoiceN of draftLine.invoiceLines) {
+          const itemReading = accepted.get(`invoice.lines.${invoiceN}.itemNo`);
+          if (itemReading && itemReading.value) {
+            const itemNo = normalizeSpace(itemReading.value);
+            const packingLines = packingByItemNo2.get(itemNo) || [];
+            for (const pLine of packingLines) {
+              lineBasis += pLine.grossKg;
+              lineSources.push(docSource(pLine.grossKgReading));
+            }
+          }
+        }
+        basis.push(lineBasis);
+        grossKgSources.push(lineSources);
+      }
+
+      const basisSum = basis.reduce((a, b) => a + b, 0);
+
+      // Rule 38.4: Check gross weight allocation rules in order
+      // (b) total accepted, billOfLading.grossKg accepted/uncertain, weights differ by > 0.1 kg
+      const bilReading = verified.find((r) => r.field === "billOfLading.grossKg" && (r.status === "accepted" || r.status === "uncertain"));
+      const bilParsed = bilReading && bilReading.value ? kgTenthsForCompare(bilReading.value) : null;
+      const bilDiffers = !!bilParsed && bilParsed.ok && Math.abs(bilParsed.value - totalTenths) > 1;
+
+      // (c) a packing list line has at least one reading but no accepted item number or no accepted gross weight
+      const unreadyPackingLines: number[] = [];
+      for (let n = 1; n <= 8; n++) {
+        const hasAnyReading = verified.some((r) => r.field.startsWith(`packingList.lines.${n}.`));
+        if (!hasAnyReading) continue;
+        
+        const itemNoReading = accepted.get(`packingList.lines.${n}.itemNo`);
+        const grossKgReading = accepted.get(`packingList.lines.${n}.grossKg`);
+        
+        const hasItemNo = itemNoReading && itemNoReading.value;
+        const hasGrossKg = grossKgReading && grossKgReading.value && parseKgToTenths(normalizeSpace(grossKgReading.value)).ok;
+        
+        if (!hasItemNo || !hasGrossKg) {
+          unreadyPackingLines.push(n);
+        }
+      }
+
+      if (bilDiffers) {
+        // Rule 38.4(b): weights differ
+        const tg = totalGrossReading!;
         for (const draftLine of draftLines) {
           const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
           if (grossField) {
             grossField.status = "needsReview";
             grossField.value = null;
-            grossField.reason = "No total gross weight was read from the packing list. A person enters the gross weight.";
-            grossField.sources = [docSource(totalGrossReading)];
+            grossField.reason = `The packing list total gross weight (${(totalTenths / 10).toFixed(1)} kg) differs from the bill of lading (${(bilParsed!.value / 10).toFixed(1)} kg). A person decides.`;
+            grossField.sources = [docSource(tg)];
+          }
+        }
+      } else if (unreadyPackingLines.length > 0) {
+        // Rule 38.4(c): packing list line not ready
+        const tg = totalGrossReading!;
+        const lineList = unreadyPackingLines.join(", ");
+        for (const draftLine of draftLines) {
+          const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+          if (grossField) {
+            grossField.status = "needsReview";
+            grossField.value = null;
+            grossField.reason = `The gross weight of packing list line ${lineList} was not read or the AI reader was not sure of it, so the total cannot be split over the 7501 lines. A person enters the gross weight.`;
+            grossField.sources = [docSource(tg)];
+          }
+        }
+      } else if (basisSum !== totalTenths) {
+        // Rule 38.4(d): the line sums differ from the total
+        const tg = totalGrossReading!;
+        for (const draftLine of draftLines) {
+          const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
+          if (grossField) {
+            grossField.status = "needsReview";
+            grossField.reason = `Gross weight basis sum (${(basisSum / 10).toFixed(1)} kg) differs from packing list total (${(totalTenths / 10).toFixed(1)} kg).`;
+            grossField.sources = [docSource(tg)];
           }
         }
       } else {
-        // Reading is valid, proceed with allocation
-        // Build basis for each 7501 line: sum of packing list gross kg for its items
-        // Also collect the individual packing list readings for sources
-        const basis: number[] = [];
-        const grossKgSources: DocSource[][] = [];
+        // Allocate using largest remainder
+        const tg = totalGrossReading!;
+        const totalGrossKg = Math.floor((totalTenths + 5) / 10); // tenths to whole kg, half up
+        const allocResult = allocateGrossWeight(totalGrossKg, basis, 0);
 
-        for (const draftLine of draftLines) {
-          let lineBasis = 0;
-          const lineSources: DocSource[] = [];
-
-          for (const invoiceN of draftLine.invoiceLines) {
-            const itemReading = accepted.get(`invoice.lines.${invoiceN}.itemNo`);
-            if (itemReading && itemReading.value) {
-              const itemNo = normalizeSpace(itemReading.value);
-              const packingLines = packingByItemNo2.get(itemNo) || [];
-              for (const pLine of packingLines) {
-                lineBasis += pLine.grossKg;
-                lineSources.push(docSource(pLine.grossKgReading));
+        if (allocResult.ok) {
+          for (let i = 0; i < draftLines.length; i++) {
+            const allocated = allocResult.value[i];
+            const grossField = draftLines[i].fields.find((f) => f.id.endsWith(".34A"));
+            if (grossField) {
+              grossField.value = String(allocated.kilograms);
+              if (allocated.estimated) {
+                grossField.note = "Estimated";
               }
+              // Use the individual packing list readings for this line's sources
+              let lineSources = grossKgSources[i].length > 0 ? grossKgSources[i] : [docSource(tg)];
+              // Add totalGrossKg source if it's from image (Requirement 32.3)
+              if (fromImagePage(tg) && !lineSources.some(s => s.readingField === "packingList.totalGrossKg")) {
+                lineSources = [...lineSources, docSource(tg)];
+              }
+              grossField.sources = lineSources;
             }
           }
-          basis.push(lineBasis);
-          grossKgSources.push(lineSources);
-        }
-
-        const basisSum = basis.reduce((a, b) => a + b, 0);
-
-        // Check if basis sum matches total gross
-        if (basisSum !== totalGrossResult.value) {
-          // Mismatch
+        } else {
+          // Allocation failed (e.g., all basis zero)
           for (const draftLine of draftLines) {
             const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
             if (grossField) {
               grossField.status = "needsReview";
-              grossField.reason = `Gross weight basis sum (${(basisSum / 10).toFixed(1)} kg) differs from packing list total (${(totalGrossResult.value / 10).toFixed(1)} kg).`;
-              grossField.sources = [docSource(totalGrossReading)];
-            }
-          }
-        } else {
-          // Allocate using largest remainder
-          const totalGrossKg = Math.floor((totalGrossResult.value + 5) / 10); // tenths to whole kg, half up
-          const allocResult = allocateGrossWeight(totalGrossKg, basis, 0);
-
-          if (allocResult.ok) {
-            for (let i = 0; i < draftLines.length; i++) {
-              const allocated = allocResult.value[i];
-              const grossField = draftLines[i].fields.find((f) => f.id.endsWith(".34A"));
-              if (grossField) {
-                grossField.value = String(allocated.kilograms);
-                if (allocated.estimated) {
-                  grossField.note = "Estimated";
-                }
-                // Use the individual packing list readings for this line's sources
-                let lineSources = grossKgSources[i].length > 0 ? grossKgSources[i] : [docSource(totalGrossReading)];
-                // Add totalGrossKg source if it's from image (Requirement 32.3)
-                if (fromImagePage(totalGrossReading) && !lineSources.some(s => s.readingField === "packingList.totalGrossKg")) {
-                  lineSources = [...lineSources, docSource(totalGrossReading)];
-                }
-                grossField.sources = lineSources;
-              }
-            }
-          } else {
-            // Allocation failed (e.g., all basis zero)
-            for (const draftLine of draftLines) {
-              const grossField = draftLine.fields.find((f) => f.id.endsWith(".34A"));
-              if (grossField) {
-                grossField.status = "needsReview";
-                grossField.reason = allocResult.reason;
-                grossField.sources = [docSource(totalGrossReading)];
-              }
+              grossField.reason = allocResult.reason;
+              grossField.sources = [docSource(tg)];
             }
           }
         }
@@ -1979,15 +2209,39 @@ export function buildDraft(input: {
     }
   }
 
-  // Build B10: country of origin block
-  const b10Field = (() => {
+  // Build B10: country of origin block (Requirement 38.1)
+  // Helper function to build B10 field
+  const buildB10 = (): DraftField => {
     // Collect all L<nnn>.10 field IDs in order
     const lineOriginIds: string[] = [];
+    const lineOriginValues: (string | null)[] = [];
     for (const draftLine of draftLines) {
+      const originField = draftLine.fields.find((f) => f.id.endsWith(".10"));
       lineOriginIds.push(`L${draftLine.lineNumber}.10`);
+      lineOriginValues.push(originField?.value || null);
     }
 
-    if (allOrigins.length === 0) {
+    // Count lines with no value
+    const missingOriginIds = lineOriginIds.filter((_, i) => lineOriginValues[i] === null);
+    
+    // Count unique codes from lines that have values
+    const codes = new Set(lineOriginValues.filter((v): v is string => v !== null));
+    
+    // Requirement 38.1: if any line has no value and fewer than 2 different codes exist
+    if (missingOriginIds.length > 0 && codes.size < 2) {
+      return field_helper({
+        id: "B10",
+        block: "10",
+        label: "Country of origin",
+        status: "needsReview",
+        value: null,
+        inputs: lineOriginIds,
+        reason: `Waiting on ${missingOriginIds.join(", ")}.`,
+      });
+    }
+
+    // Otherwise, use the existing logic
+    if (codes.size === 0) {
       return field_helper({
         id: "B10",
         block: "10",
@@ -1998,9 +2252,8 @@ export function buildDraft(input: {
       });
     }
 
-    const uniqueOrigins = [...new Set(allOrigins)];
-    if (uniqueOrigins.length > 1) {
-      const originList = uniqueOrigins.join(", ");
+    if (codes.size > 1) {
+      const originList = [...codes].join(", ");
       return field_helper({
         id: "B10",
         block: "10",
@@ -2016,13 +2269,15 @@ export function buildDraft(input: {
         id: "B10",
         block: "10",
         label: "Country of origin",
-        value: uniqueOrigins[0],
+        value: [...codes][0],
         status: "computed",
         rule: "7501 p.8",
         inputs: lineOriginIds,
       });
     }
-  })();
+  };
+
+  const b10Field = buildB10();
 
   // Insert B10 after B9
   const b9Index = headerFields.findIndex((f) => f.id === "B9");
@@ -2531,6 +2786,15 @@ export function buildDraft(input: {
       continue;
     }
 
+    // Confirming a low-confidence value: the person applies the value that is shown (Requirement 36.3).
+    if (oldReason === LOW_CONFIDENCE_REVIEW_REASON && oldValue !== null && override.value === oldValue) {
+      // Back to "copied": the value is the document's, now checked by a person.
+      field.status = "copied";
+      field.reason = null;
+      field.note = CONFIRMED_NOTE;
+      continue;
+    }
+
     try {
       switch (field.block) {
         // dollars (36A, B39): parseMoneyToCents and require whole dollars
@@ -2727,6 +2991,26 @@ export function buildDraft(input: {
       field.value = null;
       field.reason = parseResult.reason || "Invalid person value.";
       field.note = null;
+      
+      // Requirement 38.3: When an HTS person value for L<nnn>.33A is refused,
+      // mark that line's 35 and 37A as needsReview with the right reason
+      if (field.block === "33A" && field.line) {
+        const lineNum = field.line;
+        const field35 = allFieldsList.find((f) => f.id === `L${lineNum}.35` && f.status !== "personEdited");
+        const field37A = allFieldsList.find((f) => f.id === `L${lineNum}.37A` && f.status !== "personEdited");
+        if (field35) {
+          field35.status = "needsReview";
+          field35.value = null;
+          field35.reason = `Waiting on L${lineNum}.33A: the HTS number a person entered was not accepted.`;
+          field35.note = null;
+        }
+        if (field37A) {
+          field37A.status = "needsReview";
+          field37A.value = null;
+          field37A.reason = `Waiting on L${lineNum}.33A: the HTS number a person entered was not accepted.`;
+          field37A.note = null;
+        }
+      }
     }
   }
 
@@ -2740,7 +3024,15 @@ export function buildDraft(input: {
     // - .35 (unit from HTS) — now done in case "33A" override handling
     // - .37A (rate from HTS)  
     // - .38 (duty from value and rate)
+    // - B10 (country of origin) [Requirement 38.1]
     // - B39, B41, B43, B44
+
+    // Rebuild B10 unless it's personEdited (Requirement 38.1)
+    const b10Field = headerFields.find((f) => f.id === "B10");
+    if (b10Field && b10Field.status !== "personEdited") {
+      const freshB10 = buildB10();
+      Object.assign(b10Field, freshB10);
+    }
 
     // Recompute L<nnn>.37A for lines where .10 or .33A was personEdited
     for (const line of draftLines) {

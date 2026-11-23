@@ -86,7 +86,7 @@ describe("Requirement 33: A Quantity That Was Not Read Is Not Zero (Property 50)
       expect(l005_35?.unit).toBe(l005_35Base?.unit); // Same unit as in draft without changes
 
       const expectedReason =
-        "Packing list line 5 was not fully read (item number or quantity), so invoice line 5 (64 PCS) was not compared with the packing list. A person compares them.";
+        "The AI reader read the quantity of packing list line 5 as 64 but was not sure, so invoice line 5 (64 PCS) was not compared with the packing list. A person compares them.";
       expect(l005_35?.reason).toBe(expectedReason);
 
       // Check that no field reason contains "says 0 PCS"
@@ -101,7 +101,7 @@ describe("Requirement 33: A Quantity That Was Not Read Is Not Zero (Property 50)
       const checkEntry = check(d, "P3.qty.LH-105");
       expect(checkEntry).toBeDefined();
       expect(checkEntry?.ok).toBe(false);
-      expect(checkEntry?.detail).toBe("packing list line 5 not fully read");
+      expect(checkEntry?.detail).toBe("packing list line 5 quantity not sure");
     });
 
     it("2. low(['packingList.lines.5.quantity']): every 34A field has same status and value as without changes", () => {
