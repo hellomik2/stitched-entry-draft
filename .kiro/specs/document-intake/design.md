@@ -1338,7 +1338,7 @@ For any part that inflates past a limit of Requirement 45.3 (whether the zip hea
 **Validates: Requirements 45.2, 45.3**
 
 ### Property 62: Only an Exactly Equal Part Code Takes the List's Number
-For any invoice lines and parts list: when a line's item number equals exactly one row's part code, its invoice HTS number has no accepted reading and the row's number is in the tariff table, the line's 33A value is that number in entry form with the row's cell as a source; when the item number differs from every part code in any way (one character, case, a space, a hyphen), no field of the draft has a source from the list for that line and its 33A is the same as without a list.
+For any invoice lines and parts list: when a line's item number equals exactly one row's part code, its invoice HTS number has no accepted reading and the row's number is in the tariff table, the line's 33A value is that number in entry form with the row's cell as a source; when the item number differs from every part code in any way (one character, case, a space, a hyphen), no field of that line's 7501 line has a source from the list, and its 33A has the status and value it has without a list.
 **Validates: Requirements 46.3, 46.4, 46.5**
 
 ### Property 63: A Disagreement Waits and Shows Both
