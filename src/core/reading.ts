@@ -44,8 +44,8 @@ export type RejectReason =
 
 export type VerifiedReading = FieldReading &
   (
-    | { status: "accepted"; box: Box; itemIds: string[]; origin?: "imageTranscript"; lineText?: string }
-    | { status: "uncertain"; box: Box; itemIds: string[]; origin?: "imageTranscript"; message: string; lineText?: string }
+    | { status: "accepted"; box: Box; itemIds: string[]; origin?: "imageTranscript"; lineText?: string; cell?: string }
+    | { status: "uncertain"; box: Box; itemIds: string[]; origin?: "imageTranscript"; message: string; lineText?: string; cell?: string }
     | { status: "rejected"; reason: RejectReason; message: string }
   );
 
@@ -374,7 +374,7 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
     docMap.set(doc.docId, doc);
   }
 
-  return answer.fields.map((field, fieldIdx, allFields) => {
+  const verified: VerifiedReading[] = answer.fields.map((field, fieldIdx, allFields) => {
     const isLowConfidence = field.confidence === "low";
 
     // 1. Check document exists
@@ -860,4 +860,48 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
 
     return result;
   });
+
+  // After all readings are verified, populate cell field for sheet pages
+  for (const reading of verified) {
+    if (reading.status !== "accepted" && reading.status !== "uncertain") continue;
+    
+    const doc = docMap.get(reading.doc);
+    const page = doc?.pages.find((p) => p.page === reading.page);
+    
+    if (page && reading.itemIds.length > 0) {
+      // Collect cell values from items
+      const cellValues: string[] = [];
+      for (const itemId of reading.itemIds) {
+        const item = page.items.find((i) => i.id === itemId);
+        if (item && item.cell) {
+          cellValues.push(item.cell);
+        }
+      }
+      
+      if (cellValues.length > 0) {
+        // If multiple cells, use first and last
+        if (cellValues.length === 1) {
+          reading.cell = cellValues[0];
+        } else {
+          const first = cellValues[0];
+          const last = cellValues[cellValues.length - 1];
+          if (first === last) {
+            reading.cell = first;
+          } else {
+            // Extract the ref part (after !) from both first and last
+            const firstParts = first.split("!");
+            const lastParts = last.split("!");
+            if (firstParts.length === 2 && lastParts.length === 2) {
+              const sheetName = firstParts[0];
+              const firstRef = firstParts[1];
+              const lastRef = lastParts[1];
+              reading.cell = `${sheetName}!${firstRef}:${lastRef}`;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return verified;
 }

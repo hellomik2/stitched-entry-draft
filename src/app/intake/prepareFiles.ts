@@ -1,6 +1,7 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { RuleResult } from "../../rules/types";
 import { DocKind, DocumentText, extractDocumentText, PdfLike } from "../../core/pdfText";
+import { readXlsx, sheetToPageText } from "../../core/sheet";
 import { ReaderInput, ReaderDocument, ReaderPage, validateReaderInput } from "../../core/readerContract";
 import { intakeConfig } from "../../core/intakeConfig";
 
@@ -77,10 +78,14 @@ export async function prepareUpload(
       ["image/jpeg", "image/png"].includes(file.type) ||
       /\.(jpg|jpeg|png)$/i.test(file.name);
 
-    if (!isPdf && !isImage) {
+    const isXlsx =
+      file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      file.name.toLowerCase().endsWith(".xlsx");
+
+    if (!isPdf && !isImage && !isXlsx) {
       return {
         ok: false,
-        reason: `${file.name}: only PDF, JPEG and PNG files are accepted.`,
+        reason: `${file.name}: only PDF, JPEG, PNG and Excel (.xlsx) files are accepted.`,
       };
     }
 
@@ -217,6 +222,66 @@ export async function prepareUpload(
           width: p.width,
           height: p.height,
           source: p.text !== null ? "text" : "image",
+        })),
+      });
+    } else if (isXlsx) {
+      // Excel file (.xlsx)
+      onProgress?.(`Reading ${file.name}`);
+
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const wb = readXlsx(bytes, file.name);
+
+      if (!wb.ok) {
+        return {
+          ok: false,
+          reason: wb.reason,
+        };
+      }
+
+      const pages: ReaderPage[] = [];
+      for (let i = 0; i < wb.value.sheets.length; i++) {
+        const sheet = wb.value.sheets[i];
+        const pageText = sheetToPageText(sheet, docId, i + 1);
+
+        pages.push({
+          page: i + 1,
+          width: pageText.width,
+          height: pageText.height,
+          text: pageText.text,
+          image: null,
+        });
+      }
+
+      documents.push({
+        docId,
+        kind,
+        fileName: file.name,
+        fileSha256,
+        pages,
+      });
+
+      // Create DocumentText with PageText entries
+      const sheetPages = wb.value.sheets.map((sheet, i) =>
+        sheetToPageText(sheet, docId, i + 1)
+      );
+
+      textDocs.push({
+        docId,
+        kind,
+        pages: sheetPages,
+      });
+
+      views.push({
+        docId,
+        kind,
+        fileName: file.name,
+        pdf: null,
+        imageUrl: null,
+        pages: wb.value.sheets.map((_, i) => ({
+          page: i + 1,
+          width: sheetPages[i].width,
+          height: sheetPages[i].height,
+          source: "text" as const,
         })),
       });
     } else {

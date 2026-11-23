@@ -1,0 +1,735 @@
+{
+ "name": "upload-test-gloamwick",
+ "filesSha256": [
+  "a34efb9b3670bd9e7b8bf211e3e00784a916876c96b105432fb6d02cffc2053b",
+  "8680fd8b453f34ea4de229489c95e5640504ddbe1a294238c8db4c9ec3d45dd7",
+  "413faf7a3c6495b40a6ae156441c5e0e2ed7f919b3888a8338a476150f6336cd"
+ ],
+ "output": {
+  "reader": "recorded",
+  "fields": [
+   {
+    "field": "invoice.number",
+    "value": "GPL-26-1131",
+    "quote": "Invoice No.: GPL-26-1131",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.date",
+    "value": "11/18/2026",
+    "quote": "Invoice Date: 11/18/2026",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.terms",
+    "value": "FOB Haiphong",
+    "quote": "Terms of Sale: FOB Haiphong",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.currency",
+    "value": "USD",
+    "quote": "Currency: USD",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.countryOfExport",
+    "value": "Vietnam",
+    "quote": "Country of Export: Vietnam",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.seller.name",
+    "value": "Gloamwick Paper Lantern Co.",
+    "quote": "Seller / Exporter: Gloamwick Paper Lantern Co.",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.seller.address",
+    "value": "88 Duskvine Lane, Thornhollow 00000, Vietnam",
+    "quote": "Seller Address: 88 Duskvine Lane, Thornhollow 00000, Vietnam",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.buyer.name",
+    "value": "Bramblecrypt Home & Party LLC",
+    "quote": "Buyer / Importer: Bramblecrypt Home & Party LLC",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.buyer.address",
+    "value": "414 Owlgate Road, Hollowpine, OH 00000, USA",
+    "quote": "Buyer Address: 414 Owlgate Road, Hollowpine, OH 00000, USA",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.itemNo",
+    "value": "GPL-101",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.description",
+    "value": "Glass lantern, non-electric, for candles",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.origin",
+    "value": "VN",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.quantity",
+    "value": "300",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.unit",
+    "value": "PCS",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.unitPrice",
+    "value": "6.40",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.amount",
+    "value": "1,920.00",
+    "quote": "GPL-101 Glass lantern, non-electric, for candles VN 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.itemNo",
+    "value": "GPL-102",
+    "quote": "GPL-102 Glass votive candle holder 1,200 PCS 0.95 1,140.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.description",
+    "value": "Glass votive candle holder",
+    "quote": "GPL-102 Glass votive candle holder 1,200 PCS 0.95 1,140.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.quantity",
+    "value": "1,200",
+    "quote": "GPL-102 Glass votive candle holder 1,200 PCS 0.95 1,140.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.unit",
+    "value": "PCS",
+    "quote": "GPL-102 Glass votive candle holder 1,200 PCS 0.95 1,140.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.unitPrice",
+    "value": "0.95",
+    "quote": "GPL-102 Glass votive candle holder 1,200 PCS 0.95 1,140.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.amount",
+    "value": "1,140.00",
+    "quote": "GPL-102 Glass votive candle holder 1,200 PCS 0.95 1,140.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.itemNo",
+    "value": "GPL-103",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.description",
+    "value": "Paper confetti cannon, party favor",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.origin",
+    "value": "VN",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.quantity",
+    "value": "2,000",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.unit",
+    "value": "PCS",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.unitPrice",
+    "value": "0.35",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.amount",
+    "value": "700.00",
+    "quote": "GPL-103 Paper confetti cannon, party favor VN 2,000 PCS 0.35 700.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.itemNo",
+    "value": "GPL-104",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.description",
+    "value": "Ceramic owl figurine",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.hts",
+    "value": "6913.90.5000",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.origin",
+    "value": "VN",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.quantity",
+    "value": "480",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.unit",
+    "value": "PCS",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.unitPrice",
+    "value": "2.10",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.amount",
+    "value": "1,008.00",
+    "quote": "GPL-104 Ceramic owl figurine 6913.90.5000 VN 480 PCS 2.10 1,008.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.itemNo",
+    "value": "GPL-105",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.description",
+    "value": "Plastic skeleton ornament",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.hts",
+    "value": "3926.40.0090",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.origin",
+    "value": "VN",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.quantity",
+    "value": "600",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.unit",
+    "value": "PCS",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.unitPrice",
+    "value": "0.80",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.amount",
+    "value": "480.00",
+    "quote": "GPL-105 Plastic skeleton ornament 3926.40.0090 VN 600 PCS 0.80 480.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.subtotal",
+    "value": "5,248.00",
+    "quote": "Subtotal (USD) 5,248.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.total",
+    "value": "5,248.00",
+    "quote": "Total (USD) 5,248.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.number",
+    "value": "GPL-PL-1131",
+    "quote": "Packing List No.: GPL-PL-1131",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.invoiceRef",
+    "value": "GPL-26-1131",
+    "quote": "Invoice Ref.: GPL-26-1131",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.blNumber",
+    "value": "DUSK26HPH1131",
+    "quote": "B/L No.: DUSK26HPH1131",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.itemNo",
+    "value": "GPL-101",
+    "quote": "GPL-101 Glass lantern, non-electric 15 300 PCS 150.0 168.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.cartons",
+    "value": "15",
+    "quote": "GPL-101 Glass lantern, non-electric 15 300 PCS 150.0 168.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.quantity",
+    "value": "300",
+    "quote": "GPL-101 Glass lantern, non-electric 15 300 PCS 150.0 168.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.netKg",
+    "value": "150.0",
+    "quote": "GPL-101 Glass lantern, non-electric 15 300 PCS 150.0 168.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.grossKg",
+    "value": "168.0",
+    "quote": "GPL-101 Glass lantern, non-electric 15 300 PCS 150.0 168.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.itemNo",
+    "value": "GPL-102",
+    "quote": "GPL-102 Glass votive candle holder 10 1,200 PCS 96.0 108.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.cartons",
+    "value": "10",
+    "quote": "GPL-102 Glass votive candle holder 10 1,200 PCS 96.0 108.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.quantity",
+    "value": "1,200",
+    "quote": "GPL-102 Glass votive candle holder 10 1,200 PCS 96.0 108.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.netKg",
+    "value": "96.0",
+    "quote": "GPL-102 Glass votive candle holder 10 1,200 PCS 96.0 108.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.grossKg",
+    "value": "108.0",
+    "quote": "GPL-102 Glass votive candle holder 10 1,200 PCS 96.0 108.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.itemNo",
+    "value": "GPL-103",
+    "quote": "GPL-103 Paper confetti cannon 8 2,000 PCS 40.0 46.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.cartons",
+    "value": "8",
+    "quote": "GPL-103 Paper confetti cannon 8 2,000 PCS 40.0 46.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.quantity",
+    "value": "2,000",
+    "quote": "GPL-103 Paper confetti cannon 8 2,000 PCS 40.0 46.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.netKg",
+    "value": "40.0",
+    "quote": "GPL-103 Paper confetti cannon 8 2,000 PCS 40.0 46.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.grossKg",
+    "value": "46.5",
+    "quote": "GPL-103 Paper confetti cannon 8 2,000 PCS 40.0 46.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.itemNo",
+    "value": "GPL-104",
+    "quote": "GPL-104 Ceramic owl figurine 6 480 PCS 72.0 80.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.cartons",
+    "value": "6",
+    "quote": "GPL-104 Ceramic owl figurine 6 480 PCS 72.0 80.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.quantity",
+    "value": "480",
+    "quote": "GPL-104 Ceramic owl figurine 6 480 PCS 72.0 80.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.netKg",
+    "value": "72.0",
+    "quote": "GPL-104 Ceramic owl figurine 6 480 PCS 72.0 80.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.grossKg",
+    "value": "80.4",
+    "quote": "GPL-104 Ceramic owl figurine 6 480 PCS 72.0 80.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.itemNo",
+    "value": "GPL-105",
+    "quote": "GPL-105 Plastic skeleton ornament 5 600 PCS 30.0 34.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.cartons",
+    "value": "5",
+    "quote": "GPL-105 Plastic skeleton ornament 5 600 PCS 30.0 34.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.quantity",
+    "value": "600",
+    "quote": "GPL-105 Plastic skeleton ornament 5 600 PCS 30.0 34.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.netKg",
+    "value": "30.0",
+    "quote": "GPL-105 Plastic skeleton ornament 5 600 PCS 30.0 34.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.grossKg",
+    "value": "34.5",
+    "quote": "GPL-105 Plastic skeleton ornament 5 600 PCS 30.0 34.5",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalCartons",
+    "value": "44",
+    "quote": "TOTAL 44 4,580 PCS 388.0 437.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalQuantity",
+    "value": "4,580",
+    "quote": "TOTAL 44 4,580 PCS 388.0 437.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalNetKg",
+    "value": "388.0",
+    "quote": "TOTAL 44 4,580 PCS 388.0 437.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalGrossKg",
+    "value": "437.4",
+    "quote": "TOTAL 44 4,580 PCS 388.0 437.4",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.number",
+    "value": "DUSK26HPH1131",
+    "quote": "B/L No.: DUSK26HPH1131",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.carrier",
+    "value": "Duskline Freight (DEMO)",
+    "quote": "Carrier: Duskline Freight (DEMO)",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.consignee.name",
+    "value": "Bramblecrypt Home & Party LLC",
+    "quote": "Consignee: Bramblecrypt Home & Party LLC",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.vessel",
+    "value": "MOTHLIGHT STAR",
+    "quote": "Vessel: MOTHLIGHT STAR",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.voyage",
+    "value": "031E",
+    "quote": "Voyage: 031E",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.portOfLoading",
+    "value": "Haiphong, Vietnam",
+    "quote": "Port of Loading: Haiphong, Vietnam",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.portOfDischarge",
+    "value": "Long Beach, CA, USA",
+    "quote": "Port of Discharge: Long Beach, CA, USA",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.onBoardDate",
+    "value": "11/20/2026",
+    "quote": "On Board Date: 11/20/2026",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.containerNo",
+    "value": "DSKU 4471200",
+    "quote": "Container No.: DSKU 4471200",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.packages",
+    "value": "44 CTNS",
+    "quote": "Packages: 44 CTNS",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.grossKg",
+    "value": "437.4",
+    "quote": "Gross Weight: 437.4 KG",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   }
+  ],
+  "transcripts": [],
+  "invoiceLineCount": 5
+ }
+}

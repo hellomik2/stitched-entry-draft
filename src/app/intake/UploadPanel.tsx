@@ -160,7 +160,7 @@ export default function UploadPanel(props: {
         data-testid="upload-input"
         type="file"
         multiple
-        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={handleFileSelect}
       />
 
@@ -192,6 +192,7 @@ export default function UploadPanel(props: {
       <div className="upload-limits">
         Up to {intakeConfig.maxFiles} files, {formatFileSize(intakeConfig.maxFileBytes)},
         {intakeConfig.maxPdfPages} PDF pages each, {intakeConfig.maxImagePages} image pages in total.
+        An Excel (.xlsx) file is read as text, one page per sheet (up to 4 sheets).
         At most {intakeConfig.maxInvoiceLines} invoice lines are read. HTS numbers are checked
         against a {33}-row subset of the 2026 tariff schedule.
       </div>

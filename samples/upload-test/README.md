@@ -19,3 +19,26 @@ Deliberate review items:
 2. Invoice line 3 (9505.90.6000) has a Chapter 99 footnote in the tariff table, so the additional duty is a person's input.
 
 The files were made outside Kiro and outside the app code: the PDF invoices with pdf-lib, the photo and the scan by rendering an HTML page in a headless browser (the scan is that image placed on a PDF page).
+
+## Parts-list test bundle (Gloamwick, DEMO / FICTITIOUS)
+
+Five more invented files for Requirements 45 (Excel documents) and 46 (customer parts list). Every page and sheet carries `DEMO / FICTITIOUS`; "Gloamwick Paper Lantern Co.", "Bramblecrypt Home & Party LLC", "Duskline Freight (DEMO)", the addresses (postal code 00000), the vessel, the container number and the MID `VNGLOPAP88THO` are invented. The HTS numbers are in `data/hts/2026HTSRev23-subset.json` (2026 HTS Revision 23).
+
+| File | Shape | Document kind to pick |
+|---|---|---|
+| `files/gloamwick-invoice.pdf` | text PDF; item codes on every line, an HTS number only on lines 4 and 5 | Commercial invoice |
+| `files/gloamwick-packing-list.xlsx` | Excel, sheet "Packing List", inline strings, number formats `#,##0` and `0.0` | Packing list |
+| `files/gloamwick-bill-of-lading.pdf` | text PDF | Bill of lading |
+| `files/gloamwick-customer-parts-list.xlsx` | Excel, sheet "Parts", shared strings (as Excel writes them); header row 4 | the "Customer parts list (optional)" input |
+| `files/gloamwick-customer-parts-list.csv` | the same list as CSV, header on line 1 | the "Customer parts list (optional)" input |
+
+`recordings/upload-test-gloamwick.json` is the fake reader's recorded answer for the three documents (matched by their SHA-256). It was written by hand from the printed strings; no AI model produced it. The parts list is never sent to the reader.
+
+Deliberate review items:
+
+1. Invoice line 3 (`GPL-103`) is not in the list: the list has `GPL 103` with a space, and only an exactly equal part code is used, so L003.33A waits and says the code is not in the customer parts list.
+2. Invoice line 4 prints 6913.90.5000; the list row 8 gives 6913.90.1000. L004.33A waits with both numbers and both sources; its 35 and 37A wait.
+3. Invoice line 2 prints no origin; the list gives VN (copied from the list, with the list cell as its source).
+4. Line 5 prints the same number as the list (the list cell is added as a second source).
+5. B13 waits: four lines have the MID `VNGLOPAP88THO` in the list, line 3 has none.
+6. The list has a row `GPL-110` that is not on the invoice.

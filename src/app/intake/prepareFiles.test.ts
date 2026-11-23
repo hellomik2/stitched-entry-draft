@@ -50,7 +50,7 @@ describe("prepareFiles: prepareUpload", () => {
     const result = await prepareUpload(choices);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.reason).toContain("only PDF, JPEG and PNG files");
+      expect(result.reason).toContain("only PDF, JPEG, PNG and Excel (.xlsx) files");
     }
   });
 

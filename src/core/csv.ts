@@ -19,6 +19,7 @@ export const CSV_COLUMNS = [
  * Format a source for CSV output.
  * DocSource: `${doc} p.${page} [${x},${y},${w},${h}] "${quote}"`
  * With origin === "imageTranscript", append ` (read from an image by the AI reader)` after the closing quote.
+ * With cell, append ` (cell <cell>)` after the closing quote.
  * HtsSource: `HTS ${revision} ${htsno}`
  */
 export function formatSource(s: Source): string {
@@ -29,9 +30,12 @@ export function formatSource(s: Source): string {
     const w = docS.box.w.toFixed(1);
     const h = docS.box.h.toFixed(1);
     const quote = docS.quote.replace(/"/g, '""'); // Escape quotes in the quote itself
-    const base = `${docS.doc} p.${docS.page} [${x},${y},${w},${h}] "${quote}"`;
+    let base = `${docS.doc} p.${docS.page} [${x},${y},${w},${h}] "${quote}"`;
     if (docS.origin === "imageTranscript") {
-      return base + " (read from an image by the AI reader)";
+      base += " (read from an image by the AI reader)";
+    }
+    if (docS.cell) {
+      base += ` (cell ${docS.cell})`;
     }
     return base;
   } else {

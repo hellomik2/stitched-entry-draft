@@ -36,6 +36,7 @@ export type DocSource = {
   box: Box;
   readingField: string;
   origin?: "imageTranscript";
+  cell?: string;
 };
 
 export type HtsSource = {
@@ -136,6 +137,9 @@ function docSource(reading: VerifiedReading): DocSource {
   };
   if (reading.origin === "imageTranscript") {
     source.origin = "imageTranscript";
+  }
+  if (reading.cell) {
+    source.cell = reading.cell;
   }
   return source;
 }

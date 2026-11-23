@@ -581,6 +581,100 @@ export default function StitchBoard({
             console.error('Image render error:', e)
           }
         }
+      } else {
+        // Sheet page rendering
+        const activePageText = activeDoc.documentText.pages.find((p) => p.page === activePage)
+        if (activePageText && activePageText.origin === 'sheet' && activePageText.grid) {
+          const pageWidth = activePageText.width
+          const pageHeight = activePageText.height
+          const grid = activePageText.grid
+
+          const canvas = document.createElement('canvas')
+          canvas.width = pageWidth * pageScale * window.devicePixelRatio
+          canvas.height = pageHeight * pageScale * window.devicePixelRatio
+          canvas.style.width = `${pageWidth * pageScale}px`
+          canvas.style.height = `${pageHeight * pageScale}px`
+
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.scale(pageScale * window.devicePixelRatio, pageScale * window.devicePixelRatio)
+            
+            // Fill white
+            ctx.fillStyle = 'white'
+            ctx.fillRect(0, 0, pageWidth, pageHeight)
+            
+            // Fill top 20 points with light gray
+            ctx.fillStyle = '#f3f4f6'
+            ctx.fillRect(0, 0, pageWidth, 20)
+            
+            // Fill left 36 points with light gray
+            ctx.fillRect(0, 0, 36, pageHeight)
+            
+            // Draw grid lines
+            ctx.strokeStyle = '#d1d5db'
+            ctx.lineWidth = 0.5
+            
+            // Vertical lines
+            for (const col of grid.cols) {
+              const x = col.x + col.w
+              ctx.beginPath()
+              ctx.moveTo(x, 0)
+              ctx.lineTo(x, pageHeight)
+              ctx.stroke()
+            }
+            
+            // Horizontal lines
+            for (const row of grid.rows) {
+              const y = row.y + row.h
+              ctx.beginPath()
+              ctx.moveTo(0, y)
+              ctx.lineTo(pageWidth, y)
+              ctx.stroke()
+            }
+            
+            // Draw column letters
+            ctx.fillStyle = '#6b7280'
+            ctx.font = '9px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            for (const col of grid.cols) {
+              const x = col.x + col.w / 2
+              ctx.fillText(col.label, x, 10)
+            }
+            
+            // Draw row numbers
+            ctx.textAlign = 'right'
+            for (const row of grid.rows) {
+              const y = row.y + row.h / 2
+              ctx.fillText(row.label, 32, y)
+            }
+            
+            // Draw cell text
+            ctx.fillStyle = '#111827'
+            ctx.font = `${Math.min(10, Math.max(6, pageHeight * 0.05))}px sans-serif`
+            ctx.textAlign = 'left'
+            ctx.textBaseline = 'bottom'
+            
+            for (const item of activePageText.items) {
+              const box = item.box
+              ctx.save()
+              ctx.beginPath()
+              ctx.rect(box.x, box.y - box.h, box.x + box.w, box.y)
+              ctx.clip()
+              ctx.fillText(item.str, box.x + 3, box.y - box.h * 0.28)
+              ctx.restore()
+            }
+            
+            if (!cancelledRef.current && pageViewRef.current) {
+              if (canvasRef.current) {
+                canvasRef.current.remove()
+              }
+              canvasRef.current = canvas
+              canvas.style.display = 'block'
+              pageViewRef.current.insertBefore(canvas, pageViewRef.current.firstChild)
+            }
+          }
+        }
       }
     }
 
