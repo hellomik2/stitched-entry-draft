@@ -22,6 +22,8 @@ export const IMAGE_WAITING_SUFFIX = "values read from an image are not confirmed
 
 export const CONFIRMED_NOTE = "Confirmed by a person against the page.";
 
+export const NO_LINE_REASON = "No 7501 line was built because no invoice line was read. A person reads the invoice lines.";
+
 export type FieldStatus = "copied" | "computed" | "needsReview" | "personInput" | "personEdited";
 
 export type DocSource = {
@@ -106,6 +108,13 @@ function getValue(readings: Map<string, VerifiedReading>, fieldName: string): st
   const reading = readings.get(fieldName);
   if (!reading || reading.status !== "accepted") return null;
   return reading.value ? normalizeSpace(reading.value) : null;
+}
+
+/**
+ * Helper: check if a reading is from an image page.
+ */
+function fromImagePage(reading: VerifiedReading | undefined): boolean {
+  return !!reading && reading.status === "accepted" && reading.origin === "imageTranscript";
 }
 
 /**
@@ -1057,6 +1066,246 @@ export function buildDraft(input: {
     }
   }
 
+  // Helper function: derive net quantity for a 7501 line by the first rule (Requirement 31.1)
+  const deriveNetQuantity = (
+    lineNum: string,
+    invoiceLines: number[],
+    htsLookup: ReturnType<typeof lookupHts>
+  ): DraftField => {
+    const id = `L${lineNum}.35`;
+
+    // Get HTS unit
+    let htsUnit: string | null = null;
+    if (htsLookup.found) {
+      htsUnit = htsLookup.unit;
+    }
+
+    // Check for P3 quantity mismatch
+    let quantityMismatchReason: string | null = null;
+    for (const n of invoiceLines) {
+      const invQtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+      const itemReading = accepted.get(`invoice.lines.${n}.itemNo`);
+
+      if (invQtyReading && invQtyReading.value && itemReading && itemReading.value) {
+        const invQtyResult = parseCount(normalizeSpace(invQtyReading.value));
+        const itemNo = normalizeSpace(itemReading.value);
+
+        if (invQtyResult.ok) {
+          const packingQty = (packingByItemNo.get(itemNo) || []).reduce((sum, q) => sum + q, 0);
+
+          if (packingQty !== invQtyResult.value) {
+            quantityMismatchReason = `says ${invQtyResult.value} PCS, the packing list says ${packingQty} PCS. A person decides.`;
+            break;
+          }
+        }
+      }
+    }
+
+    if (quantityMismatchReason) {
+      return field_helper({
+        id,
+        block: "35",
+        line: lineNum,
+        label: "Net quantity in HTS units",
+        status: "needsReview",
+        unit: htsUnit,
+        reason: quantityMismatchReason,
+      });
+    } else if (!htsLookup.found) {
+      // HTS not found, can't get unit or compute
+      return field_helper({
+        id,
+        block: "35",
+        line: lineNum,
+        label: "Net quantity in HTS units",
+        status: "needsReview",
+        inputs: [`L${lineNum}.33A`],
+        reason: "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.",
+      });
+    } else {
+      // Parse quantities from invoice lines and convert to HTS unit
+      let totalQuantity: number | null = null;
+      const quantityReadingSources: DocSource[] = [];
+
+      for (let i = 0; i < invoiceLines.length; i++) {
+        const n = invoiceLines[i];
+        const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+        const unitReading = accepted.get(`invoice.lines.${n}.unit`);
+
+        if (qtyReading && qtyReading.value && unitReading && unitReading.value) {
+          const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+          const invoiceUnit = normalizeSpace(unitReading.value).toUpperCase();
+
+          if (qtyResult.ok) {
+            let convertedQty: number | null = null;
+
+            if (invoiceUnit === "PCS" || invoiceUnit === "PC" || invoiceUnit === "EA" || invoiceUnit === "PIECES") {
+              convertedQty = qtyResult.value;
+            } else if (invoiceUnit === "NO.") {
+              convertedQty = qtyResult.value;
+            } else if (invoiceUnit === "DZ PCS" || invoiceUnit === "DOZ." || invoiceUnit === "DZ.") {
+              const quotient = qtyResult.value / 12;
+              if (qtyResult.value % 12 === 0) {
+                convertedQty = quotient;
+              } else {
+                convertedQty = qtyResult.value;
+              }
+            } else if (invoiceUnit === "KG") {
+              convertedQty = qtyResult.value;
+            } else {
+              convertedQty = null;
+            }
+
+            if (convertedQty !== null) {
+              if (totalQuantity === null) totalQuantity = 0;
+              totalQuantity += convertedQty;
+            }
+
+            quantityReadingSources.push(docSource(qtyReading));
+            // Add image transcript sources for unit reading (Requirement 32.3)
+            if (fromImagePage(unitReading)) {
+              quantityReadingSources.push(docSource(unitReading));
+            }
+          }
+        }
+      }
+
+      if (totalQuantity !== null) {
+        let displayValue = String(totalQuantity);
+        if (htsUnit && htsUnit.toUpperCase() === "DZ PCS") {
+          const dozenCount = totalQuantity / 12;
+          if (dozenCount === Math.floor(dozenCount)) {
+            displayValue = String(Math.floor(dozenCount));
+          } else {
+            displayValue = dozenCount.toFixed(2);
+          }
+        }
+
+        // Build arithmetic note for computed quantity
+        let arithmeticNote = "";
+        if (invoiceLines.length === 1) {
+          arithmeticNote = `${displayValue} ${htsUnit || ""}`.trim();
+        } else {
+          const parts: string[] = [];
+          for (let i = 0; i < invoiceLines.length; i++) {
+            const n = invoiceLines[i];
+            const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+            if (qtyReading && qtyReading.value) {
+              const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+              if (qtyResult.ok) {
+                parts.push(String(qtyResult.value));
+              }
+            }
+          }
+          arithmeticNote = `${parts.join(" + ")} ${htsUnit || ""}`.trim();
+        }
+
+        return field_helper({
+          id,
+          block: "35",
+          line: lineNum,
+          label: "Net quantity in HTS units",
+          value: displayValue,
+          unit: htsUnit,
+          status: "computed",
+          rule: "P12",
+          note: arithmeticNote,
+          sources: quantityReadingSources,
+        });
+      } else {
+        return field_helper({
+          id,
+          block: "35",
+          line: lineNum,
+          label: "Net quantity in HTS units",
+          status: "needsReview",
+          unit: htsUnit,
+          reason: "Could not parse quantities from invoice lines.",
+        });
+      }
+    }
+  };
+
+  // Helper function: compute duty for a 7501 line (Requirement 32.2)
+  const deriveDuty = (
+    lineNum: string,
+    enteredValueField: DraftField | undefined,
+    rateField: DraftField | undefined
+  ): DraftField => {
+    const id = `L${lineNum}.38`;
+
+    // Check if inputs are waiting (missing, no value, or needsReview with reason other than image reasons)
+    const enteredValueWaits =
+      !enteredValueField ||
+      !enteredValueField.value ||
+      (enteredValueField.status === "needsReview" &&
+        enteredValueField.reason &&
+        enteredValueField.reason !== IMAGE_REVIEW_REASON &&
+        enteredValueField.reason !== IMAGE_COMPUTED_REVIEW_REASON);
+
+    const rateWaits =
+      !rateField ||
+      !rateField.value ||
+      (rateField.status === "needsReview" &&
+        rateField.reason &&
+        rateField.reason !== IMAGE_REVIEW_REASON &&
+        rateField.reason !== IMAGE_COMPUTED_REVIEW_REASON);
+
+    if (enteredValueWaits) {
+      return field_helper({
+        id,
+        block: "38",
+        line: lineNum,
+        label: "Duty (USD)",
+        status: "needsReview",
+        inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+        reason: `Waiting on L${lineNum}.36A.`,
+      });
+    } else if (rateWaits) {
+      return field_helper({
+        id,
+        block: "38",
+        line: lineNum,
+        label: "Duty (USD)",
+        status: "needsReview",
+        inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+        reason: `Waiting on L${lineNum}.37A.`,
+      });
+    } else {
+      // Both value and rate are available, compute duty
+      const enteredDollars = parseInt(enteredValueField!.value!, 10);
+      const dutyResult = computeDuty(rateField!.value!, enteredDollars * 100);
+
+      if (!dutyResult.ok) {
+        return field_helper({
+          id,
+          block: "38",
+          line: lineNum,
+          label: "Duty (USD)",
+          status: "needsReview",
+          inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+          reason: dutyResult.reason,
+        });
+      } else {
+        const dutyFormatted = formatCents(dutyResult.value);
+        const rateValue = rateField!.value! || "0%";
+        const enteredValueStr = enteredValueField!.value! || "0";
+        const note = `${rateValue} x ${enteredValueStr} = ${dutyFormatted}`;
+        return field_helper({
+          id,
+          block: "38",
+          line: lineNum,
+          label: "Duty (USD)",
+          value: dutyFormatted,
+          status: "computed",
+          rule: "P7",
+          note,
+          inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
+        });
+      }
+    }
+  };
+
   // Process each group
   for (const group of lineGroups.values()) {
     const lineNum = String(lineNumber).padStart(3, "0");
@@ -1223,175 +1472,7 @@ export function buildDraft(input: {
     // L<nnn>.34A: gross weight (kg) — allocated after all lines built
 
     // L<nnn>.35: net quantity
-    {
-      const id = `L${lineNum}.35`;
-
-      // Get HTS unit
-      let htsUnit: string | null = null;
-      if (htsLookup.found) {
-        htsUnit = htsLookup.unit;
-      }
-
-      // Check for P3 quantity mismatch
-      let quantityMismatchReason: string | null = null;
-      for (const n of group.invoiceLines) {
-        const invQtyReading = accepted.get(`invoice.lines.${n}.quantity`);
-        const itemReading = accepted.get(`invoice.lines.${n}.itemNo`);
-
-        if (invQtyReading && invQtyReading.value && itemReading && itemReading.value) {
-          const invQtyResult = parseCount(normalizeSpace(invQtyReading.value));
-          const itemNo = normalizeSpace(itemReading.value);
-
-          if (invQtyResult.ok) {
-            // The quantity check needs only the item number and the quantity of each packing list line.
-            // A rejected gross weight must not hide the line here; the weight allocation (34A) deals with it.
-            const packingQty = (packingByItemNo.get(itemNo) || []).reduce((sum, q) => sum + q, 0);
-
-            if (packingQty !== invQtyResult.value) {
-              quantityMismatchReason = `says ${invQtyResult.value} PCS, the packing list says ${packingQty} PCS. A person decides.`;
-              break;
-            }
-          }
-        }
-      }
-
-      if (quantityMismatchReason) {
-        lineFields.push(
-          field_helper({
-            id,
-            block: "35",
-            line: lineNum,
-            label: "Net quantity in HTS units",
-            status: "needsReview",
-            unit: htsUnit,
-            reason: quantityMismatchReason,
-          })
-        );
-      } else if (!htsLookup.found) {
-        // HTS not found, can't get unit or compute
-        lineFields.push(
-          field_helper({
-            id,
-            block: "35",
-            line: lineNum,
-            label: "Net quantity in HTS units",
-            status: "needsReview",
-            inputs: [`L${lineNum}.33A`],
-            reason: "Waiting on L" + lineNum + ".33A: the HTS number is not in the tariff schedule revision.",
-          })
-        );
-      } else {
-        // Parse quantities from invoice lines and convert to HTS unit
-        let totalQuantity: number | null = null;
-        const quantityReadingSources: DocSource[] = [];
-
-        for (let i = 0; i < group.invoiceLines.length; i++) {
-          const n = group.invoiceLines[i];
-          const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
-          const unitReading = accepted.get(`invoice.lines.${n}.unit`);
-
-          if (qtyReading && qtyReading.value && unitReading && unitReading.value) {
-            const qtyResult = parseCount(normalizeSpace(qtyReading.value));
-            const invoiceUnit = normalizeSpace(unitReading.value).toUpperCase();
-
-            if (qtyResult.ok) {
-              let convertedQty: number | null = null;
-
-              if (invoiceUnit === "PCS" || invoiceUnit === "PC" || invoiceUnit === "EA" || invoiceUnit === "PIECES") {
-                convertedQty = qtyResult.value;
-              } else if (invoiceUnit === "NO.") {
-                convertedQty = qtyResult.value;
-              } else if (invoiceUnit === "DZ PCS" || invoiceUnit === "DOZ." || invoiceUnit === "DZ.") {
-                // Dozens to individual pieces: divide by 12 (only show decimals if fractional)
-                const quotient = qtyResult.value / 12;
-                // Format with two decimals only if there's a fractional part
-                if (qtyResult.value % 12 === 0) {
-                  convertedQty = quotient;
-                } else {
-                  // Has fractional part; keep as whole number pieces, will convert at display
-                  convertedQty = qtyResult.value;
-                }
-              } else if (invoiceUnit === "KG") {
-                // Use as net kg with one decimal
-                convertedQty = qtyResult.value;
-              } else {
-                // Unknown unit, can't convert
-                convertedQty = null;
-              }
-
-              if (convertedQty !== null) {
-                if (totalQuantity === null) totalQuantity = 0;
-                totalQuantity += convertedQty;
-              }
-
-              quantityReadingSources.push(docSource(qtyReading));
-            }
-          }
-        }
-
-        if (totalQuantity !== null) {
-          // Format quantity: for "Dz Pcs" unit, show as whole number or with 2 decimals
-          let displayValue = String(totalQuantity);
-          if (htsUnit && htsUnit.toUpperCase() === "DZ PCS") {
-            // Convert from pieces to dozens
-            const dozenCount = totalQuantity / 12;
-            if (dozenCount === Math.floor(dozenCount)) {
-              displayValue = String(Math.floor(dozenCount));
-            } else {
-              displayValue = dozenCount.toFixed(2);
-            }
-          }
-
-          // Build arithmetic note for computed quantity
-          let arithmeticNote = "";
-          if (group.invoiceLines.length === 1) {
-            // Single line: just show the quantity
-            arithmeticNote = `${displayValue} ${htsUnit || ""}`.trim();
-          } else {
-            // Multiple lines: show the addition
-            const parts: string[] = [];
-            for (let i = 0; i < group.invoiceLines.length; i++) {
-              const n = group.invoiceLines[i];
-              const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
-              if (qtyReading && qtyReading.value) {
-                const qtyResult = parseCount(normalizeSpace(qtyReading.value));
-                if (qtyResult.ok) {
-                  parts.push(String(qtyResult.value));
-                }
-              }
-            }
-            arithmeticNote = `${parts.join(" + ")} ${htsUnit || ""}`.trim();
-          }
-
-          lineFields.push(
-            field_helper({
-              id,
-              block: "35",
-              line: lineNum,
-              label: "Net quantity in HTS units",
-              value: displayValue,
-              unit: htsUnit,
-              status: "computed",
-              rule: "P12",
-              note: arithmeticNote,
-              sources: quantityReadingSources,
-            })
-          );
-        } else {
-          lineFields.push(
-            field_helper({
-              id,
-              block: "35",
-              line: lineNum,
-              label: "Net quantity in HTS units",
-              status: "needsReview",
-              unit: htsUnit,
-              reason: "Could not parse quantities from invoice lines.",
-            })
-          );
-        }
-      }
-    }
+    lineFields.push(deriveNetQuantity(lineNum, group.invoiceLines, htsLookup));
 
     // L<nnn>.36A: entered value (whole dollars)
     {
@@ -1520,7 +1601,9 @@ export function buildDraft(input: {
                 status: "computed",
                 rule: "P4",
                 note: "Nothing was deducted. A person confirms the entered value.",
-                sources: amountSources,
+                sources: fromImagePage(currencyReading) 
+                  ? [...amountSources, docSource(currencyReading)]
+                  : amountSources,
               })
             );
           }
@@ -1611,72 +1694,9 @@ export function buildDraft(input: {
 
     // L<nnn>.38: duty
     {
-      const id = `L${lineNum}.38`;
-
       const enteredValueField = lineFields.find((f) => f.id === `L${lineNum}.36A`);
       const rateField = lineFields.find((f) => f.id === `L${lineNum}.37A`);
-
-      if (!enteredValueField || enteredValueField.status === "needsReview" || !enteredValueField.value) {
-        lineFields.push(
-          field_helper({
-            id,
-            block: "38",
-            line: lineNum,
-            label: "Duty (USD)",
-            status: "needsReview",
-            inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
-            reason: `Waiting on L${lineNum}.36A.`,
-          })
-        );
-      } else if (!rateField || rateField.status === "needsReview" || !rateField.value) {
-        lineFields.push(
-          field_helper({
-            id,
-            block: "38",
-            line: lineNum,
-            label: "Duty (USD)",
-            status: "needsReview",
-            inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
-            reason: `Waiting on L${lineNum}.37A.`,
-          })
-        );
-      } else {
-        // Both value and rate are available, compute duty
-        const enteredDollars = parseInt(enteredValueField.value, 10);
-        const dutyResult = computeDuty(rateField.value, enteredDollars * 100);
-
-        if (!dutyResult.ok) {
-          lineFields.push(
-            field_helper({
-              id,
-              block: "38",
-              line: lineNum,
-              label: "Duty (USD)",
-              status: "needsReview",
-              inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
-              reason: dutyResult.reason,
-            })
-          );
-        } else {
-          const dutyFormatted = formatCents(dutyResult.value);
-          const rateValue = rateField.value || "0%";
-          const enteredValueStr = enteredValueField.value || "0";
-          const note = `${rateValue} x ${enteredValueStr} = ${dutyFormatted}`;
-          lineFields.push(
-            field_helper({
-              id,
-              block: "38",
-              line: lineNum,
-              label: "Duty (USD)",
-              value: dutyFormatted,
-              status: "computed",
-              rule: "P7",
-              note,
-              inputs: [`L${lineNum}.36A`, `L${lineNum}.37A`],
-            })
-          );
-        }
-      }
+      lineFields.push(deriveDuty(lineNum, enteredValueField, rateField));
     }
 
     // L<nnn>.ch99: Chapter 99 additional duty (if applicable)
@@ -1832,7 +1852,12 @@ export function buildDraft(input: {
                   grossField.note = "Estimated";
                 }
                 // Use the individual packing list readings for this line's sources
-                grossField.sources = grossKgSources[i].length > 0 ? grossKgSources[i] : [docSource(totalGrossReading)];
+                let lineSources = grossKgSources[i].length > 0 ? grossKgSources[i] : [docSource(totalGrossReading)];
+                // Add totalGrossKg source if it's from image (Requirement 32.3)
+                if (fromImagePage(totalGrossReading) && !lineSources.some(s => s.readingField === "packingList.totalGrossKg")) {
+                  lineSources = [...lineSources, docSource(totalGrossReading)];
+                }
+                grossField.sources = lineSources;
               }
             }
           } else {
@@ -1942,40 +1967,40 @@ export function buildDraft(input: {
       })
       .filter((id): id is string => id !== null);
 
-    // Check if all line entered values are available
-    const missingIds: string[] = [];
-    let totalCentsExact = 0;
-
-    for (const valueId of lineValueIds) {
-      const value = getFieldValue(valueId);
-      if (!value) {
-        missingIds.push(valueId);
-      } else {
-        const dollars = parseInt(value, 10);
-        if (!isNaN(dollars)) {
-          totalCentsExact += dollars * 100;
-        } else {
-          missingIds.push(valueId);
-        }
-      }
-    }
-
-    if (missingIds.length > 0) {
+    // Check if no lines were built (Requirement 32.1)
+    if (draftLines.length === 0) {
       totalFields.push(
         field_helper({
           id,
           block: "39",
           label: "Total entered value (USD)",
           status: "needsReview",
-          inputs: lineValueIds,
-          reason: `Waiting on ${missingIds.join(", ")}.`,
+          value: null,
           rule: null,
+          note: null,
+          reason: NO_LINE_REASON,
         })
       );
     } else {
-      // Compute total using config mode
-      const totalResult = totalEnteredValue([totalCentsExact], config.totalEnteredValueMode);
-      if (!totalResult.ok) {
+      // Check if all line entered values are available
+      const missingIds: string[] = [];
+      let totalCentsExact = 0;
+
+      for (const valueId of lineValueIds) {
+        const value = getFieldValue(valueId);
+        if (!value) {
+          missingIds.push(valueId);
+        } else {
+          const dollars = parseInt(value, 10);
+          if (!isNaN(dollars)) {
+            totalCentsExact += dollars * 100;
+          } else {
+            missingIds.push(valueId);
+          }
+        }
+      }
+
+      if (missingIds.length > 0) {
         totalFields.push(
           field_helper({
             id,
@@ -1983,24 +2008,40 @@ export function buildDraft(input: {
             label: "Total entered value (USD)",
             status: "needsReview",
             inputs: lineValueIds,
-            reason: totalResult.reason,
+            reason: `Waiting on ${missingIds.join(", ")}.`,
             rule: null,
           })
         );
       } else {
-        const totalDollars = totalResult.value;
-        totalFields.push(
-          field_helper({
-            id,
-            block: "39",
-            label: "Total entered value (USD)",
-            value: String(totalDollars),
-            status: "computed",
-            rule: "P5",
-            note: lineValueIds.length > 0 ? `${lineValueIds.map(id => getFieldValue(id) || "0").join(" + ")} = ${totalDollars}` : String(totalDollars),
-            inputs: lineValueIds,
-          })
-        );
+        // Compute total using config mode
+        const totalResult = totalEnteredValue([totalCentsExact], config.totalEnteredValueMode);
+        if (!totalResult.ok) {
+          totalFields.push(
+            field_helper({
+              id,
+              block: "39",
+              label: "Total entered value (USD)",
+              status: "needsReview",
+              inputs: lineValueIds,
+              reason: totalResult.reason,
+              rule: null,
+            })
+          );
+        } else {
+          const totalDollars = totalResult.value;
+          totalFields.push(
+            field_helper({
+              id,
+              block: "39",
+              label: "Total entered value (USD)",
+              value: String(totalDollars),
+              status: "computed",
+              rule: "P5",
+              note: lineValueIds.length > 0 ? `${lineValueIds.map(id => getFieldValue(id) || "0").join(" + ")} = ${totalDollars}` : String(totalDollars),
+              inputs: lineValueIds,
+            })
+          );
+        }
       }
     }
   }
@@ -2098,51 +2139,67 @@ export function buildDraft(input: {
       if (ch99Field) dutyIds.push(ch99Field.id);
     }
 
-    const missingIds: string[] = [];
-    let totalDutyCents = 0;
-
-    for (const dutyId of dutyIds) {
-      const value = getFieldValue(dutyId);
-      if (!value) {
-        missingIds.push(dutyId);
-      } else {
-        const dutyResult = parseMoneyToCents(value);
-        if (dutyResult.ok) {
-          totalDutyCents += dutyResult.value;
-        } else {
-          missingIds.push(dutyId);
-        }
-      }
-    }
-
-    if (missingIds.length > 0) {
+    // Check if no lines were built (Requirement 32.1)
+    if (draftLines.length === 0) {
       totalFields.push(
         field_helper({
           id,
           block: "41",
           label: "Duty (USD)",
           status: "needsReview",
-          inputs: dutyIds,
-          reason: `Waiting on ${missingIds.join(", ")}.`,
+          value: null,
           rule: null,
+          note: null,
+          reason: NO_LINE_REASON,
         })
       );
     } else {
-      const dutyFormatted = formatCents(totalDutyCents);
-      const dutyValues = dutyIds.map(id => getFieldValue(id) || "0.00");
-      const note = `${dutyValues.join(" + ")} = ${dutyFormatted}`;
-      totalFields.push(
-        field_helper({
-          id,
-          block: "41",
-          label: "Duty (USD)",
-          value: dutyFormatted,
-          status: "computed",
-          rule: "7501 p.20",
-          note,
-          inputs: dutyIds,
-        })
-      );
+      const missingIds: string[] = [];
+      let totalDutyCents = 0;
+
+      for (const dutyId of dutyIds) {
+        const value = getFieldValue(dutyId);
+        if (!value) {
+          missingIds.push(dutyId);
+        } else {
+          const dutyResult = parseMoneyToCents(value);
+          if (dutyResult.ok) {
+            totalDutyCents += dutyResult.value;
+          } else {
+            missingIds.push(dutyId);
+          }
+        }
+      }
+
+      if (missingIds.length > 0) {
+        totalFields.push(
+          field_helper({
+            id,
+            block: "41",
+            label: "Duty (USD)",
+            status: "needsReview",
+            inputs: dutyIds,
+            reason: `Waiting on ${missingIds.join(", ")}.`,
+            rule: null,
+          })
+        );
+      } else {
+        const dutyFormatted = formatCents(totalDutyCents);
+        const dutyValues = dutyIds.map(id => getFieldValue(id) || "0.00");
+        const note = `${dutyValues.join(" + ")} = ${dutyFormatted}`;
+        totalFields.push(
+          field_helper({
+            id,
+            block: "41",
+            label: "Duty (USD)",
+            value: dutyFormatted,
+            status: "computed",
+            rule: "7501 p.20",
+            note,
+            inputs: dutyIds,
+          })
+        );
+      }
     }
   }
 
@@ -2424,22 +2481,33 @@ export function buildDraft(input: {
                 },
               ];
 
-              // Re-derive dependent fields in this line: .35 (unit), .37A (rate), .38 (duty)
+              // Re-derive dependent fields in this line (Requirements 31.2, 31.3)
               if (field.line) {
                 const lineNum = field.line;
+                const draftLine = draftLines.find((l) => l.lineNumber === lineNum);
                 
                 // Update .35 unit from new HTS
                 const field35 = allFieldsList.find((f) => f.id === `L${lineNum}.35`);
-                if (field35) {
-                  field35.unit = lookup.unit;
-                  // If .35 was computed before, keep it; otherwise leave it as is
-                  if (field35.status === "computed" || field35.status === "personEdited") {
-                    // Keep its value; just update unit
-                  } else if (field35.status === "needsReview" && field35.reason && field35.reason.includes("HTS number is not")) {
-                    // Was waiting on HTS; try to recompute if we have quantity data
-                    // For now, mark as needs review to be recomputed in recomputeTotals
-                    field35.status = "needsReview";
-                    field35.reason = "Re-derived from new HTS number; awaiting quantity recalculation.";
+                if (field35 && draftLine) {
+                  // Check if .35 was personEdited (Requirement 31.3)
+                  if (field35.status === "personEdited") {
+                    // Unit changed: set to needsReview with specific reason
+                    if (field35.unit !== lookup.unit) {
+                      const oldUnit = field35.unit || "unknown";
+                      const oldValue = field35.value || "unknown";
+                      const newUnit = lookup.unit || "unknown";
+                      const unitPeriod = newUnit.endsWith(".") ? "" : ".";
+                      field35.status = "needsReview";
+                      field35.value = null;
+                      field35.note = null;
+                      field35.unit = lookup.unit;
+                      field35.reason = `L${lineNum}.33A changed the unit from ${oldUnit} to ${newUnit}; the quantity a person entered (${oldValue} ${oldUnit}) is in the old unit. A person enters the quantity in ${newUnit}${unitPeriod}`;
+                    }
+                    // Unit is the same: leave .35 as is
+                  } else {
+                    // Otherwise, re-derive using the helper (Requirement 31.1)
+                    const fresh = deriveNetQuantity(lineNum, draftLine.invoiceLines, lookup);
+                    Object.assign(field35, { ...fresh, id: field35.id });
                   }
                 }
 
@@ -2566,99 +2634,10 @@ export function buildDraft(input: {
   // Re-compute totals and line fields if any dependent values were overridden
   const recomputeTotals = () => {
     // After HTS or quantity overrides on a line, recompute:
-    // - .35 (unit from HTS)
+    // - .35 (unit from HTS) — now done in case "33A" override handling
     // - .37A (rate from HTS)  
     // - .38 (duty from value and rate)
     // - B39, B41, B43, B44
-    
-    // First, for each line, check if .33A was personEdited and recompute .35 if it was waiting on HTS
-    for (const line of draftLines) {
-      const lineNum = line.lineNumber;
-      const field33A = line.fields.find((f) => f.id === `L${lineNum}.33A`);
-      const field35 = line.fields.find((f) => f.id === `L${lineNum}.35`);
-      const field36A = line.fields.find((f) => f.id === `L${lineNum}.36A`);
-      const field37A = line.fields.find((f) => f.id === `L${lineNum}.37A`);
-      const field38 = line.fields.find((f) => f.id === `L${lineNum}.38`);
-      
-      // If .33A was personEdited and .35 is now marked as needs review due to HTS, recompute it
-      if (field33A && field33A.status === "personEdited" && field35 && field35.status === "needsReview") {
-        // Look up the new HTS to get unit
-        const newHtsLookup = lookupHts(hts, field33A.value || "");
-        if (newHtsLookup.found) {
-          // Try to compute quantity from invoice data
-          // Find the line numbers that map to this 7501 line
-          const invoiceLineNumbers = line.invoiceLines;
-          
-          let totalQuantity: number | null = null;
-          const quantityReadingSources: DocSource[] = [];
-
-          for (const n of invoiceLineNumbers) {
-            const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
-            const unitReading = accepted.get(`invoice.lines.${n}.unit`);
-
-            if (qtyReading && qtyReading.value && unitReading && unitReading.value) {
-              const qtyResult = parseCount(normalizeSpace(qtyReading.value));
-              const invoiceUnit = normalizeSpace(unitReading.value).toUpperCase();
-
-              if (qtyResult.ok) {
-                let convertedQty: number | null = null;
-
-                if (invoiceUnit === "PCS" || invoiceUnit === "PC" || invoiceUnit === "EA" || invoiceUnit === "PIECES") {
-                  convertedQty = qtyResult.value;
-                } else if (invoiceUnit === "NO.") {
-                  convertedQty = qtyResult.value;
-                } else if (invoiceUnit === "DZ PCS" || invoiceUnit === "DOZ." || invoiceUnit === "DZ.") {
-                  const quotient = qtyResult.value / 12;
-                  if (qtyResult.value % 12 === 0) {
-                    convertedQty = quotient;
-                  } else {
-                    convertedQty = qtyResult.value;
-                  }
-                } else if (invoiceUnit === "KG") {
-                  convertedQty = qtyResult.value;
-                } else {
-                  convertedQty = null;
-                }
-
-                if (convertedQty !== null) {
-                  if (totalQuantity === null) totalQuantity = 0;
-                  totalQuantity += convertedQty;
-                }
-
-                quantityReadingSources.push(docSource(qtyReading));
-              }
-            }
-          }
-
-          if (totalQuantity !== null) {
-            let displayValue = String(totalQuantity);
-            const htsUnit = newHtsLookup.unit;
-            if (htsUnit && htsUnit.toUpperCase() === "DZ PCS") {
-              const dozenCount = totalQuantity / 12;
-              if (dozenCount === Math.floor(dozenCount)) {
-                displayValue = String(Math.floor(dozenCount));
-              } else {
-                displayValue = dozenCount.toFixed(2);
-              }
-            }
-
-            field35.value = displayValue;
-            field35.status = "computed";
-            field35.rule = "P12";
-            field35.unit = htsUnit;
-            field35.sources = quantityReadingSources;
-            field35.reason = null;
-            field35.inputs = [];
-            field35.note = `${displayValue} ${htsUnit || ""}`.trim();
-          } else {
-            field35.value = null;
-            field35.status = "needsReview";
-            field35.unit = newHtsLookup.unit;
-            field35.reason = "Could not parse quantities from invoice lines.";
-          }
-        }
-      }
-    }
 
     // Recompute L<nnn>.37A for lines where .10 or .33A was personEdited
     for (const line of draftLines) {
@@ -2708,29 +2687,17 @@ export function buildDraft(input: {
       }
     }
     
-    // Now handle duty recomputation
+    // Now handle duty recomputation for lines where inputs changed (Requirement 32.2)
     for (const line of draftLines) {
       const lineNum = line.lineNumber;
       const field36A = line.fields.find((f) => f.id === `L${lineNum}.36A`);
       const field37A = line.fields.find((f) => f.id === `L${lineNum}.37A`);
       const field38 = line.fields.find((f) => f.id === `L${lineNum}.38`);
 
-      // If .36A or .37A changed, recompute .38
-      if (field38 && field36A && field37A) {
-        // Only recompute if .38 is not personEdited and both inputs are available
-        if (field38.status !== "personEdited" && field36A.status !== "needsReview" && field36A.value && 
-            field37A.status !== "needsReview" && field37A.value) {
-          const enteredDollars = parseInt(field36A.value, 10);
-          const dutyResult = computeDuty(field37A.value, enteredDollars * 100);
-          if (dutyResult.ok) {
-            field38.value = formatCents(dutyResult.value);
-            field38.status = "computed";
-            field38.rule = "P7";
-            field38.reason = null;
-            field38.inputs = [`L${lineNum}.36A`, `L${lineNum}.37A`];
-            field38.note = `${field37A.value} x ${field36A.value} = ${field38.value}`;
-          }
-        }
+      // If .38 is not personEdited, recompute it using the helper
+      if (field38 && field38.status !== "personEdited") {
+        const fresh = deriveDuty(lineNum, field36A, field37A);
+        Object.assign(field38, { ...fresh, id: field38.id });
       }
     }
 
@@ -2742,44 +2709,53 @@ export function buildDraft(input: {
       })
       .filter((id): id is string => id !== null);
 
-    const missingB39: string[] = [];
-    let totalCentsExact = 0;
-
-    for (const valueId of lineValueIds) {
-      const field = allFieldsList.find((f) => f.id === valueId);
-      if (!field || !field.value) {
-        missingB39.push(valueId);
-      } else {
-        const dollars = parseInt(field.value, 10);
-        if (!isNaN(dollars)) {
-          totalCentsExact += dollars * 100;
-        } else {
-          missingB39.push(valueId);
-        }
-      }
-    }
-
     const b39Field = totalFieldsMap.get("B39");
     if (b39Field) {
-      if (missingB39.length > 0) {
+      // Check if no lines were built (Requirement 32.1)
+      if (draftLines.length === 0) {
         b39Field.status = "needsReview";
         b39Field.value = null;
-        b39Field.reason = `Waiting on ${missingB39.join(", ")}.`;
         b39Field.rule = null;
+        b39Field.note = null;
+        b39Field.reason = NO_LINE_REASON;
       } else {
-        const totalResult = totalEnteredValue([totalCentsExact], config.totalEnteredValueMode);
-        if (!totalResult.ok) {
+        const missingB39: string[] = [];
+        let totalCentsExact = 0;
+
+        for (const valueId of lineValueIds) {
+          const field = allFieldsList.find((f) => f.id === valueId);
+          if (!field || !field.value) {
+            missingB39.push(valueId);
+          } else {
+            const dollars = parseInt(field.value, 10);
+            if (!isNaN(dollars)) {
+              totalCentsExact += dollars * 100;
+            } else {
+              missingB39.push(valueId);
+            }
+          }
+        }
+
+        if (missingB39.length > 0) {
           b39Field.status = "needsReview";
           b39Field.value = null;
-          b39Field.reason = totalResult.reason;
+          b39Field.reason = `Waiting on ${missingB39.join(", ")}.`;
           b39Field.rule = null;
         } else {
-          b39Field.status = "computed";
-          b39Field.value = String(totalResult.value);
-          b39Field.reason = null;
-          b39Field.rule = "P5";
-          const lineValues = lineValueIds.map(id => allFieldsList.find((f) => f.id === id)?.value || "0").join(" + ");
-          b39Field.note = `${lineValues} = ${totalResult.value}`;
+          const totalResult = totalEnteredValue([totalCentsExact], config.totalEnteredValueMode);
+          if (!totalResult.ok) {
+            b39Field.status = "needsReview";
+            b39Field.value = null;
+            b39Field.reason = totalResult.reason;
+            b39Field.rule = null;
+          } else {
+            b39Field.status = "computed";
+            b39Field.value = String(totalResult.value);
+            b39Field.reason = null;
+            b39Field.rule = "P5";
+            const lineValues = lineValueIds.map(id => allFieldsList.find((f) => f.id === id)?.value || "0").join(" + ");
+            b39Field.note = `${lineValues} = ${totalResult.value}`;
+          }
         }
       }
     }
@@ -2830,37 +2806,46 @@ export function buildDraft(input: {
       if (ch99Field) dutyIds.push(ch99Field.id);
     }
 
-    const missingB41: string[] = [];
-    let totalDutyCents = 0;
-
-    for (const dutyId of dutyIds) {
-      const field = allFieldsList.find((f) => f.id === dutyId);
-      if (!field || !field.value) {
-        missingB41.push(dutyId);
-      } else {
-        const dutyResult = parseMoneyToCents(field.value);
-        if (dutyResult.ok) {
-          totalDutyCents += dutyResult.value;
-        } else {
-          missingB41.push(dutyId);
-        }
-      }
-    }
-
     const b41Field = totalFieldsMap.get("B41");
     if (b41Field) {
-      if (missingB41.length > 0) {
+      // Check if no lines were built (Requirement 32.1)
+      if (draftLines.length === 0) {
         b41Field.status = "needsReview";
         b41Field.value = null;
-        b41Field.reason = `Waiting on ${missingB41.join(", ")}.`;
         b41Field.rule = null;
+        b41Field.note = null;
+        b41Field.reason = NO_LINE_REASON;
       } else {
-        b41Field.status = "computed";
-        b41Field.value = formatCents(totalDutyCents);
-        b41Field.reason = null;
-        b41Field.rule = "7501 p.20";
-        const dutyValues = dutyIds.map(id => allFieldsList.find((f) => f.id === id)?.value || "0.00").join(" + ");
-        b41Field.note = `${dutyValues} = ${b41Field.value}`;
+        const missingB41: string[] = [];
+        let totalDutyCents = 0;
+
+        for (const dutyId of dutyIds) {
+          const field = allFieldsList.find((f) => f.id === dutyId);
+          if (!field || !field.value) {
+            missingB41.push(dutyId);
+          } else {
+            const dutyResult = parseMoneyToCents(field.value);
+            if (dutyResult.ok) {
+              totalDutyCents += dutyResult.value;
+            } else {
+              missingB41.push(dutyId);
+            }
+          }
+        }
+
+        if (missingB41.length > 0) {
+          b41Field.status = "needsReview";
+          b41Field.value = null;
+          b41Field.reason = `Waiting on ${missingB41.join(", ")}.`;
+          b41Field.rule = null;
+        } else {
+          b41Field.status = "computed";
+          b41Field.value = formatCents(totalDutyCents);
+          b41Field.reason = null;
+          b41Field.rule = "7501 p.20";
+          const dutyValues = dutyIds.map(id => allFieldsList.find((f) => f.id === id)?.value || "0.00").join(" + ");
+          b41Field.note = `${dutyValues} = ${b41Field.value}`;
+        }
       }
     }
 
