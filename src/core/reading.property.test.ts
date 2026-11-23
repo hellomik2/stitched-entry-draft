@@ -38,6 +38,9 @@ describe("Reading verification with confidence and image origin", () => {
                 }),
               };
 
+              // Verify the unchanged answer once
+              const original = verifyReadings(bundleAnswer, bundleDocuments);
+
               // Verify the modified readings
               const verified = verifyReadings(modifiedAnswer, bundleDocuments);
 
@@ -55,10 +58,9 @@ describe("Reading verification with confidence and image origin", () => {
               // Check that other fields keep their original status
               for (let i = 0; i < verified.length; i++) {
                 if (!lowConfidenceIndexes.includes(i)) {
-                  const original = verifyReadings(bundleAnswer, bundleDocuments)[i];
-                  expect(verified[i].status).toBe(original.status);
-                  if (verified[i].status === "rejected" && original.status === "rejected") {
-                    expect((verified[i] as any).reason).toBe((original as any).reason);
+                  expect(verified[i].status).toBe(original[i].status);
+                  if (verified[i].status === "rejected" && original[i].status === "rejected") {
+                    expect((verified[i] as any).reason).toBe((original[i] as any).reason);
                   }
                 }
               }
