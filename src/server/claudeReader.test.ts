@@ -15,6 +15,7 @@ import {
 import type { ReaderInput, ReaderOutput } from "../core/readerContract";
 import { ReaderError } from "./readerTypes";
 import { FIELD_CATALOG } from "../core/fieldCatalog";
+import { estimateReaderCall } from "../core/budget";
 
 type RequestParams = Parameters<ClaudeClientLike["messages"]["create"]>[0];
 
@@ -34,6 +35,34 @@ function makeClient(
     },
     calls,
   };
+}
+
+// Helper: convert ReaderOutput (with { text, box: { x, y, w, h } } lines) to wire format ({ t, b: [x, y, w, h] })
+// Works on a copy, never mutates the argument.
+function toModelJson(output: any): any {
+  const copy = structuredClone(output);
+  const { reader, ...modelJson } = copy;
+  if (Array.isArray(modelJson.transcripts)) {
+    for (const transcript of modelJson.transcripts) {
+      if (Array.isArray(transcript.lines)) {
+        for (const line of transcript.lines) {
+          if (line.text !== undefined && line.box !== undefined) {
+            const { x, y, w, h } = line.box;
+            line.t = line.text;
+            line.b = [
+              Math.round(x * 1000),
+              Math.round(y * 1000),
+              Math.round(w * 1000),
+              Math.round(h * 1000),
+            ];
+            delete line.text;
+            delete line.box;
+          }
+        }
+      }
+    }
+  }
+  return modelJson;
 }
 
 describe("Claude Reader", () => {
@@ -64,7 +93,6 @@ describe("Claude Reader", () => {
     );
     const content = await fs.readFile(recordingPath, "utf-8");
     const recording = JSON.parse(content);
-    const modelJson = recording.output;
 
     // Build the input as the spec describes
     const testInput: ReaderInput = {
@@ -122,7 +150,7 @@ describe("Claude Reader", () => {
       stop_reason: "end_turn",
       content: [
         { type: "thinking" },
-        { type: "text", text: JSON.stringify(modelJson) },
+        { type: "text", text: JSON.stringify(toModelJson(recording.output)) },
       ],
       usage: { input_tokens: 1200, output_tokens: 300 },
     }));
@@ -130,10 +158,28 @@ describe("Claude Reader", () => {
     const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
     const result = await reader.read(testInput);
 
-    expect(result.output.fields).toEqual(modelJson.fields);
+    expect(result.output.fields).toEqual(recording.output.fields);
     expect(result.output.reader).toBe("claude-haiku-5-5");
     expect(result.usage).toEqual({ inputTokens: 1200, outputTokens: 300 });
     expect(calls).toHaveLength(1);
+
+    // Compare transcript lines: the reader converts wire format { t, b: [...] } back to { text, box: { x, y, w, h } }
+    // so verify by converting recording's shape through the wire format and back.
+    expect(result.output.transcripts).toHaveLength(recording.output.transcripts.length);
+    for (let i = 0; i < recording.output.transcripts.length; i++) {
+      const recordingTranscript = recording.output.transcripts[i];
+      const resultTranscript = result.output.transcripts[i];
+      expect(resultTranscript!.lines).toHaveLength(recordingTranscript.lines.length);
+      for (let j = 0; j < recordingTranscript.lines.length; j++) {
+        const recordingLine = recordingTranscript.lines[j];
+        const resultLine = resultTranscript!.lines[j];
+        expect(resultLine!.text).toBe(recordingLine.text);
+        expect(resultLine!.box.x).toBe(Math.round(recordingLine.box.x * 1000) / 1000);
+        expect(resultLine!.box.y).toBe(Math.round(recordingLine.box.y * 1000) / 1000);
+        expect(resultLine!.box.w).toBe(Math.round(recordingLine.box.w * 1000) / 1000);
+        expect(resultLine!.box.h).toBe(Math.round(recordingLine.box.h * 1000) / 1000);
+      }
+    }
   });
 
   describe("Feature: document-intake, Property 21: Claude Reader Stop Reason Check", () => {
@@ -432,7 +478,6 @@ describe("Claude Reader", () => {
       );
       const content = await fs.readFile(recordingPath, "utf-8");
       const recording = JSON.parse(content);
-      const modelJson = recording.output;
 
       const testInput: ReaderInput = {
         bundle: "test",
@@ -487,7 +532,7 @@ describe("Claude Reader", () => {
 
       const { client, calls } = makeClient(async () => ({
         stop_reason: "end_turn",
-        content: [{ type: "text", text: JSON.stringify(modelJson) }],
+        content: [{ type: "text", text: JSON.stringify(toModelJson(recording.output)) }],
         usage: { input_tokens: 1200, output_tokens: 300 },
       }));
 
@@ -499,18 +544,22 @@ describe("Claude Reader", () => {
 
       // Check model and max_tokens
       expect(params.model).toBe("claude-haiku-5-5");
-      expect(params.max_tokens).toBe(8000);
+      // Output tokens are calculated based on input (Requirement 29.4)
+      const estimate = estimateReaderCall(testInput);
+      expect(params.max_tokens).toBe(estimate.outputTokens);
 
       // Check output_config
       expect(params.output_config).toBeDefined();
       expect((params.output_config as any).effort).toBe("low");
       expect((params.output_config as any).format.type).toBe("json_schema");
 
-      // Check no temperature, top_p, top_k, thinking
+      // Check no temperature, top_p, top_k
       expect((params as any).temperature).toBeUndefined();
       expect((params as any).top_p).toBeUndefined();
       expect((params as any).top_k).toBeUndefined();
-      expect((params as any).thinking).toBeUndefined();
+
+      // Check thinking is disabled (Requirement 29.1)
+      expect((params as any).thinking).toEqual({ type: "disabled" });
 
       // Check exactly one message with role "user"
       expect(params.messages).toHaveLength(1);
@@ -621,7 +670,7 @@ describe("Claude Reader", () => {
   });
 
   describe("Feature: document-intake, Property 38: Reader Call Limits and No Document Text in Errors (Validates: Requirements 21, 22)", () => {
-    it("with an injected client that records (params, options): options.timeout is 45000 and params.max_tokens is 8000", async () => {
+    it("with an injected client that records (params, options): options.timeout is 45000 and params.max_tokens matches estimateReaderCall", async () => {
       let recordedOptions: { timeout?: number } | undefined;
       let recordedParams: any;
 
@@ -669,7 +718,9 @@ describe("Claude Reader", () => {
       await reader.read(testInput);
 
       expect(recordedOptions?.timeout).toBe(45000);
-      expect(recordedParams.max_tokens).toBe(8000);
+      // Output tokens are calculated based on input (Requirement 29.4)
+      const estimate = estimateReaderCall(testInput);
+      expect(recordedParams.max_tokens).toBe(estimate.outputTokens);
     });
 
     it("an injected client whose create rejects with APIConnectionTimeoutError makes read reject with timeout message", async () => {
@@ -804,6 +855,451 @@ describe("Claude Reader", () => {
       expect(source).toContain('logLevel: "off"');
       expect(source).toContain("openTelemetry: false");
       expect(source).not.toContain("process.env");
+    });
+  });
+
+  describe("Feature: document-intake, Property 46: The Answer Room Stays Under the Line (Validates: Requirements 29.1, 29.2, 29.3, 29.4)", () => {
+    it("buildReaderRequest sends thinking: { type: 'disabled' }", () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const request = buildReaderRequest(testInput);
+      expect((request as any).thinking).toEqual({ type: "disabled" });
+      expect((request.output_config as any).effort).toBe("low");
+    });
+
+    it("READER_SYSTEM_PROMPT describes transcript lines as 't' and 'b' in thousandths", () => {
+      expect(READER_SYSTEM_PROMPT).toContain('"t": the line text');
+      expect(READER_SYSTEM_PROMPT).toContain('"b": [x, y, w, h]');
+      expect(READER_SYSTEM_PROMPT).toContain("thousandths of the page width and height");
+      expect(READER_SYSTEM_PROMPT).toContain("Write the JSON on one line, with no indentation.");
+      expect(READER_SYSTEM_PROMPT).not.toContain("fractions 0..1");
+    });
+
+    it("READER_OUTPUT_SCHEMA transcript line items have exactly t and b (no text, box, minimum, maximum, minItems, maxItems)", () => {
+      const lineSchema = (READER_OUTPUT_SCHEMA.properties.transcripts as any).items.properties.lines.items;
+      expect(lineSchema.required).toEqual(["t", "b"]);
+      expect(Object.keys(lineSchema.properties)).toEqual(["t", "b"]);
+      expect(lineSchema.properties.t.type).toBe("string");
+      expect(lineSchema.properties.b.type).toBe("array");
+      expect(lineSchema.properties.b.items.type).toBe("integer");
+      expect(lineSchema.properties.b.minimum).toBeUndefined();
+      expect(lineSchema.properties.b.maximum).toBeUndefined();
+      expect(lineSchema.properties.b.minItems).toBeUndefined();
+      expect(lineSchema.properties.b.maxItems).toBeUndefined();
+    });
+
+    it("transforms wire format line { t, b: [716, 88, 172, 16] } to output format { text, box: { x: 0.716, y: 0.088, w: 0.172, h: 0.016 } }", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 1200,
+                height: 1600,
+                text: null,
+                image: { mediaType: "image/jpeg", base64: "QUJD" },
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "Total 10", b: [716, 88, 172, 16] }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+      const result = await reader.read(testInput);
+
+      expect(result.output.transcripts).toHaveLength(1);
+      expect(result.output.transcripts[0]!.lines).toHaveLength(1);
+      const line = result.output.transcripts[0]!.lines[0]!;
+      expect(line.text).toBe("Total 10");
+      expect(line.box).toEqual({ x: 0.716, y: 0.088, w: 0.172, h: 0.016 });
+    });
+
+    it("b = [1, 2, 3] (not 4 elements) rejects with exact error message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "text", b: [1, 2, 3] }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe(
+          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
+        );
+        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+      }
+    });
+
+    it("b = [0, 0, 0, 1001] (1001 out of range) rejects with exact error message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "text", b: [0, 0, 0, 1001] }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe(
+          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
+        );
+        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+      }
+    });
+
+    it("b = [-1, 0, 0, 0] (negative) rejects with exact error message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "text", b: [-1, 0, 0, 0] }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe(
+          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
+        );
+        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+      }
+    });
+
+    it("b = [0.5, 0, 0, 0] (not integer) rejects with exact error message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "text", b: [0.5, 0, 0, 0] }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe(
+          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
+        );
+        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+      }
+    });
+
+    it("b = '1,2,3,4' (string instead of array) rejects with exact error message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x",
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ t: "text", b: "1,2,3,4" }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe(
+          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
+        );
+        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+      }
+    });
+
+    it("old shape { text: 'Total 10', box: { x: 0.1, y: 0.1, w: 0.2, h: 0.02 } } on an image page rejects with exact error message", async () => {
+      const testInput: ReaderInput = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "invoice",
+            kind: "invoice",
+            fileName: "invoice.pdf",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 1200,
+                height: 1600,
+                text: null,
+                image: { mediaType: "image/jpeg" as const, base64: "QUJD" },
+              },
+            ],
+          },
+        ],
+      };
+
+      const { client } = makeClient(async () => ({
+        stop_reason: "end_turn",
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              fields: [],
+              transcripts: [
+                {
+                  doc: "invoice",
+                  page: 1,
+                  lines: [{ text: "Total 10", box: { x: 0.1, y: 0.1, w: 0.2, h: 0.02 } }],
+                },
+              ],
+              invoiceLineCount: null,
+            }),
+          },
+        ],
+        usage: { input_tokens: 100, output_tokens: 10 },
+      }));
+
+      const reader = createClaudeReader({ apiKey: "test-key-not-real", client });
+
+      try {
+        await reader.read(testInput);
+        expect.fail("should have thrown");
+      } catch (e) {
+        if (!(e instanceof ReaderError)) throw e;
+        expect(e.message).toBe(
+          "The reader answer was not valid: transcripts[0].lines[0].b: must be 4 integers from 0 to 1000",
+        );
+        expect(e.usage).toEqual({ inputTokens: 100, outputTokens: 10 });
+      }
     });
   });
 });

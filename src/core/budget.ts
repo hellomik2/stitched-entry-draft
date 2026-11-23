@@ -262,7 +262,23 @@ export function estimateReaderCall(
     }
   }
 
-  const outputTokens = cfg.readerMaxOutputTokens;
+  // Output room under the per-call line: largest whole number of tokens o for which
+  // estimateCostNanoUsd(inputTokens, o) <= perCall.maxCallCostNanoUsd (Requirement 29.4).
+  // The output price depends on inputTokens: use the same rule as estimateCostNanoUsd.
+  const outputPrice =
+    inputTokens > cfg.prices.upToPromptTokens
+      ? cfg.prices.outputNanoUsdPerTokenOver
+      : cfg.prices.outputNanoUsdPerToken;
+
+  // Cost of input alone
+  const inputCostNanoUsd = estimateCostNanoUsd(inputTokens, 0, cfg.prices);
+
+  // Room for output tokens under the per-call cost line
+  const room = Math.floor((cfg.perCall.maxCallCostNanoUsd - inputCostNanoUsd) / outputPrice);
+
+  // Output tokens capped at max, but never below min
+  const outputTokens = Math.min(cfg.readerMaxOutputTokens, Math.max(cfg.readerMinOutputTokens, room));
+
   const worstCaseCostNanoUsd = estimateCostNanoUsd(inputTokens, outputTokens, cfg.prices);
 
   return {

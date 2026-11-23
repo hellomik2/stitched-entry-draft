@@ -221,7 +221,7 @@ describe("budget: remainingCalls", () => {
 });
 
 describe("Feature: document-intake, Property 33: Per-Call Line Holds Before Any Spending (Validates: Requirements 17.2, 17.3, 17.7)", () => {
-  it("estimate is at least promptOverhead, output is maxOutputTokens, adding pages never lowers cost", () => {
+  it("estimate is at least promptOverhead, output is between min and max, adding pages never lowers cost", () => {
     fc.assert(
       fc.property(
         fc.integer({ min: 1, max: 3 }),
@@ -269,8 +269,9 @@ describe("Feature: document-intake, Property 33: Per-Call Line Holds Before Any 
           // Check: inputTokens >= promptOverheadTokens
           expect(estimate1.inputTokens).toBeGreaterThanOrEqual(intakeConfig.perCall.promptOverheadTokens);
 
-          // Check: outputTokens == maxOutputTokens
-          expect(estimate1.outputTokens).toBe(intakeConfig.readerMaxOutputTokens);
+          // Check: outputTokens is between min and max (Requirement 29.4)
+          expect(estimate1.outputTokens).toBeGreaterThanOrEqual(intakeConfig.readerMinOutputTokens);
+          expect(estimate1.outputTokens).toBeLessThanOrEqual(intakeConfig.readerMaxOutputTokens);
 
           // Check: adding a text page never lowers cost
           if (documents.length > 0 && documents[0].pages.length < 4) {
@@ -652,6 +653,248 @@ describe("Feature: document-intake, Property 45: Small Guards Hold (day counts) 
             expect(nextDays["2026-12-10"].calls).toBe(expectedCount);
           },
         ),
+        { numRuns: 100 },
+      );
+    });
+  });
+});
+
+describe("Feature: document-intake, Property 46: The Answer Room Stays Under the Line (Validates: Requirements 29.1, 29.2, 29.4)", () => {
+  describe("examples: output tokens and costs", () => {
+    it("21,841 input tokens give 16,000 output tokens (max)", () => {
+      const input = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "d",
+            kind: "invoice" as const,
+            fileName: "f",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x".repeat(11676),
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const estimate = estimateReaderCall(input);
+      expect(estimate.inputTokens).toBe(21841);
+      expect(estimate.outputTokens).toBe(16000);
+    });
+
+    it("60,000 input tokens give 9,600 output tokens", () => {
+      const input = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "d",
+            kind: "invoice" as const,
+            fileName: "f",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x".repeat(49835),
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const estimate = estimateReaderCall(input);
+      expect(estimate.inputTokens).toBe(60000);
+      expect(estimate.outputTokens).toBe(9600);
+    });
+
+    it("68,000 input tokens give 8,000 output tokens (min) and worst case exactly 10,800,000", () => {
+      const input = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "d",
+            kind: "invoice" as const,
+            fileName: "f",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x".repeat(57835),
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const estimate = estimateReaderCall(input);
+      expect(estimate.inputTokens).toBe(68000);
+      expect(estimate.outputTokens).toBe(8000);
+      expect(estimate.worstCaseCostNanoUsd).toBe(10800000);
+    });
+
+    it("68,001 input tokens are refused (worst case above 10,800,000)", () => {
+      const input = {
+        bundle: "test",
+        documents: [
+          {
+            docId: "d",
+            kind: "invoice" as const,
+            fileName: "f",
+            fileSha256: "a".repeat(64),
+            pages: [
+              {
+                page: 1,
+                width: 612,
+                height: 792,
+                text: "x".repeat(57836),
+                image: null,
+              },
+            ],
+          },
+        ],
+      };
+
+      const estimate = estimateReaderCall(input);
+      expect(estimate.inputTokens).toBe(68001);
+      // With 68,001 input (under the step), output tokens are capped at min 8,000
+      // Cost = 68,001 * 100 + 8,000 * 500 = 6,800,100 + 4,000,000 = 10,800,100 nanoUsd
+      expect(estimate.worstCaseCostNanoUsd).toBeGreaterThan(10800000);
+    });
+  });
+
+  describe("property: output room between 8,000 and 16,000, worst case at or below 10,800,000 for inputs up to 68,000", () => {
+    it("any input tokens from 0 to 200,000 give output between 8,000 and 16,000", () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 0, max: 200_000 }), (targetInputTokens) => {
+          // Build input that roughly hits the target token count
+          const baseTokens = 10_000; // promptOverheadTokens
+          const remainingTokens = Math.max(0, targetInputTokens - baseTokens);
+          const perPageTokens = 160 + 1 + 4; // perPageOverheadTokens + fileName "f" (1) + 4*docId "d" (1*4)
+          const textTokens = Math.max(0, remainingTokens - perPageTokens);
+
+          const input = {
+            bundle: "test",
+            documents: [
+              {
+                docId: "d",
+                kind: "invoice" as const,
+                fileName: "f",
+                fileSha256: "a".repeat(64),
+                pages: [
+                  {
+                    page: 1,
+                    width: 612,
+                    height: 792,
+                    text: "x".repeat(textTokens),
+                    image: null,
+                  },
+                ],
+              },
+            ],
+          };
+
+          const estimate = estimateReaderCall(input);
+          expect(estimate.outputTokens).toBeGreaterThanOrEqual(8000);
+          expect(estimate.outputTokens).toBeLessThanOrEqual(16000);
+        }),
+        { numRuns: 100 },
+      );
+    });
+
+    it("for inputs 0 to 68,000 tokens, worst case <= 10,800,000; for 68,001+, worst case > 10,800,000", () => {
+      fc.assert(
+        fc.property(
+          fc.tuple(fc.integer({ min: 0, max: 68_000 }), fc.boolean()),
+          ([inputTokens, over]) => {
+            const baseTokens = 10_000;
+            const perPageTokens = 160 + 1 + 4;
+            const textTokens = Math.max(0, inputTokens - baseTokens - perPageTokens);
+
+            const input = {
+              bundle: "test",
+              documents: [
+                {
+                  docId: "d",
+                  kind: "invoice" as const,
+                  fileName: "f",
+                  fileSha256: "a".repeat(64),
+                  pages: [
+                    {
+                      page: 1,
+                      width: 612,
+                      height: 792,
+                      text: "x".repeat(textTokens),
+                      image: null,
+                    },
+                  ],
+                },
+              ],
+            };
+
+            const estimate = estimateReaderCall(input);
+
+            if (estimate.inputTokens <= 68_000) {
+              expect(estimate.worstCaseCostNanoUsd).toBeLessThanOrEqual(10_800_000);
+            } else {
+              expect(estimate.worstCaseCostNanoUsd).toBeGreaterThan(10_800_000);
+            }
+          },
+        ),
+        { numRuns: 100 },
+      );
+    });
+
+    it("property: when room < 16,000, room + 1 output tokens would exceed the line", () => {
+      fc.assert(
+        fc.property(fc.integer({ min: 0, max: 68_000 }), (inputTokens) => {
+          const baseTokens = 10_000;
+          const perPageTokens = 160 + 1 + 4;
+          const textTokens = Math.max(0, inputTokens - baseTokens - perPageTokens);
+
+          const input = {
+            bundle: "test",
+            documents: [
+              {
+                docId: "d",
+                kind: "invoice" as const,
+                fileName: "f",
+                fileSha256: "a".repeat(64),
+                pages: [
+                  {
+                    page: 1,
+                    width: 612,
+                    height: 792,
+                    text: "x".repeat(textTokens),
+                    image: null,
+                  },
+                ],
+              },
+            ],
+          };
+
+          const estimate = estimateReaderCall(input);
+          const outputRoom = estimate.outputTokens;
+
+          if (outputRoom < 16_000) {
+            const costIfOneMore = estimateCostNanoUsd(estimate.inputTokens, outputRoom + 1, intakeConfig.prices);
+            expect(costIfOneMore).toBeGreaterThan(intakeConfig.perCall.maxCallCostNanoUsd);
+          }
+
+          // And the room value is never exceeding the max
+          expect(outputRoom).toBeLessThanOrEqual(16_000);
+          expect(outputRoom).toBeGreaterThanOrEqual(8_000);
+        }),
         { numRuns: 100 },
       );
     });

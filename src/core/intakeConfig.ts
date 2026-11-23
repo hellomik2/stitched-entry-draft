@@ -9,7 +9,10 @@ export const intakeConfig = {
   maxRequestBytes: 4_500_000,
   maxInvoiceLines: 8,
   readerModel: "claude-haiku-5-5",
-  readerMaxOutputTokens: 8000,
+  // Most output tokens a reader call may use (the usual limit for a request that is not streamed).
+  readerMaxOutputTokens: 16_000,
+  // Fewest output tokens a call gets; with less room under perCall.maxCallCostNanoUsd the call is refused (the output size of the approved cost assumption).
+  readerMinOutputTokens: 8_000,
   readerTimeoutMs: 45_000,
   prices: {
     inputNanoUsdPerToken: 100,

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as fc from "fast-check";
-import { emptyUsageState, decideCall, remainingCalls, estimateCostNanoUsd, utcDay } from "./budget";
+import { emptyUsageState, decideCall, remainingCalls, estimateCostNanoUsd, utcDay, estimateReaderCall } from "./budget";
 import { intakeConfig } from "./intakeConfig";
 
 describe("budget: property tests", () => {
@@ -263,6 +263,64 @@ describe("budget: property tests", () => {
             const costSum = estimateCostNanoUsd(a1 + a2, b1 + b2, intakeConfig.prices);
 
             expect(costSum).toBe(cost1 + cost2);
+          },
+        ),
+        { numRuns: 200 },
+      );
+    });
+  });
+
+  describe("Property 46: The Answer Room Stays Under the Line (Validates: Requirements 29.1, 29.2, 29.4)", () => {
+    it("Feature: document-intake, Property 46: The Answer Room Stays Under the Line", () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 0, max: 200_000 }),
+          (targetInputTokens) => {
+            // Build input that roughly hits the target token count
+            const baseTokens = 10_000; // promptOverheadTokens
+            const remainingTokens = Math.max(0, targetInputTokens - baseTokens);
+            const textPerPage = Math.max(0, remainingTokens - 500);
+
+            const input = {
+              bundle: "test",
+              documents: [
+                {
+                  docId: "d",
+                  kind: "invoice" as const,
+                  fileName: "f",
+                  fileSha256: "a".repeat(64),
+                  pages: [
+                    {
+                      page: 1,
+                      width: 612,
+                      height: 792,
+                      text: "x".repeat(textPerPage),
+                      image: null,
+                    },
+                  ],
+                },
+              ],
+            };
+
+            const estimate = estimateReaderCall(input);
+
+            // Property 1: Output room is between 8,000 and 16,000
+            expect(estimate.outputTokens).toBeGreaterThanOrEqual(8000);
+            expect(estimate.outputTokens).toBeLessThanOrEqual(16000);
+
+            // Property 2: When input <= 68,000, worst case <= 10,800,000; when > 68,000, worst case > 10,800,000
+            if (estimate.inputTokens <= 68_000) {
+              expect(estimate.worstCaseCostNanoUsd).toBeLessThanOrEqual(10_800_000);
+            } else {
+              expect(estimate.worstCaseCostNanoUsd).toBeGreaterThan(10_800_000);
+            }
+
+            // Property 3: When room < 16,000, adding one more output token would exceed the line
+            const outputRoom = estimate.outputTokens;
+            if (outputRoom < 16_000) {
+              const costIfOneMore = estimateCostNanoUsd(estimate.inputTokens, outputRoom + 1, intakeConfig.prices);
+              expect(costIfOneMore).toBeGreaterThan(intakeConfig.perCall.maxCallCostNanoUsd);
+            }
           },
         ),
         { numRuns: 200 },
