@@ -267,6 +267,81 @@ export function buildDraft(input: {
     }
   }
 
+  // Requirement 33.1: Identify packing list lines that were not fully read
+  const packingNotFullyRead: { line: number; itemNo: string | null }[] = [];
+  for (let n = 1; n <= 8; n++) {
+    const hasAnyReading = verified.some((r) => r.field.startsWith(`packingList.lines.${n}.`));
+    if (!hasAnyReading) continue;
+
+    const itemNoReading = accepted.get(`packingList.lines.${n}.itemNo`);
+    const qtyReading = accepted.get(`packingList.lines.${n}.quantity`);
+
+    const itemNoValue = itemNoReading && itemNoReading.value ? normalizeSpace(itemNoReading.value) : null;
+    const qtyOk = qtyReading && qtyReading.value ? parseCount(normalizeSpace(qtyReading.value)).ok : false;
+
+    if (!itemNoValue || !qtyOk) {
+      packingNotFullyRead.push({ line: n, itemNo: itemNoValue });
+    }
+  }
+
+  // Requirement 33.2: One quantity check
+  const packingQuantityProblem = (
+    n: number,
+    itemNo: string | null,
+    q: number
+  ): { reason: string; detail: string } | null => {
+    // (a) itemNo is null
+    if (itemNo === null) {
+      return {
+        reason: `The item number of invoice line ${n} was not read, so its quantity was not compared with the packing list. A person compares them.`,
+        detail: "invoice item number not read",
+      };
+    }
+
+    // (b) lines where packing list line was not fully read with this itemNo
+    const notFullyReadWithItemNo = packingNotFullyRead.filter((x) => x.itemNo === itemNo);
+    if (notFullyReadWithItemNo.length > 0) {
+      const lineList = notFullyReadWithItemNo.map((x) => x.line).join(", ");
+      return {
+        reason: `Packing list line ${lineList} was not fully read (item number or quantity), so invoice line ${n} (${q} PCS) was not compared with the packing list. A person compares them.`,
+        detail: `packing list line ${lineList} not fully read`,
+      };
+    }
+
+    // (c) sum of packing with itemNo != q and there are not-fully-read lines with itemNo === null
+    const sum = (packingByItemNo.get(itemNo) ?? []).reduce((a, b) => a + b, 0);
+    if (sum !== q) {
+      const notFullyReadNoItemNo = packingNotFullyRead.filter((x) => x.itemNo === null);
+      if (notFullyReadNoItemNo.length > 0) {
+        const lineList = notFullyReadNoItemNo.map((x) => x.line).join(", ");
+        return {
+          reason: `Packing list line ${lineList} was not fully read (item number or quantity), so invoice line ${n} (${q} PCS) was not compared with the packing list. A person compares them.`,
+          detail: `packing list line ${lineList} not fully read`,
+        };
+      }
+    }
+
+    // (d) no packing list line for itemNo was read
+    if (!packingByItemNo.has(itemNo)) {
+      return {
+        reason: `Invoice line ${n} (${itemNo}) says ${q} PCS; no packing list line for ${itemNo} was read. A person decides.`,
+        detail: `no packing list line for ${itemNo} was read`,
+      };
+    }
+
+    // (e) sum !== q
+    const packingSum = (packingByItemNo.get(itemNo) ?? []).reduce((a, b) => a + b, 0);
+    if (packingSum !== q) {
+      return {
+        reason: `says ${q} PCS, the packing list says ${packingSum} PCS. A person decides.`,
+        detail: `invoice qty = ${q}, packing sum = ${packingSum}`,
+      };
+    }
+
+    // No problem
+    return null;
+  };
+
   // P1 and P3.qty checks interleaved by invoice line
   for (let n = 1; n <= 8; n++) {
     const line = invoiceLines.get(n)!;
@@ -296,17 +371,13 @@ export function buildDraft(input: {
       const id = `P3.qty.${line.itemNo || `LH-${String(n).padStart(3, "0")}`}`;
 
       if (line.itemNo && line.quantity !== null) {
-        const packingQtys = packingByItemNo.get(line.itemNo) || [];
-        const packingSum = packingQtys.reduce((a, b) => a + b, 0);
-        const ok = packingQtys.length > 0 && packingSum === line.quantity;
+        const problem = packingQuantityProblem(n, line.itemNo, line.quantity);
         checks.push({
           id,
           rule: "P3",
           label: `Invoice qty ${line.itemNo}`,
-          ok,
-          detail: ok
-            ? "invoice qty = packing sum"
-            : `invoice qty = ${line.quantity}, packing sum = ${packingSum}`,
+          ok: problem === null,
+          detail: problem ? problem.detail : "invoice qty = packing sum",
         });
       }
     }
@@ -1029,11 +1100,12 @@ export function buildDraft(input: {
 
   // Parse packing list by item for allocation: build map of itemNo -> [{carton, quantity, grossKg, reading}]
   // Also collect gross kg tenths and readings for each item
+  // Requirement 33.4: quantity is optional (used only for reference, not for allocation)
   const packingByItemNo2 = new Map<
     string,
     Array<{
       carton: number;
-      quantity: number;
+      quantity: number | null;
       grossKg: number;
       grossKgReading: VerifiedReading;
     }>
@@ -1047,18 +1119,19 @@ export function buildDraft(input: {
     const qtyReading = accepted.get(qtyField);
     const grossReading = accepted.get(grossField);
 
-    if (itemReading && itemReading.value && qtyReading && qtyReading.value && grossReading && grossReading.value) {
+    if (itemReading && itemReading.value && grossReading && grossReading.value) {
       const itemNo = normalizeSpace(itemReading.value);
-      const qtyResult = parseCount(normalizeSpace(qtyReading.value));
+      const qtyResult = qtyReading && qtyReading.value ? parseCount(normalizeSpace(qtyReading.value)) : null;
       const grossResult = parseKgToTenths(normalizeSpace(grossReading.value));
 
-      if (qtyResult.ok && grossResult.ok) {
+      if (grossResult.ok) {
+        const quantity = qtyResult && qtyResult.ok ? qtyResult.value : null;
         if (!packingByItemNo2.has(itemNo)) {
           packingByItemNo2.set(itemNo, []);
         }
         packingByItemNo2.get(itemNo)!.push({
           carton: n,
-          quantity: qtyResult.value,
+          quantity,
           grossKg: grossResult.value,
           grossKgReading: grossReading,
         });
@@ -1080,21 +1153,20 @@ export function buildDraft(input: {
       htsUnit = htsLookup.unit;
     }
 
-    // Check for P3 quantity mismatch
+    // Check for P3 quantity mismatch (Requirement 33.2)
     let quantityMismatchReason: string | null = null;
     for (const n of invoiceLines) {
       const invQtyReading = accepted.get(`invoice.lines.${n}.quantity`);
       const itemReading = accepted.get(`invoice.lines.${n}.itemNo`);
 
-      if (invQtyReading && invQtyReading.value && itemReading && itemReading.value) {
+      if (invQtyReading && invQtyReading.value) {
         const invQtyResult = parseCount(normalizeSpace(invQtyReading.value));
-        const itemNo = normalizeSpace(itemReading.value);
+        const itemNo = itemReading && itemReading.value ? normalizeSpace(itemReading.value) : null;
 
         if (invQtyResult.ok) {
-          const packingQty = (packingByItemNo.get(itemNo) || []).reduce((sum, q) => sum + q, 0);
-
-          if (packingQty !== invQtyResult.value) {
-            quantityMismatchReason = `says ${invQtyResult.value} PCS, the packing list says ${packingQty} PCS. A person decides.`;
+          const problem = packingQuantityProblem(n, itemNo, invQtyResult.value);
+          if (problem) {
+            quantityMismatchReason = problem.reason;
             break;
           }
         }
@@ -1124,6 +1196,37 @@ export function buildDraft(input: {
       });
     } else {
       // Parse quantities from invoice lines and convert to HTS unit
+      // Requirement 33.3: Check for not-read quantities or units
+      const notReadLines: number[] = [];
+      for (const n of invoiceLines) {
+        const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
+        const unitReading = accepted.get(`invoice.lines.${n}.unit`);
+
+        const qtyOk = qtyReading && qtyReading.value ? parseCount(normalizeSpace(qtyReading.value)).ok : false;
+        const unitOk = unitReading && unitReading.value ? true : false;
+        const unitValue = unitReading && unitReading.value ? normalizeSpace(unitReading.value).toUpperCase() : "";
+
+        // Check if unit is acceptable
+        const acceptedUnits = ["PCS", "PC", "EA", "PIECES", "NO.", "DZ PCS", "DOZ.", "DZ.", "KG"];
+        const unitAccepted = unitOk && acceptedUnits.includes(unitValue);
+
+        if (!qtyOk || !unitAccepted) {
+          notReadLines.push(n);
+        }
+      }
+
+      if (notReadLines.length > 0) {
+        return field_helper({
+          id,
+          block: "35",
+          line: lineNum,
+          label: "Net quantity in HTS units",
+          status: "needsReview",
+          unit: htsUnit,
+          reason: `The quantity or unit of invoice line ${notReadLines.join(", ")} was not read or is not a unit the draft counts, so the net quantity is not added up. A person enters it.`,
+        });
+      }
+
       let totalQuantity: number | null = null;
       const quantityReadingSources: DocSource[] = [];
 
