@@ -1329,6 +1329,22 @@ For any number k from 0 to 5 of top-up tries that meet a changed state before a 
 For any string put into a field of the sample draft, the cell read back from `draftToCsv` is the string itself when it is a plain number or does not start with "=", "+", "-", "@", a tab or a carriage return, and "'" followed by the string otherwise.
 **Validates: Requirements 44.1, 44.2**
 
+### Property 60: A Sheet Cell Keeps Its Text and Address
+For any grid of up to 30 by 30 cells holding random text (letters, digits, spaces, punctuation, "&", "<") or numbers with a format of Requirement 45.4, written to an .xlsx with shared or inline strings, `readXlsx` then `sheetToPageText` give one item per cell with text, with the expected text and address, boxes that do not overlap, and a page text in which every cell's text is found.
+**Validates: Requirements 45.2, 45.4, 45.5**
+
+### Property 61: A Hostile Workbook Is Refused Before It Is Unpacked
+For any part that inflates past a limit of Requirement 45.3 (whether the zip header claims a small size or the true one) and any count of cells or sheets over a limit, `readXlsx` refuses the file with the reason of Requirement 45.3 and returns no cells; a macro part or an external link part in the zip changes no cell text.
+**Validates: Requirements 45.2, 45.3**
+
+### Property 62: Only an Exactly Equal Part Code Takes the List's Number
+For any invoice lines and parts list: when a line's item number equals exactly one row's part code, its invoice HTS number has no accepted reading and the row's number is in the tariff table, the line's 33A value is that number in entry form with the row's cell as a source; when the item number differs from every part code in any way (one character, case, a space, a hyphen), no field of the draft has a source from the list for that line and its 33A is the same as without a list.
+**Validates: Requirements 46.3, 46.4, 46.5**
+
+### Property 63: A Disagreement Waits and Shows Both
+For any invoice line whose accepted invoice HTS number (or origin) differs from its one matching row, the line's 33A (or 10) is needsReview with no value and has both sources, and for HTS its 35, 37A and 38 have no value; when they agree, the field has the value and both sources.
+**Validates: Requirements 46.4, 46.6**
+
 ---
 
 ## Error Handling

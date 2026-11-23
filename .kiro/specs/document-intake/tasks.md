@@ -346,6 +346,19 @@
   - [x] 55.2 `csv.ts`: the plain-number exception; `draft.ts`: the B9 rule
   - _Requirements: 44_
 
+- [ ] 56. An Excel document is read with cell addresses
+  - [ ] 56.1 Tests that fail on the current code: an .xlsx is accepted by the upload; texts and addresses of a test packing list; number formats; hidden sheets, rows and columns; limits and hostile files; Property 60; Property 61; a reading on a sheet page carries its cell; the CSV source and the source strip show it
+  - [ ] 56.2 `src/core/sheet.ts` (`readXlsx`, `sheetToPageText`), `prepareFiles.ts`, `reading.ts` (cell on a reading), `draft.ts` (cell on a source), `csv.ts`, `StitchBoard.tsx` (sheet page drawing, cell in the source strip); `fflate` (MIT) for unzipping
+  - _Requirements: 45_
+
+- [ ] 57. A customer parts list gives the HTS number, origin and MID
+  - [ ] 57.1 Tests that fail on the current code: header row and column names; exact match only; 33A from the list, the same and different; not in the list; two rows; an unusable number; origin cases; B13; Property 62; Property 63; the parts-list test bundle end to end with its recorded answer
+  - [ ] 57.2 `src/core/partsList.ts`, `draft.ts`, `UploadPanel.tsx`, `StitchBoard.tsx`, `public/templates/customer-parts-list.csv`, the test bundle in `samples/upload-test/`
+  - _Requirements: 46_
+
+- [ ] 58. (maintainer) Verifier items for Requirements 45 and 46; the board flow with the parts-list test bundle
+  - _Requirements: 45, 46_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -404,5 +417,8 @@
 53. A paid call always leaves a usage record, the cost top-up waits and tries again, and a store error is judged by its status
 54. The "AI estimate" label does not cover the page text
 55. A CSV number keeps its sign, and Block 9 waits without a container number
+56. An Excel document is read with cell addresses
+57. A customer parts list gives the HTS number, origin and MID
+58. (maintainer) Verifier items for Requirements 45 and 46; the board flow with the parts-list test bundle
 
 **Total Sub-Tasks:** 204
