@@ -322,6 +322,10 @@
   - _Requirements: 38_
 - [ ] 50. (maintainer) Verifier items for Requirements 34 to 38; the recorded real answer of bundle A replayed before and after
   - _Requirements: 34, 35, 36, 37, 38_
+- [ ] 51. A box on a photo or scan shows the AI reader's estimated place
+  - [ ] 51.1 Tests that fail on the current code: `lineText` on readings from image pages and none on text pages
+  - [ ] 51.2 `reading.ts` `lineText`; `StitchBoard.tsx` dashed boxes with `data-approx`, the "AI estimate" label, the note above an image page, the transcript line in the source strip
+  - _Requirements: 39_
 
 ## Summary
 
@@ -376,5 +380,6 @@
 48. One bad transcript line does not throw away the answer
 49. A draft value waits for what was not read, with the right reason
 50. (maintainer) Verifier items for Requirements 34 to 38; the recorded real answer of bundle A replayed before and after
+51. A box on a photo or scan shows the AI reader's estimated place
 
-**Total Sub-Tasks:** 202
+**Total Sub-Tasks:** 204

@@ -1011,6 +1011,12 @@ export default function StitchBoard(...) {
 
 ---
 
+## Second Real Read Fixes (2026-11-23)
+
+**Requirement 39 (A Box on a Photo or Scan Shows the AI Reader's Estimated Place):** `reading.ts` adds `lineText` to readings from image transcript pages; `StitchBoard.tsx` draws their boxes dashed with `data-approx`, an "AI estimate" label at the selected box, a note above an image page, and the transcript line in the source strip. The place itself is not corrected: the measurements of the real read showed no single shift or scale that fits.
+
+---
+
 ## Correctness Properties
 
 *Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 55 are defined below (55 in total).*
@@ -1304,7 +1310,7 @@ For any image page transcript and any set of its lines given a bad "b" (a wrong 
 **Validates: Requirements 37.1, 37.2, 37.3**
 
 ### Property 55: What Was Not Read Is Waited On
-For the sample bundle with text pages and any set of invoice lines whose origin readings are rejected, B10 has a value only when every line's 10 has one, and after person values of "PT" for every line 10 without a value, B10 has the value of today's rule for those codes; for any line and any refused 33A person value ("9999.99.9999" or "12345"), that line's 35, 37A and 38 have no value unless they are "personEdited".
+For the sample bundle with text pages and any set of invoice lines whose origin readings are rejected, B10 has a value only when every line's 10 has one or the line 10 values hold two or more different codes, and after person values of "PT" for every line 10 without a value, B10 has the value of today's rule for those codes; for any line and any refused 33A person value ("9999.99.9999" or "12345"), that line's 35, 37A and 38 have no value unless they are "personEdited".
 **Validates: Requirements 38.1, 38.3**
 
 ---
