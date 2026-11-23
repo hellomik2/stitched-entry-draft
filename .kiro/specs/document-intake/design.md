@@ -987,9 +987,17 @@ export default function StitchBoard(...) {
 
 ---
 
+## Draft Rule Fixes (2026-11-23)
+
+**Requirement 31 (An Edited HTS Number Derives the Line's Quantity by the First Rule):** `draft.ts`: the 35 block of the line loop moves into one function (`deriveNetQuantity`) that the first build calls and that runs again for a line whose 33A a person changed to a number found in the schedule. The 35 code in the 33A person-value branch and in `recomputeTotals` that kept a computed value with the new unit, or computed any waiting 35 again without the difference check, goes away. A person's 35 stays unless the unit changes.
+
+**Requirement 32 (A Value That Cannot Be Computed From What the Draft Has Now Waits):** `draft.ts`: B39 and B41 wait with a fixed reason when there is no 7501 line (first build and `recomputeTotals`); `recomputeTotals` gives a line's 38 the rule of its first build, where an input that waits only for a person's image check counts as having its value; the computed 36A, 34A and 35 add the currency, total gross weight and unit readings to their sources only when those came from an image page, so text-page drafts keep their sources.
+
+---
+
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 47 are defined below (47 in total).*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 49 are defined below (49 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1249,6 +1257,16 @@ For any valid reader input, `estimateReaderCall(input).outputTokens` is between 
 For the sample bundle with every page marked as an image transcript and any single person edit (a line's 33A to another number of the HTS subset, a line's 10 to another country code, or a line's 36A to another whole-dollar amount), no field has status "computed" or "copied" with a document source of origin "imageTranscript" unless its note is "Confirmed by a person against the page."; with the text pages, the same edits give no field the reason `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON`.
 **Validates: Requirements 30.1, 30.3**
 
+### Property 48: An Edited HTS Number Keeps the Quantity Rule
+
+For the sample bundle and any line and any number of the HTS subset (the line's own number included), after a person's edit of that line's 33A on the text pages: a 35 that waited with the invoice and packing list difference in the draft without person values still waits with the same reason and no value; any other 35 has the unit of the new number, and when it has a value, the value is the sum of the quantities of the line's invoice lines in that unit (for "Dz Pcs" the value times 12 is the sum in pieces). With every page an image, the same edit leaves no 35 "computed" without a person's confirmation.
+**Validates: Requirements 31.1, 31.2, 31.4**
+
+### Property 49: No Total or Duty From Missing Inputs
+
+For the sample bundle with text pages or with every page an image, and any one person value drawn from a line's 36A (a refused value or a whole-dollar amount), a line's 37A ("5 cents/kg" or a simple percentage) or a line's 33A (a number of the subset), every line's 38 that is "computed" has values in its 36A and 37A and equals `computeDuty` of them; with no invoice line read, B39 and B41 have no value; and with only one of the readings invoice currency, packing list total gross weight or an invoice line's unit coming from an image page, every 36A, 34A or 35 computed with that reading has it among its sources and waits.
+**Validates: Requirements 32.1, 32.2, 32.3**
+
 ---
 
 ## Error Handling
@@ -1355,6 +1373,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (47 properties: 1 to 28, 33 to 47 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (49 properties: 1 to 28, 33 to 49 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 47
+**Total Correctness Properties:** 49

@@ -282,6 +282,20 @@
 - [x] 39. (maintainer) Verifier items for Requirements 29 and 30; the checks that expected 8,000 output tokens expect the output room
   - _Requirements: 29, 30_
 
+- [ ] 40. An edited HTS number derives the line's quantity by the first rule
+  - [ ] 40.1 Tests that fail on the current code: L003.33A edited keeps the difference, L001.33A to 7013.99.3500 gives 216 No., a person's 35 and a unit change; Property 48 test
+  - [ ] 40.2 `draft.ts`: one `deriveNetQuantity` for the first build and the rebuild after a 33A edit; remove the two old 35 copies
+  - _Requirements: 31_
+- [ ] 41. A value that cannot be computed from what the draft has now waits
+  - [ ] 41.1 Tests that fail on the current code: no invoice line, a refused 36A, a rate that is not simple, the currency, total gross weight or unit from an image page; Property 49 test
+  - [ ] 41.2 `draft.ts`: B39 and B41 with no 7501 line, 38 by its first rule in `recomputeTotals`, image readings added to the sources of 36A, 34A and 35
+  - _Requirements: 32_
+- [ ] 42. Property 2 test does the same checks in less time
+  - [ ] 42.1 `reading.property.test.ts` Property 2: verify the unchanged answer once per run instead of once per field; the same 100 runs, checks and time limit
+  - _Requirements: 14_
+- [ ] 43. (maintainer) Verifier items for Requirements 31 and 32; reproduction scripts fail before and pass after
+  - _Requirements: 31, 32_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -324,5 +338,9 @@
 37. The reader's answer fits in one call
 38. A value computed again after a person's edit still waits
 39. (maintainer) Verifier items for Requirements 29 and 30; the checks that expected 8,000 output tokens expect the output room
+40. An edited HTS number derives the line's quantity by the first rule
+41. A value that cannot be computed from what the draft has now waits
+42. Property 2 test does the same checks in less time
+43. (maintainer) Verifier items for Requirements 31 and 32; reproduction scripts fail before and pass after
 
-**Total Sub-Tasks:** 187
+**Total Sub-Tasks:** 192

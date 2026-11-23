@@ -467,6 +467,37 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 31 (MUST): An Edited HTS Number Derives the Line's Quantity by the First Rule
+
+**User Story:** As an entry writer, I want a line's net quantity (35) to follow the same rules after I change the line's HTS number (33A) as when the draft was first built, so that a quantity difference I still have to decide never disappears and the quantity is always in the unit of the number I chose.
+
+**Background:** On the sample bundle, L003.35 waits with "says 240 PCS, the packing list says 216 PCS. A person decides." A person's edit of L003.33A, even to the same number 9505.90.4000, turns it into "computed" 240 and the difference is gone. On the text pages, editing L001.33A from 6913.90.5000 (unit Dz Pcs) to 7013.99.3500 (unit No.) leaves L001.35 at "computed" 18 with the unit changed to No.; the quantity in No. is 216. Both come from a second, shorter copy of the quantity rule that runs after the edit.
+
+#### Acceptance Criteria
+
+1. THE first build of a line's 35 and the rebuild after a person's 33A edit SHALL use one function of `draft.ts` (for example `deriveNetQuantity`), given the line number, the line's invoice lines and the HTS lookup. It gives the field that the first build gives today, in the same order: the quantity difference of the invoice and the packing list first (status "needsReview", the same reason, the unit of the HTS number, no value), then "Waiting on L<nnn>.33A: the HTS number is not in the tariff schedule revision." when the number is not found, then the quantity in the unit of the HTS number (status "computed", rule P12, the same note), else "Could not parse quantities from invoice lines.".
+2. WHEN a person's value for L<nnn>.33A is accepted (the number is in the schedule), L<nnn>.35 SHALL be replaced by the result of that function for the new number, unless L<nnn>.35 has status "personEdited". This holds whatever 35 was before (computed, confirmed, or waiting for any reason). Examples on the sample bundle: L003.33A to 9505.90.4000 (the same number) or to 3926.40.0090 leaves L003.35 "needsReview" with the difference reason and no value; L001.33A of the text pages to 7013.99.3500 gives L001.35 "computed" "216" with unit "No."; L006.33A to 7013.99.5090 (the demo answer) gives L006.35 "computed" "300" as today.
+3. WHEN L<nnn>.35 has status "personEdited" and the accepted 33A has another unit than 35 had, 35 SHALL get status "needsReview", no value, and the reason "L<nnn>.33A changed the unit from <old unit> to <new unit>; the quantity a person entered (<value> <old unit>) is in the old unit. A person enters the quantity in <new unit>." With the same unit the person's value stays. (Person values apply in order; a 35 entered after the 33A edit is in the new unit and stays.)
+4. THE image rules of Requirements 18.1, 26.1 and 30.1 apply to the new 35 as before: a 35 computed from image readings waits until a person confirms it.
+5. THE sample bundle without person values, the demo answers (`samples/lantern-hollow/overrides-demo.json`), the upload test recordings and the verifier's expected drafts are unchanged.
+
+---
+
+### Requirement 32 (MUST): A Value That Cannot Be Computed From What the Draft Has Now Waits
+
+**User Story:** As an entry writer, I want a total or a duty that the draft cannot compute from the values it has now to wait for me with no value, so that a stale or empty number never looks final.
+
+**Background:** A cross-check found three ways around this. When the reader gives no invoice line at all, the draft has no 7501 line and B39 is "computed" 0, FEE.MPF "computed" 34.58 (the minimum) and B41 "computed" 0.00. When a person's value for a line's 36A is refused (for example "540.50", not whole dollars), 36A has no value but its 38 keeps the duty computed from the old value; the same happens when a person enters a rate that is not Free or a simple percentage (for example "5 cents/kg") in 37A. When only the invoice currency was read from an image page and the amounts from a text page, every line's 36A is "computed" with no person check, because the currency is not among its sources; the same holds for the packing list total gross weight and 34A, and for an invoice line's unit and 35.
+
+#### Acceptance Criteria
+
+1. WHEN the draft has no 7501 line, B39 and B41 SHALL have status "needsReview", no value, and the reason "No 7501 line was built because no invoice line was read. A person reads the invoice lines.", in the first build and after the recomputation of totals. FEE.MPF, B43 and B44 then wait as they do today when an input waits ("Waiting on B39." and so on).
+2. AFTER the person values, a line's 38 that is not "personEdited" SHALL follow the rule of its first build: no value and "Waiting on L<nnn>.36A." when 36A has no value or waits for another reason than the two image reasons (`IMAGE_REVIEW_REASON`, `IMAGE_COMPUTED_REVIEW_REASON`); else no value and "Waiting on L<nnn>.37A." for 37A in the same way; else the duty of `computeDuty` from the shown values (status "computed", rule P7, inputs [L<nnn>.36A, L<nnn>.37A], the same note), or no value with the reason of `computeDuty` when it cannot compute. A 38 whose inputs wait only for a person's image check keeps a value and waits through Requirement 26.3 as today. Examples on the sample bundle: text pages and L001.36A "540.50" give L001.38 "needsReview" with no value and "Waiting on L001.36A."; text pages and L001.37A "5 cents/kg" give L001.38 "needsReview" with no value; every page an image, every other image value confirmed, and L001.36A "540.50" give the same as the text pages.
+3. WHEN a line's 36A is "computed" and the invoice currency reading came from an image page, or a line's 34A is "computed" and the packing list total gross weight reading came from an image page, or a line's 35 is "computed" and the unit reading of one of its invoice lines came from an image page, that reading SHALL be added to the field's sources, so that the field waits by Requirement 26.1 and the person sees the page box. When these readings come from text pages, the sources stay as they are.
+4. THE sample bundle with or without the demo answers, the upload test recordings and the verifier's expected drafts are unchanged; Properties 35, 43 and 47 still hold.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -501,6 +532,8 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 28. (MUST) Small Guards on Requests, CSV Cells and Day Counts
 29. (MUST) The Reader's Answer Fits in One Call
 30. (MUST) A Value Computed Again After a Person's Edit Still Waits
+31. (MUST) An Edited HTS Number Derives the Line's Quantity by the First Rule
+32. (MUST) A Value That Cannot Be Computed From What the Draft Has Now Waits
 
 **NICE (if time is left):**
 
