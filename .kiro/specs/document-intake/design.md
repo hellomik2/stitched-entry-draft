@@ -987,6 +987,20 @@ export default function StitchBoard(...) {
 
 ---
 
+## Second Real Read Fixes (2026-11-23)
+
+**Requirement 34 (A Value That Repeats on the Page Is Checked in Its Own Line):** `reading.ts`: when a quote occurs more than once, `verifyReadings` counts whole-word occurrences, then, for a line field, the occurrences inside the row of the line's anchor reading (item number, description or amount with a unique quote). Text pages find the row from the vertical overlap of item boxes; image pages use the anchor's transcript line. The rest of the check (value inside the quote, box) runs at the chosen occurrence.
+
+**Requirement 35 (A Date in the Asked Form and a Quote Over Two Lines Are Checked Against the Page):** `reading.ts`: a small date reader for the two date fields that knows only day-month-name-year, month-name-day-year, ISO and day.month.year with dots; a quote not in the page text is tried over stacked items of one column; a value may read ", " where its quote goes from one row to the next.
+
+**Requirement 36 (A Value the Reader Was Not Sure Of Is Shown, Not Used):** `reading.ts`: a new `VerifiedReading` status "uncertain" with box, items and origin. `draft.ts`: the map of accepted readings does not hold uncertain readings, so every count and check is as for a rejected reading; B8, B12, B14 and B15 show an uncertain value with `LOW_CONFIDENCE_REVIEW_REASON`; the reasons of 34A, 35 (Requirement 33) and 10 name the uncertain value. `StitchBoard.tsx`: dashed boxes and an "uncertain-readings" list; the confirm button also for the new reason.
+
+**Requirement 37 (One Bad Transcript Line Does Not Throw Away the Answer):** `claudeReader.ts` (answer parsing only): a bad "b" gives `box: null`. `readerContract.ts` accepts it, `transcript.ts` keeps the line as an item without a box, `reading.ts` rejects a value whose box would come from it with "no_source_box".
+
+**Requirement 38 (A Draft Value Waits for What Was Not Read, With the Right Reason):** `draft.ts`: one B10 function for the first build and `recomputeTotals`; 33A, 35 and 37A say when the HTS number was not read; a refused 33A makes 35 and 37A wait; 34A rules in a fixed order with the bill of lading weight and lines whose gross weight was not read.
+
+---
+
 ## Draft Rule Fixes (2026-11-23)
 
 **Requirement 31 (An Edited HTS Number Derives the Line's Quantity by the First Rule):** `draft.ts`: the 35 block of the line loop moves into one function (`deriveNetQuantity`) that the first build calls and that runs again for a line whose 33A a person changed to a number found in the schedule. The 35 code in the 33A person-value branch and in `recomputeTotals` that kept a computed value with the new unit, or computed any waiting 35 again without the difference check, goes away. A person's 35 stays unless the unit changes.
@@ -999,7 +1013,7 @@ export default function StitchBoard(...) {
 
 ## Correctness Properties
 
-*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 50 are defined below (50 in total).*
+*Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 55 are defined below (55 in total).*
 
 ### Property 1: Transcript Structure Preservation
 
@@ -1013,7 +1027,7 @@ For any transcript (array of non-empty lines with text and boxes in 0..1), the r
 
 ### Property 2: Confidence Always Rejects Low
 
-For any reading with `confidence: "low"`, `verifyReadings` SHALL reject the reading with `reason: "low_confidence"` and never become a copied value in the draft.
+For any reading with `confidence: "low"`, `verifyReadings` SHALL never accept it: it is "uncertain" when it passes every other check and rejected with that check's reason otherwise, and it never becomes a copied or computed value in the draft (Requirement 36).
 
 **Validates: Requirements 5.1**
 
@@ -1252,7 +1266,7 @@ For any content type other than "application/json" (with or without parameters) 
 **Validates: Requirements 28.1, 28.2, 28.3**
 
 ### Property 46: The Answer Room Stays Under the Line
-For any valid reader input, `estimateReaderCall(input).outputTokens` is between 8,000 and 16,000; the worst case is at most `perCall.maxCallCostNanoUsd` exactly when the input tokens are at most 68,000, and then outputTokens is the largest number up to 16,000 that keeps it so; `buildReaderRequest(input).max_tokens` equals outputTokens and the request has `thinking: { type: "disabled" }`; the Claude reader turns any transcript line whose "b" is 4 integers from 0 to 1000 into a box with each number divided by 1000, and refuses any other "b".
+For any valid reader input, `estimateReaderCall(input).outputTokens` is between 8,000 and 16,000; the worst case is at most `perCall.maxCallCostNanoUsd` exactly when the input tokens are at most 68,000, and then outputTokens is the largest number up to 16,000 that keeps it so; `buildReaderRequest(input).max_tokens` equals outputTokens and the request has `thinking: { type: "disabled" }`; the Claude reader turns any transcript line whose "b" is 4 integers from 0 to 1000 into a box with each number divided by 1000, and turns any other "b" into a line with no box (Requirement 37).
 **Validates: Requirements 29.1, 29.2, 29.4**
 
 ### Property 47: An Edit Never Makes an Unchecked Image Value Final
@@ -1272,6 +1286,26 @@ For the sample bundle with text pages or with every page an image, and any one p
 ### Property 50: A Quantity That Was Not Read Is Not Zero
 For the sample bundle with text pages and any set of the readings `packingList.lines.<n>.itemNo`, `packingList.lines.<n>.quantity`, `invoice.lines.<n>.itemNo`, `invoice.lines.<n>.quantity` and `invoice.lines.<n>.unit` given low confidence: no field reason contains "says 0 PCS"; every 35 with status "computed" has, for each of its invoice lines, accepted quantity, unit and item number readings, no not fully read packing list line with that item number, and fully read packing list lines with that item number whose quantities add up to the invoice quantity, and its value is the sum of its invoice quantities in its unit; when only packing list quantities were given low confidence, every 34A has the same status and value as without any change.
 **Validates: Requirements 33.1, 33.2, 33.3, 33.4**
+
+### Property 51: A Repeated Value Is Checked in Its Own Line
+For any text page built from 1 to 8 table rows, each with a unique item number cell and cells that repeat on other rows (a country code, a unit, a number), every line field reading whose quote is one repeated cell and whose value is that cell is accepted with the box of that cell in its own row; a quote that is in no cell of its row, or twice as a whole word in its row, is never accepted; and every reading accepted before the change keeps its box.
+**Validates: Requirements 34.1, 34.2, 34.3, 34.4**
+
+### Property 52: A Date Is Accepted Only for the Same Day
+For any day from 2000-01-01 to 2099-12-31 and any of the printed forms of Requirement 35.1 inside a quote that is on the page once, the MM/DD/YYYY value of that day is accepted for `invoice.date` and `billOfLading.onBoardDate`, and the value of any other day is rejected; for the dotted form the value that swaps day and month is rejected unless it is the same day.
+**Validates: Requirements 35.1**
+
+### Property 53: An Uncertain Value Is Never Used
+For the sample bundle with text pages and any set of readings given `confidence: "low"`: none of them is accepted; each is "uncertain" or rejected; and every field and check of the draft has the same status and value as in the draft where those readings are rejected, except B8, B12, B14 and B15 when they have the reason `LOW_CONFIDENCE_REVIEW_REASON`.
+**Validates: Requirements 36.1, 36.2, 36.3**
+
+### Property 54: A Bad Box Spoils Only Its Line
+For any image page transcript and any set of its lines given a bad "b" (a wrong count, a number that is not a whole number, a number out of 0 to 1000, or a box past the page), the Claude reader returns the answer; every reading whose quote lies only on good lines has the same status and box as with all lines good; every reading whose box would come from a bad line is rejected with "no_source_box".
+**Validates: Requirements 37.1, 37.2, 37.3**
+
+### Property 55: What Was Not Read Is Waited On
+For the sample bundle with text pages and any set of invoice lines whose origin readings are rejected, B10 has a value only when every line's 10 has one, and after person values of "PT" for every line 10 without a value, B10 has the value of today's rule for those codes; for any line and any refused 33A person value ("9999.99.9999" or "12345"), that line's 35, 37A and 38 have no value unless they are "personEdited".
+**Validates: Requirements 38.1, 38.3**
 
 ---
 
@@ -1379,6 +1413,6 @@ All tests are offline:
 
 ## Section Count
 
-**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (50 properties: 1 to 28, 33 to 50 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
+**Sections:** Overview, Architecture, Components and Interfaces (18 modules/functions), Data Models, Correctness Properties (55 properties: 1 to 28, 33 to 55 here, 29 to 32 in tasks 17 and 22), Error Handling, Testing Strategy.
 
-**Total Correctness Properties:** 50
+**Total Correctness Properties:** 55

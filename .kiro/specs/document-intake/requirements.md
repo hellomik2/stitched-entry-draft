@@ -88,7 +88,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 #### Acceptance Criteria
 
-1. WHEN a reader returns a field with `confidence: "low"`, the draft builder SHALL reject the reading with `reason: "low_confidence"` (a new `RejectReason` value).
+1. WHEN a reader returns a field with `confidence: "low"`, the draft builder SHALL reject the reading with `reason: "low_confidence"` (a new `RejectReason` value). (Replaced by Requirement 36.1: a low reading that passes every other check is "uncertain".)
 2. THE existing `RejectReason` values and their use remain unchanged: `unknown_document`, `page_out_of_range`, `value_missing`, `empty_quote`, `quote_not_found`, `quote_not_unique`, `value_not_in_quote`. Readings rejected for any of these reasons go to "Needs review" with the existing message text.
 3. A reading whose `confidence` field is missing (undefined or null, as in the sample `reading.json`) is treated as having passed confidence (confidence is not a rejection reason).
 4. IF a reading is rejected for any reason (including `low_confidence`), THE reading SHALL NOT become a copied value in the draft; instead it SHALL go to "Needs review" with the reason shown, exactly like today.
@@ -468,7 +468,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 #### Acceptance Criteria
 
 1. `buildReaderRequest` SHALL send `thinking: { type: "disabled" }` together with `output_config.effort: "low"` (Claude Haiku 5.5 accepts "disabled" at effort low, medium and high). Reading printed values needs no reasoning, and without thinking the size of the answer depends only on the documents.
-2. THE output schema SHALL ask for each transcript line as an object with exactly two properties: "t" (string, the line text) and "b" (array of integers: x, y, w, h of the line box in thousandths of the page width and height, origin top-left). The schema keeps `additionalProperties: false` and uses no `minimum`, `maximum`, `minItems` or `maxItems` (the API does not accept numeric and complex array constraints). `createClaudeReader` SHALL turn every line into the existing `{ text, box: { x, y, w, h } }` with each number divided by 1000 before `validateReaderOutput`. A line whose "b" is not exactly 4 integers from 0 to 1000 makes the answer invalid with the reason "transcripts[<i>].lines[<j>].b: must be 4 integers from 0 to 1000" (positions and fixed words only, Requirement 22.1). `ReaderOutput`, the fake reader, the recordings and every step after the reader stay as they are.
+2. THE output schema SHALL ask for each transcript line as an object with exactly two properties: "t" (string, the line text) and "b" (array of integers: x, y, w, h of the line box in thousandths of the page width and height, origin top-left). The schema keeps `additionalProperties: false` and uses no `minimum`, `maximum`, `minItems` or `maxItems` (the API does not accept numeric and complex array constraints). `createClaudeReader` SHALL turn every line into the existing `{ text, box: { x, y, w, h } }` with each number divided by 1000 before `validateReaderOutput`. A line whose "b" is not exactly 4 integers from 0 to 1000 makes the answer invalid with the reason "transcripts[<i>].lines[<j>].b: must be 4 integers from 0 to 1000" (positions and fixed words only, Requirement 22.1). `ReaderOutput`, the fake reader, the recordings and every step after the reader stay as they are. (Changed by Requirement 37.1: a line with a bad "b" keeps its text with no box.)
 3. THE system prompt SHALL describe the transcript line as "t" and "b" in thousandths, and SHALL say "Write the JSON on one line, with no indentation." (spaces and line breaks are output tokens too).
 4. `estimateReaderCall` output tokens SHALL be the output room under the per-call line: the largest whole number of tokens o for which `estimateCostNanoUsd(inputTokens, o)` is at most `perCall.maxCallCostNanoUsd`, capped at `intakeConfig.readerMaxOutputTokens` (16,000, the usual limit for a request that is not streamed) and never below the new `intakeConfig.readerMinOutputTokens` (8,000, the output size of the approved cost assumption). `buildReaderRequest(input)` SHALL send this number as `max_tokens`. The 413 rule of Requirement 17.3 does not change: with fewer than 8,000 tokens of room the worst case (with 8,000) is above the line and the call is refused, so an input that passes still has at most 68,000 input tokens and no call's worst case is above 0.0108 USD. Examples: 21,841 input tokens give 16,000; 60,000 give 9,600; 68,000 give 8,000; 68,001 are refused.
 5. THE time limit stays 45 seconds (Requirement 21.1). At the speed of the first call (8,000 tokens in about 28 seconds) about 12,000 output tokens fit in it, so 29.1 to 29.3 keep the answer short; the higher limit of 29.4 is room, not the target.
@@ -518,6 +518,87 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 34 (MUST): A Value That Repeats on the Page Is Checked in Its Own Line
+
+**User Story:** As an entry writer, I want a value that is printed on many lines (a country code, a unit, the same HTS number, a small count) to be checked in its own line, so that a right value is not refused only because the same text is printed elsewhere, and every value still points to one place.
+
+**Background:** In a real read of test bundle A, `verifyReadings` refused 15 right values with `quote_not_unique`: "PT" and "PCS" printed on every invoice line, "6913.90.5000" printed on invoice lines 1 and 5, and the carton counts "20", "24", "6" and the total "77" of the packing list, which also appear inside "1-20", "1,200" or "66-77".
+
+#### Acceptance Criteria
+
+1. WHEN a quote appears more than once on the page, `verifyReadings` SHALL count only its whole-word occurrences: the character before the occurrence is the start of the page text or a space, and the character after it is the end of the page text or a space. When the page has exactly one whole-word occurrence, the reading is checked at that occurrence (value inside the quote, box) as a quote found once is checked today. Example: on the packing list transcript of bundle A, "77" appears in "66-77" and in "TOTAL 77 4,980"; only the second is a whole word, so `packingList.totalCartons` is accepted with the box of the TOTAL line.
+2. WHEN the reading is a line field (`invoice.lines.<n>.<f>` or `packingList.lines.<n>.<f>`) and its quote has not exactly one whole-word occurrence on the page, THE check SHALL look in the row of line <n> only. The row comes from an anchor: the first of the same line's readings `itemNo`, `description` and `amount` whose own quote has exactly one occurrence, or exactly one whole-word occurrence, on the same page, and contains its own value; the anchor items are the page items that overlap that occurrence. On a text page the row is every item of the page whose box overlaps the vertical extent of the anchor items by at least half of the item's own height; on an image transcript page the row is the anchor items (each transcript line is a row). WHEN the quote has exactly one whole-word occurrence that starts inside a row item, the reading is checked at that occurrence. Example: on the bundle A invoice, the quote "PT" of `invoice.lines.3.origin` is checked in the row of "MCA-103" and gets the box of that row's "PT".
+3. WHEN no anchor is found, or the row has not exactly one such occurrence, THE reading SHALL be rejected with `quote_not_unique` and today's message.
+4. A reading that is accepted today keeps exactly the same status, items and box. Only readings that are rejected today with `quote_not_unique` can change.
+
+---
+
+### Requirement 35 (MUST): A Date in the Asked Form and a Quote Over Two Lines Are Checked Against the Page
+
+**User Story:** As an entry writer, I want a date that the reader wrote in the form the field list asks for, and an address that the reader quoted over two printed lines, to be checked against what is printed, so that right values are not refused for the form they were asked to take.
+
+**Background:** The field list asks the reader for `invoice.date` and `billOfLading.onBoardDate` in MM/DD/YYYY, but `verifyReadings` wants the value inside the quote, so "11/03/2026" with the quote "Date: 03 Nov 2026" and "11/05/2026" with "Shipped on board: 05 NOV 2026" were refused although right. The seller address printed on two lines in the left column of the invoice was quoted as one text, "Rua das Corujas 12, Vila Nevoa 0000-000 Portugal"; on a text page with two columns the two lines are not next to each other in the page text, so the quote was "not on the page", and the value had a comma where the line breaks.
+
+#### Acceptance Criteria
+
+1. FOR `invoice.date` and `billOfLading.onBoardDate`, WHEN the value is not inside the quote, `verifyReadings` SHALL accept the reading when the value is a real calendar date written MM/DD/YYYY, the quote passes the checks of being found and unique, and the quote holds exactly one printed date that names the same day without doubt. Printed dates without doubt: a day number, an English month name or its first three letters (any case) and a four-digit year, in the forms "03 Nov 2026", "03-NOV-2026", "Nov 03, 2026", "November 3, 2026" and "Nov 3 2026"; the form "2026-11-03"; and the form "09.11.2026" (dots: day, month, year). Other number-only dates ("03/11/2026" with the value "11/03/2026", "3/11/26") are not without doubt and stay `value_not_in_quote`. The box comes from the items that overlap the printed date inside the quote. Examples: "11/03/2026" with "Date: 03 Nov 2026" is accepted; "11/09/2026" with "Date: 09.11.2026" is accepted and "09/11/2026" with it is rejected (that date is the 9th of November); "02/30/2026" is rejected.
+2. `parseUsDate` and the 7501 Block 15 stay as they are.
+3. WHEN a quote is not found in the page text of a text page, `verifyReadings` SHALL try it over stacked lines: two to four page items where each next item is the nearest item below the previous one in the same column (its box top lies below the previous item's box top by at most twice the previous item's height, and its left edge is within 2 points of the first item's left edge), and whose texts joined with single spaces equal the quote. WHEN exactly one such run is on the page, the quote is found there and checked as a quote found once, with the box from the run's items.
+4. WHEN the items of a found quote lie on two or more rows (their boxes do not overlap vertically, as in a run of 35.3 or a quote over two transcript lines of an image page), the value SHALL also count as inside the quote when it reads ", " in place of the space where one row ends and the next begins. Example: the value "Rua das Corujas 12, Vila Nevoa, 0000-000 Portugal" with the run above is accepted with the box around both items.
+5. A reading that is accepted today keeps exactly the same status, items and box.
+
+---
+
+### Requirement 36 (MUST): A Value the Reader Was Not Sure Of Is Shown, Not Used
+
+**User Story:** As an entry writer, I want a value that the AI reader marked as not sure to stay visible with its place on the page, without being used in any count or total, so that I can check it instead of losing it.
+
+**Background:** The reader marked five values of bundle A "low": two net weights under a coffee stain, the handwritten quantity of packing list line 5, the printed quantity total and the total gross weight 1,248.0. Four were right. Today they are rejected like a value that is not on the page and disappear: every 34A says "No total gross weight was read from the packing list", so the difference of 1,248.0 kg (packing list) and 1,284.0 kg (bill of lading) that the entry writer must decide is never shown.
+
+#### Acceptance Criteria
+
+1. `verifyReadings` SHALL check a reading with `confidence: "low"` like any other reading. WHEN it fails a check, it is rejected with that check's reason. WHEN it passes every check, it SHALL get the new status "uncertain" with the box, items and origin an accepted reading would get, and the message "The AI reader was not sure of this value, so the draft does not use it. A person checks it on the page." `verifyReadings` no longer gives the reason "low_confidence" (the value may stay in the RejectReason type). This replaces Requirements 5.1 and 5.4 for low confidence; a missing confidence still counts as passed (Requirement 5.3).
+2. THE draft SHALL treat an "uncertain" reading like a rejected reading in every count, sum, comparison, check, grouping and computed value: every field and check of the draft has the same status and value as when that reading is rejected, except as 36.3 says, and only the reasons of 36.4 and Requirement 38.4 change.
+3. FOR the header fields B8 (`billOfLading.vessel`), B12 (`billOfLading.number`), B14 (`invoice.countryOfExport`) and B15 (`billOfLading.onBoardDate`), WHEN the reading is "uncertain" and the value converts as the copy does today (B12 passes the B/L number check, B14 gives a country code, B15 passes `parseUsDate`), the field SHALL have status "needsReview", the value the copy would have, the reading as its document source, and the reason `LOW_CONFIDENCE_REVIEW_REASON` = "The AI reader was not sure of this value. Check it against the page, then confirm it." The board shows the "Confirm this value" button for this reason as it does for `IMAGE_REVIEW_REASON`; confirming with the shown value makes the field "copied" with the note `CONFIRMED_NOTE`. When the value does not convert, the field is as today when the reading is rejected.
+4. Reasons that name an uncertain value:
+   a. WHEN `packingList.totalGrossKg` is "uncertain", every line's 34A SHALL have status "needsReview", no value, no sources but that reading, and the reason "The AI reader read the packing list total gross weight as <v> kg but was not sure, so it is not used. A person checks it and enters the gross weight." where <v> is the reading's value with spaces normalized; Requirement 38.4 adds the bill of lading weight to it.
+   b. WHEN the only packing list lines with the item number of an invoice line that are not fully read (Requirement 33.1) are not fully read only because their quantity reading is "uncertain", the reason of Requirement 33.2 (b) SHALL read "The AI reader read the quantity of packing list line <k> as <v> but was not sure, so invoice line <n> (<q> PCS) was not compared with the packing list. A person compares them." for one such line (with more lines: "of packing list lines <list> as <v1>, <v2>, ..."), and the check detail "packing list line <list> quantity not sure".
+   c. In the reason of L<nnn>.10, the part for an invoice line whose origin reading is "uncertain" SHALL read `Invoice line <n>: the AI reader read "<v>" but was not sure. A person checks it on the invoice.`; for a rejected origin reading it SHALL read `Invoice line <n>: the reader suggested "<v>" but it was rejected: <message>` with that reading's message (today it always says the quote is not on the page).
+5. THE board SHALL draw the box of an "uncertain" reading on its page with a dashed border, with `data-testid` "uncertain-box-<field>" and `data-reading` "<field>" (so a thread can reach it), and list the page's "uncertain" readings in a block with `data-testid` "uncertain-readings" above the rejected ones: the field name, the value in quotes, and "not sure, not used until a person checks it". Rejected readings stay in "rejected-readings"; accepted boxes keep `data-testid` "box-<field>".
+6. THE sample bundle (no confidence), the demo answers and the verifier's expected drafts of the sample are unchanged.
+
+---
+
+### Requirement 37 (MUST): One Bad Transcript Line Does Not Throw Away the Answer
+
+**User Story:** As an entry writer, I want the app to keep a paid answer when one transcript line has a bad box, so that I get every value that does not depend on that line.
+
+**Background:** A real read of test bundle B (an invoice PDF and a scanned bill of lading) was refused as a whole with "The reader answer was not valid: transcripts[0].lines[21].b: must be 4 integers from 0 to 1000" after the call was paid; the user got nothing.
+
+#### Acceptance Criteria
+
+1. THE Claude reader SHALL turn a transcript line whose "b" is not 4 integers from 0 to 1000, or whose box ends past the page (x + w or y + h over 1001 in thousandths), into a line with its text and `box: null`, instead of refusing the answer. A line whose "t" is not a string is left out of the transcript. Every other check of the answer (field names, documents, pages, confidence, a missing transcript for an image page) refuses the answer as today.
+2. `TranscriptLine.box` MAY be null. `validateReaderOutput` SHALL accept a line with `box: null` and check every other box as today. `transcriptToPageText` keeps such a line as a page item (its text in the page text as today) that is marked as having no box.
+3. WHEN `verifyReadings` would take the box of a reading from an item that has no box, THE reading SHALL be rejected with the reason "no_source_box" and the message "The value was found on a line of the image that the AI reader gave no usable place for, so there is nothing to point to." It goes to a person as every rejected reading does. Readings on other lines are checked as today.
+
+---
+
+### Requirement 38 (MUST): A Draft Value Waits for What Was Not Read, With the Right Reason
+
+**User Story:** As an entry writer, I want a value that depends on something not read to wait and to say what is missing, so that a value computed from part of the lines never looks final and I am not sent after the wrong problem.
+
+**Background:** With bundle A, the origins of four invoice lines were rejected and Block 10 became "computed" CN from the one line left. An HTS number that was not read gave the reasons "HTS number must be exactly 10 digits (got "")" and "the HTS number is not in the tariff schedule revision". When a person enters an HTS number that is not in the schedule, 33A waits but 35, 37A and 38 keep the values of the old number. When a packing list line's gross weight was not read, 34A says the line sum "differs" from the total.
+
+#### Acceptance Criteria
+
+1. WHEN any 7501 line's 10 has no value, B10 SHALL have status "needsReview", no value, the inputs of today, and the reason "Waiting on <the ids of the line 10 fields with no value, joined with ", ">." Otherwise B10 is built as today (one code: "computed" with that code; several: "computed" "MULTI"). THE first build and `recomputeTotals` SHALL use one function for B10, so that B10 is built again after person values unless it is "personEdited". Example: the line 10 values of L001, L002, L003 and L005 missing give "Waiting on L001.10, L002.10, L003.10, L005.10."; after a person enters "PT" in each, B10 is "computed" "MULTI".
+2. WHEN none of the invoice lines of a 7501 line has an accepted HTS reading, L<nnn>.33A SHALL have status "needsReview", no value, and the reason made of one part per invoice line n of the 7501 line, joined with " ", then " A person reads it on the invoice. The app does not choose a number.": no reading of `invoice.lines.<n>.hts`: "The HTS number of invoice line <n> was not read."; a rejected reading: `Invoice line <n>: the reader suggested "<v>" but it was rejected: <message>`; an "uncertain" reading: `Invoice line <n>: the AI reader read "<v>" but was not sure.` The line's 35 and 37A then wait with the reason "Waiting on L<nnn>.33A: the HTS number was not read." (instead of "...is not in the tariff schedule revision."). An HTS number that was read and is not in the schedule keeps today's reasons.
+3. WHEN a person's value for L<nnn>.33A is refused (not a 10-digit number or not in the schedule), L<nnn>.35 and L<nnn>.37A that are not "personEdited" SHALL have status "needsReview", no value, and the reason "Waiting on L<nnn>.33A: the HTS number a person entered was not accepted."; L<nnn>.38 then waits on 37A by Requirement 32.2. Example on the sample text pages: L001.33A "9999.99.9999" gives L001.35 and L001.37A no value and L001.38 "Waiting on L001.37A.".
+4. THE line 34A fields SHALL follow these rules in this order, each giving every line's 34A status "needsReview", no value and the reason shown: (a) the total gross weight was not read (no reading, rejected, or not a weight): today's reason; "uncertain": the reason of 36.4a, where, WHEN `billOfLading.grossKg` is accepted or "uncertain" and its weight differs from <v> by more than 0.1 kg, the sentence "The bill of lading says <b> kg." comes before "A person checks it and enters the gross weight." (<b> as printed, spaces normalized); (b) the total gross weight is accepted, `billOfLading.grossKg` is accepted or "uncertain", and the two weights differ by more than 0.1 kg: "The packing list total gross weight (<p> kg) differs from the bill of lading (<b> kg). A person decides." (<p> and <b> with one decimal, as the reason of today's sum difference writes weights); (c) a packing list line has at least one reading but no accepted item number or no accepted gross weight that parses: "The gross weight of packing list line <list> was not read or the AI reader was not sure of it, so the total cannot be split over the 7501 lines. A person enters the gross weight."; (d) the line sums differ from the total: today's reason. Otherwise the allocation is as today. Example for bundle A: (a) gives "The AI reader read the packing list total gross weight as 1,248.0 kg but was not sure, so it is not used. The bill of lading says 1,284.0 kg. A person checks it and enters the gross weight."
+5. THE sample bundle with or without the demo answers and the verifier's expected drafts of the sample are unchanged. In the upload test recordings only the reasons these rules name change (the packing list line 3 gross weight there is marked low, so its 34A reason follows 38.4 (c)).
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -555,6 +636,11 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 31. (MUST) An Edited HTS Number Derives the Line's Quantity by the First Rule
 32. (MUST) A Value That Cannot Be Computed From What the Draft Has Now Waits
 33. (MUST) A Quantity That Was Not Read Is Not Zero
+34. (MUST) A Value That Repeats on the Page Is Checked in Its Own Line
+35. (MUST) A Date in the Asked Form and a Quote Over Two Lines Are Checked Against the Page
+36. (MUST) A Value the Reader Was Not Sure Of Is Shown, Not Used
+37. (MUST) One Bad Transcript Line Does Not Throw Away the Answer
+38. (MUST) A Draft Value Waits for What Was Not Read, With the Right Reason
 
 **NICE (if time is left):**
 

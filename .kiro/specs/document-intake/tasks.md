@@ -304,6 +304,25 @@
 - [x] 45. (maintainer) Verifier item for Requirement 33; the real read of a test bundle (recorded answer) reproduces before and passes after
   - _Requirements: 33_
 
+- [ ] 46. A value that repeats on the page, a date in the asked form and a quote over two lines are checked against the page
+  - [ ] 46.1 Tests that fail on the current code: the repeated invoice cells and packing list counts, the two dates and a dotted date, the two-line address; Property 51 and 52 tests
+  - [ ] 46.2 `reading.ts`: whole-word occurrences, the row of the line's anchor, the date reader, stacked lines and the ", " at a row change
+  - _Requirements: 34, 35_
+- [ ] 47. A value the reader was not sure of is shown, not used
+  - [ ] 47.1 Tests that fail on the current code: low readings that pass the checks are "uncertain", B8 to B15 with the new reason and the confirm button, the 34A, 35 and 10 reasons; Property 53 test
+  - [ ] 47.2 `reading.ts` status "uncertain"; `draft.ts` reasons and header fields; `StitchBoard.tsx` dashed boxes, the list and the confirm button
+  - _Requirements: 36_
+- [ ] 48. One bad transcript line does not throw away the answer
+  - [ ] 48.1 Tests that fail on the current code: a bad "b" of one line keeps the answer, the line's value is rejected with "no_source_box", other values are accepted; Property 54 test
+  - [ ] 48.2 `claudeReader.ts` answer parsing, `readerContract.ts`, `transcript.ts`, `reading.ts`
+  - _Requirements: 37_
+- [ ] 49. A draft value waits for what was not read, with the right reason
+  - [ ] 49.1 Tests that fail on the current code: B10 with missing origins and after person values, 33A not read, a refused 33A, the 34A rules; Property 55 test
+  - [ ] 49.2 `draft.ts`: one B10 function, the 33A, 35 and 37A reasons, 35 and 37A after a refused 33A, the 34A order
+  - _Requirements: 38_
+- [ ] 50. (maintainer) Verifier items for Requirements 34 to 38; the recorded real answer of bundle A replayed before and after
+  - _Requirements: 34, 35, 36, 37, 38_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -352,5 +371,10 @@
 43. (maintainer) Verifier items for Requirements 31 and 32; reproduction scripts fail before and pass after
 44. A quantity that was not read is not zero
 45. (maintainer) Verifier item for Requirement 33; the real read of a test bundle (recorded answer) reproduces before and passes after
+46. A value that repeats on the page, a date in the asked form and a quote over two lines are checked against the page
+47. A value the reader was not sure of is shown, not used
+48. One bad transcript line does not throw away the answer
+49. A draft value waits for what was not read, with the right reason
+50. (maintainer) Verifier items for Requirements 34 to 38; the recorded real answer of bundle A replayed before and after
 
-**Total Sub-Tasks:** 194
+**Total Sub-Tasks:** 202
