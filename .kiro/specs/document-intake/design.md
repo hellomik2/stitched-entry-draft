@@ -1313,6 +1313,10 @@ For any image page transcript and any set of its lines given a bad "b" (a wrong 
 For the sample bundle with text pages and any set of invoice lines whose origin readings are rejected, B10 has a value only when every line's 10 has one or the line 10 values hold two or more different codes, and after person values of "PT" for every line 10 without a value, B10 has the value of today's rule for those codes; for any line and any refused 33A person value ("9999.99.9999" or "12345"), that line's 35, 37A and 38 have no value unless they are "personEdited".
 **Validates: Requirements 38.1, 38.3**
 
+### Property 56: A Thousands Comma Does Not Change a Weight
+For any weight from 0 to 99,999,999.9 kg written with or without thousands commas, with or without " kg", `parseKgToTenths` gives the same tenths; a comma before the last two digits of the integer part is never read.
+**Validates: Requirements 40.1**
+
 ---
 
 ## Error Handling

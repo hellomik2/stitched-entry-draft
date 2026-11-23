@@ -327,6 +327,11 @@
   - [x] 51.2 `reading.ts` `lineText`; `StitchBoard.tsx` dashed boxes with `data-approx`, the "AI estimate" label, the note above an image page, the transcript line in the source strip
   - _Requirements: 39_
 
+- [x] 52. A weight or package count with thousands commas is read
+  - [x] 52.1 Tests that fail on the current code: weights and package counts with thousands commas, misplaced commas, the draft checks and 34A of the sample with weights over 1,000 kg; Property 56 test
+  - [x] 52.2 `parse.ts`: `parseKgToTenths` and `parsePackages` read thousands commas; `draft.ts`: the local comma helper is no longer needed
+  - _Requirements: 40_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -381,5 +386,6 @@
 49. A draft value waits for what was not read, with the right reason
 50. (maintainer) Verifier items for Requirements 34 to 38; the recorded real answer of bundle A replayed before and after
 51. A box on a photo or scan shows the AI reader's estimated place
+52. A weight or package count with thousands commas is read
 
 **Total Sub-Tasks:** 204

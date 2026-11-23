@@ -614,6 +614,21 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 40 (MUST): A Weight or Package Count With Thousands Commas Is Read
+
+**User Story:** As an entry writer, I want "1,248.0 kg" and "1,200 CTNS" read as the numbers they are, so that the weight checks and the 34A split work for shipments over 1,000 kg.
+
+**Background:** `parseMoneyToCents` and `parseCount` read thousands commas; `parseKgToTenths` and `parsePackages` did not. An accepted total gross weight "1,248.0" counted as "not a weight", so every 34A said "No total gross weight was read", and the bill of lading weight "1,284.0" was never compared.
+
+#### Acceptance Criteria
+
+1. `parseKgToTenths` SHALL read an integer part written with thousands commas in groups of three (one to three digits, then one or more groups of a comma and three digits) as well as plain digits, with the optional single decimal and the optional "kg" as today. Examples: "1,248.0" gives 12480 tenths, "12,345.6 kg" gives 123456. A comma anywhere else ("1,24.8", "12,34", ",123.4", "1,2345.0") stays not a weight.
+2. `parsePackages` SHALL read the count in the same two forms: "1,200 CTNS" gives 1200; "1,20 CTNS" is refused.
+3. `parseMoneyToCents` and `parseCount` stay as they are (they already read thousands commas in groups of three). Person values of 34A and 35 keep their pattern. The sample bundle, its CSV and the verifier's expected drafts are unchanged.
+4. THE packing list sum checks `P3.packing.gross`, `P3.packing.net` and `P3.packing.cartons` SHALL not add up part of the lines: WHEN a packing list line has at least one reading but no accepted gross weight (net weight, carton count) that parses, the check has ok false and the detail "packing list line <list> gross weight not read or not sure" ("net weight", "cartons" for the other two), not a line sum that leaves the line out. Example: once "1,103.0" is read, the real read of bundle A (net weights of lines 2 and 3 not sure) gives "packing list line 2, 3 net weight not read or not sure" instead of "line sum = 512.0, total = 1103.0".
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -657,6 +672,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 37. (MUST) One Bad Transcript Line Does Not Throw Away the Answer
 38. (MUST) A Draft Value Waits for What Was Not Read, With the Right Reason
 39. (MUST) A Box on a Photo or Scan Shows the AI Reader's Estimated Place
+40. (MUST) A Weight or Package Count With Thousands Commas Is Read
 
 **NICE (if time is left):**
 
