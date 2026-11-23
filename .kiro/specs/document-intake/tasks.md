@@ -332,18 +332,18 @@
   - [x] 52.2 `parse.ts`: `parseKgToTenths` and `parsePackages` read thousands commas; `draft.ts`: the local comma helper is no longer needed
   - _Requirements: 40_
 
-- [ ] 53. A paid call always leaves a usage record, the cost top-up waits and tries again, and a store error is judged by its status
-  - [ ] 53.1 Tests that fail on the current code: a refused record write (403, real library with a fake fetch), token counts that are not integers, top-up after conflicts with waits, a 503 with an ETag on the conditional PUT; the existing top-up tests that expect 3 tries follow Requirement 42.1; Property 57 and 58 tests
-  - [ ] 53.2 `usageStoreBlobs.ts`: `appendRecord` checks the result, `dropEtagOnError`, `getStore` gets the `fetch`; `usageStore.ts`: `UsageStateConflictError`; `intakeService.ts`: the record log line, the record cost for counts that are not integers, top-up tries with waits (`ReadDeps.sleep`)
+- [x] 53. A paid call always leaves a usage record, the cost top-up waits and tries again, and a store error is judged by its status
+  - [x] 53.1 Tests that fail on the current code: a refused record write (403, real library with a fake fetch), token counts that are not integers, top-up after conflicts with waits, a 503 with an ETag on the conditional PUT; the existing top-up tests that expect 3 tries follow Requirement 42.1; Property 57 and 58 tests
+  - [x] 53.2 `usageStoreBlobs.ts`: `appendRecord` checks the result, `dropEtagOnError`, `getStore` gets the `fetch`; `usageStore.ts`: `UsageStateConflictError`; `intakeService.ts`: the record log line, the record cost for counts that are not integers, top-up tries with waits (`ReadDeps.sleep`)
   - _Requirements: 41, 42_
 
-- [ ] 54. The "AI estimate" label does not cover the page text
-  - [ ] 54.1 `StitchBoard.tsx` and `globals.css`: the label beside the box with `data-label-side`
+- [x] 54. The "AI estimate" label does not cover the page text
+  - [x] 54.1 `StitchBoard.tsx` and `globals.css`: the label beside the box with `data-label-side`
   - _Requirements: 43_
 
-- [ ] 55. A CSV number keeps its sign, and Block 9 waits without a container number
-  - [ ] 55.1 Tests that fail on the current code: plain numbers without the quote, "+5V adapter" and "=HYPERLINK(...)" with it, all through `draftToCsv`; Property 59; B9 when the container number is removed, rejected or not sure
-  - [ ] 55.2 `csv.ts`: the plain-number exception; `draft.ts`: the B9 rule
+- [x] 55. A CSV number keeps its sign, and Block 9 waits without a container number
+  - [x] 55.1 Tests that fail on the current code: plain numbers without the quote, "+5V adapter" and "=HYPERLINK(...)" with it, all through `draftToCsv`; Property 59; B9 when the container number is removed, rejected or not sure
+  - [x] 55.2 `csv.ts`: the plain-number exception; `draft.ts`: the B9 rule
   - _Requirements: 44_
 
 ## Summary
