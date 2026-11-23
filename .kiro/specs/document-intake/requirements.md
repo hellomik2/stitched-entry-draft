@@ -669,6 +669,20 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 44 (MUST): A CSV Number Keeps Its Sign, and Block 9 Waits Without a Container Number
+
+**User Story:** As an entry writer, I want "-12" in the CSV to stay "-12", and Block 9 not to say that the bill of lading lists a container when no container number was read, so that the draft says only what the documents show.
+
+**Background:** Every CSV cell that started with "+" or "-" got a leading quote, also plain numbers, and the tests of Property 45 repeated the rule inside the test instead of reading the real `draftToCsv` output. B9 was "11" computed with the note "Vessel, containerized: the B/L lists a container." also when the container number was not read or was rejected.
+
+#### Acceptance Criteria
+
+1. THE CSV SHALL NOT add the leading quote to a cell that is a plain number: an optional "+" or "-", then digits (plain, or one to three digits followed by groups of a comma and three digits), then optionally "." and digits. Examples: "-12", "+5", "-1,234.50" stay as they are. Every other cell that starts with "=", "+", "-", "@", a tab or a carriage return keeps the leading quote: "+5V adapter" gives "'+5V adapter" (a spreadsheet would read it as a formula) and "=HYPERLINK(...)" gives "'=HYPERLINK(...)".
+2. THE tests of Property 45 SHALL put the value into a field of the sample draft and read the cell back from the real `draftToCsv` output with `parseCsv`, not repeat the rule inside the test.
+3. WHEN the bill of lading container number has no accepted reading (not read, rejected, or not sure), B9 SHALL be needsReview with no value, no rule, no note and the reason "The container number on the bill of lading was not read, so the mode of transport is not known. A person checks the bill of lading." WHEN it is accepted, B9 stays as today ("11", computed, rule "7501 p.8", the container reading as its source; a value from an image waits for a person by Requirement 26). The sample bundle, its CSV and the verifier's expected drafts are unchanged.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -716,6 +730,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 41. (MUST) A Paid Call Always Leaves a Usage Record
 42. (MUST) The Cost Top-Up Waits and Tries Again, and a Store Error Is Judged by Its Status
 43. (MUST) The "AI estimate" Label Does Not Cover the Page Text
+44. (MUST) A CSV Number Keeps Its Sign, and Block 9 Waits Without a Container Number
 
 **NICE (if time is left):**
 

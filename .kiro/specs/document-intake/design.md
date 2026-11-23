@@ -1325,6 +1325,10 @@ For any outcome of a claude-mode call (valid answer, invalid answer, reader erro
 For any number k from 0 to 5 of top-up tries that meet a changed state before a write that succeeds, `reservedCostNanoUsd` ends at the reservation plus (actual cost - reserved worst case), added once; for k = 6 or more it ends at the reservation and "usage cost top-up not written" is logged once; a try that fails with another error ends the top-up after that try.
 **Validates: Requirements 42.1**
 
+### Property 59: A Plain Number Keeps Its Sign and No Other Cell Starts a Formula
+For any string put into a field of the sample draft, the cell read back from `draftToCsv` is the string itself when it is a plain number or does not start with "=", "+", "-", "@", a tab or a carriage return, and "'" followed by the string otherwise.
+**Validates: Requirements 44.1, 44.2**
+
 ---
 
 ## Error Handling

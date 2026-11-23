@@ -341,6 +341,11 @@
   - [ ] 54.1 `StitchBoard.tsx` and `globals.css`: the label beside the box with `data-label-side`
   - _Requirements: 43_
 
+- [ ] 55. A CSV number keeps its sign, and Block 9 waits without a container number
+  - [ ] 55.1 Tests that fail on the current code: plain numbers without the quote, "+5V adapter" and "=HYPERLINK(...)" with it, all through `draftToCsv`; Property 59; B9 when the container number is removed, rejected or not sure
+  - [ ] 55.2 `csv.ts`: the plain-number exception; `draft.ts`: the B9 rule
+  - _Requirements: 44_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -398,5 +403,6 @@
 52. A weight or package count with thousands commas is read
 53. A paid call always leaves a usage record, the cost top-up waits and tries again, and a store error is judged by its status
 54. The "AI estimate" label does not cover the page text
+55. A CSV number keeps its sign, and Block 9 waits without a container number
 
 **Total Sub-Tasks:** 204
