@@ -269,17 +269,17 @@
   - [x] 36.4 Property 45 test
   - _Requirements: 28_
 
-- [ ] 37. The reader's answer fits in one call
-  - [ ] 37.1 `intakeConfig` (`readerMaxOutputTokens` 16000, `readerMinOutputTokens` 8000) and the output room in `estimateReaderCall`; `buildReaderRequest` sends it as `max_tokens`
-  - [ ] 37.2 `buildReaderRequest`: `thinking: { type: "disabled" }`, `{ t, b }` transcript lines in the schema and the system prompt, the JSON on one line; `createClaudeReader` converts `{ t, b }` before validation
-  - [ ] 37.3 Property 46 test; tests that expected 8,000 follow Requirement 29.4
+- [x] 37. The reader's answer fits in one call
+  - [x] 37.1 `intakeConfig` (`readerMaxOutputTokens` 16000, `readerMinOutputTokens` 8000) and the output room in `estimateReaderCall`; `buildReaderRequest` sends it as `max_tokens`
+  - [x] 37.2 `buildReaderRequest`: `thinking: { type: "disabled" }`, `{ t, b }` transcript lines in the schema and the system prompt, the JSON on one line; `createClaudeReader` converts `{ t, b }` before validation
+  - [x] 37.3 Property 46 test; tests that expected 8,000 follow Requirement 29.4
   - _Requirements: 29_
-- [ ] 38. A value computed again after a person's edit still waits
-  - [ ] 38.1 A test that fails on the current code: all-image sample, edit only L001.33A, L001.35 must wait
-  - [ ] 38.2 `draft.ts`: the pass of Requirement 30.1 after `recomputeTotals`
-  - [ ] 38.3 Property 47 test
+- [x] 38. A value computed again after a person's edit still waits
+  - [x] 38.1 A test that fails on the current code: all-image sample, edit only L001.33A, L001.35 must wait
+  - [x] 38.2 `draft.ts`: the pass of Requirement 30.1 after `recomputeTotals`
+  - [x] 38.3 Property 47 test
   - _Requirements: 30_
-- [ ] 39. (maintainer) Verifier items for Requirements 29 and 30; the checks that expected 8,000 output tokens expect the output room
+- [x] 39. (maintainer) Verifier items for Requirements 29 and 30; the checks that expected 8,000 output tokens expect the output room
   - _Requirements: 29, 30_
 
 ## Summary
