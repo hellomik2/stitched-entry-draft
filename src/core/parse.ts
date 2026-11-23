@@ -96,7 +96,8 @@ export function parseCount(text: string): RuleResult<number> {
 /**
  * Parse weight in kg to tenths (stored as integer tenths).
  * Optional trailing "kg"; at most one decimal place.
- * Examples: "286.2" -> 2862 (tenths), "48.0" -> 480, "1.25" -> NeedsReview
+ * Thousands commas in groups of three are read (e.g., "1,248.0" -> 12480).
+ * Examples: "286.2" -> 2862 (tenths), "48.0" -> 480, "1,248.0" -> 12480, "1.25" -> NeedsReview
  */
 export function parseKgToTenths(text: string): RuleResult<number> {
   if (typeof text !== "string") {
@@ -113,14 +114,14 @@ export function parseKgToTenths(text: string): RuleResult<number> {
     trimmed = trimmed.slice(0, -2).trim();
   }
 
-  // Match: digits with at most one decimal
-  const kgRegex = /^(\d+)(?:\.(\d))?$/;
+  // Match: digits with optional thousands commas (groups of three) and at most one decimal
+  const kgRegex = /^(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d))?$/;
   const match = trimmed.match(kgRegex);
   if (!match) {
     return { ok: false, reason: `Invalid weight format: "${text}"` };
   }
 
-  const intPart = parseInt(match[1], 10);
+  const intPart = parseInt(match[1].replace(/,/g, ""), 10);
   const decimalPart = match[2] ? parseInt(match[2], 10) : 0;
 
   const tenths = intPart * 10 + decimalPart;
@@ -135,7 +136,8 @@ export function parseKgToTenths(text: string): RuleResult<number> {
 /**
  * Parse package count and unit.
  * Accepts: CTN, CTNS, CARTON, CARTONS, PKG, PKGS, PACKAGE, PACKAGES (case-insensitive).
- * Examples: "37 CTNS" -> 37, "50 PACKAGE" -> 50
+ * Thousands commas in groups of three are read (e.g., "1,200 CTNS" -> 1200).
+ * Examples: "37 CTNS" -> 37, "50 PACKAGE" -> 50, "1,200 CTNS" -> 1200
  */
 export function parsePackages(text: string): RuleResult<number> {
   if (typeof text !== "string") {
@@ -147,9 +149,9 @@ export function parsePackages(text: string): RuleResult<number> {
     return { ok: false, reason: "Packages text is empty" };
   }
 
-  // Match: number followed by optional whitespace and unit
+  // Match: number with optional thousands commas followed by optional whitespace and unit
   const packagesRegex =
-    /^(\d+)\s*(?:CTN|CTNS|CARTON|CARTONS|PKG|PKGS|PACKAGE|PACKAGES)?$/i;
+    /^(\d{1,3}(?:,\d{3})+|\d+)\s*(?:CTN|CTNS|CARTON|CARTONS|PKG|PKGS|PACKAGE|PACKAGES)?$/i;
   const match = trimmed.match(packagesRegex);
   if (!match) {
     return {
@@ -158,7 +160,7 @@ export function parsePackages(text: string): RuleResult<number> {
     };
   }
 
-  const count = parseInt(match[1], 10);
+  const count = parseInt(match[1].replace(/,/g, ""), 10);
 
   if (!Number.isSafeInteger(count)) {
     return { ok: false, reason: "Package count is not a safe integer" };

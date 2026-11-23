@@ -170,14 +170,6 @@ function acceptedReadings(verified: VerifiedReading[]): Map<string, VerifiedRead
 }
 
 /**
- * Helper: parse kg with thousands comma support (e.g., "1,284.0").
- * Removes thousands commas before parsing.
- */
-function kgTenthsForCompare(text: string) {
-  return parseKgToTenths(normalizeSpace(text).replace(/,(?=\d{3}(?!\d))/g, ""));
-}
-
-/**
  * Build a draft for CBP Form 7501.
  * Part 1: checks, header (except B10), rejectedReadings.
  */
@@ -474,6 +466,10 @@ export function buildDraft(input: {
   let packingGrossSum = 0,
     packingNetSum = 0,
     packingCartonSum = 0;
+  const grossNotUsed: number[] = [];
+  const netNotUsed: number[] = [];
+  const cartonsNotUsed: number[] = [];
+
   for (let n = 1; n <= 8; n++) {
     const gField = `packingList.lines.${n}.grossKg`;
     const nField = `packingList.lines.${n}.netKg`;
@@ -483,17 +479,36 @@ export function buildDraft(input: {
     const nReading = accepted.get(nField);
     const cReading = accepted.get(cField);
 
+    // Check if line has at least one reading
+    const hasReading = verified.some(
+      (r) =>
+        r.field.startsWith(`packingList.lines.${n}.grossKg`) ||
+        r.field.startsWith(`packingList.lines.${n}.netKg`) ||
+        r.field.startsWith(`packingList.lines.${n}.cartons`)
+    );
+
     if (gReading && gReading.value) {
       const gResult = parseKgToTenths(normalizeSpace(gReading.value));
       if (gResult.ok) packingGrossSum += gResult.value;
+      else if (hasReading) grossNotUsed.push(n);
+    } else if (hasReading) {
+      grossNotUsed.push(n);
     }
+
     if (nReading && nReading.value) {
       const nResult = parseKgToTenths(normalizeSpace(nReading.value));
       if (nResult.ok) packingNetSum += nResult.value;
+      else if (hasReading) netNotUsed.push(n);
+    } else if (hasReading) {
+      netNotUsed.push(n);
     }
+
     if (cReading && cReading.value) {
       const cResult = parseCount(normalizeSpace(cReading.value));
       if (cResult.ok) packingCartonSum += cResult.value;
+      else if (hasReading) cartonsNotUsed.push(n);
+    } else if (hasReading) {
+      cartonsNotUsed.push(n);
     }
   }
 
@@ -509,7 +524,10 @@ export function buildDraft(input: {
         rule: "P3",
         label: "Packing list gross weight",
         ok: Math.abs(packingGrossSum - totalGrossResult.value) <= 1, // Within 1 tenth
-        detail: `line sum = ${(packingGrossSum / 10).toFixed(1)}, total = ${(totalGrossResult.value / 10).toFixed(1)}`,
+        detail:
+          grossNotUsed.length > 0
+            ? `packing list line ${grossNotUsed.join(", ")} gross weight not read or not sure`
+            : `line sum = ${(packingGrossSum / 10).toFixed(1)}, total = ${(totalGrossResult.value / 10).toFixed(1)}`,
       });
     }
   }
@@ -522,7 +540,10 @@ export function buildDraft(input: {
         rule: "P3",
         label: "Packing list net weight",
         ok: Math.abs(packingNetSum - totalNetResult.value) <= 1, // Within 1 tenth
-        detail: `line sum = ${(packingNetSum / 10).toFixed(1)}, total = ${(totalNetResult.value / 10).toFixed(1)}`,
+        detail:
+          netNotUsed.length > 0
+            ? `packing list line ${netNotUsed.join(", ")} net weight not read or not sure`
+            : `line sum = ${(packingNetSum / 10).toFixed(1)}, total = ${(totalNetResult.value / 10).toFixed(1)}`,
       });
     }
   }
@@ -535,7 +556,10 @@ export function buildDraft(input: {
         rule: "P3",
         label: "Packing list cartons",
         ok: packingCartonSum === totalCartonResult.value,
-        detail: `line sum = ${packingCartonSum}, total = ${totalCartonResult.value}`,
+        detail:
+          cartonsNotUsed.length > 0
+            ? `packing list line ${cartonsNotUsed.join(", ")} cartons not read or not sure`
+            : `line sum = ${packingCartonSum}, total = ${totalCartonResult.value}`,
       });
     }
   }
@@ -2053,8 +2077,8 @@ export function buildDraft(input: {
             const bilReading = verified.find((r) => r.field === "billOfLading.grossKg" && (r.status === "accepted" || r.status === "uncertain"));
             if (bilReading && bilReading.value) {
               const bilValue = normalizeSpace(bilReading.value ?? "");
-              const bilParsed = kgTenthsForCompare(bilValue);
-              const pkgParsed = kgTenthsForCompare(readValue);
+              const bilParsed = parseKgToTenths(normalizeSpace(bilValue));
+              const pkgParsed = parseKgToTenths(normalizeSpace(readValue));
               if (bilParsed.ok && pkgParsed.ok && Math.abs(bilParsed.value - pkgParsed.value) > 1) {
                 reason = `The AI reader read the packing list total gross weight as ${readValue} kg but was not sure, so it is not used. The bill of lading says ${bilValue} kg. A person checks it and enters the gross weight.`;
               }
@@ -2114,7 +2138,7 @@ export function buildDraft(input: {
       // Rule 38.4: Check gross weight allocation rules in order
       // (b) total accepted, billOfLading.grossKg accepted/uncertain, weights differ by > 0.1 kg
       const bilReading = verified.find((r) => r.field === "billOfLading.grossKg" && (r.status === "accepted" || r.status === "uncertain"));
-      const bilParsed = bilReading && bilReading.value ? kgTenthsForCompare(bilReading.value) : null;
+      const bilParsed = bilReading && bilReading.value ? parseKgToTenths(normalizeSpace(bilReading.value)) : null;
       const bilDiffers = !!bilParsed && bilParsed.ok && Math.abs(bilParsed.value - totalTenths) > 1;
 
       // (c) a packing list line has at least one reading but no accepted item number or no accepted gross weight
