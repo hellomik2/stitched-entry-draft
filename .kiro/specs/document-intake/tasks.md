@@ -377,32 +377,32 @@
 - [x] 62. (maintainer) The two code tables extracted from the CBP PDFs; verifier items for Requirements 47 to 49; the sample's expected drafts, Needs review counts and CSV fingerprint updated
   - _Requirements: 47, 48, 49_
 
-- [ ] 63. A value read from an image line that is not in the transcript waits for a person
-  - [ ] 63.1 Tests that fail on the current code: the bundle C recording through `verifyReadings` (57 uncertain with no box, 1 rejected with value_not_in_quote, 5 accepted), Property 68, Property 69, the bundle C draft (values with the unplaced reasons, confirming, the same values as with boxes), Property 70, low confidence with no box, the CSV source
-  - [ ] 63.2 `src/core/reading.ts`, `draft.ts`, `csv.ts`, `index.ts`
+- [x] 63. A value read from an image line that is not in the transcript waits for a person
+  - [x] 63.1 Tests that fail on the current code: the bundle C recording through `verifyReadings` (57 uncertain with no box, 1 rejected with value_not_in_quote, 5 accepted), Property 68, Property 69, the bundle C draft (values with the unplaced reasons, confirming, the same values as with boxes), Property 70, low confidence with no box, the CSV source
+  - [x] 63.2 `src/core/reading.ts`, `draft.ts`, `csv.ts`, `index.ts`
   - _Requirements: 50.1 to 50.5, 50.7_
 
-- [ ] 64. The reader writes the transcripts first and counts the packing list lines
-  - [ ] 64.1 Tests that fail on the current code: the schema order, the prompt paragraphs, `packingListLineCount` in the validator, the answer and the reading answer, the check "P3.packing.lines"
-  - [ ] 64.2 `src/server/claudeReader.ts`, `src/core/readerContract.ts`, `reading.ts`, `draft.ts`, `StitchBoard.tsx`
+- [x] 64. The reader writes the transcripts first and counts the packing list lines
+  - [x] 64.1 Tests that fail on the current code: the schema order, the prompt paragraphs, `packingListLineCount` in the validator, the answer and the reading answer, the check "P3.packing.lines"
+  - [x] 64.2 `src/server/claudeReader.ts`, `src/core/readerContract.ts`, `reading.ts`, `draft.ts`, `StitchBoard.tsx`
   - _Requirements: 51_
 
-- [ ] 65. Every country name and code, and the printed date forms, reach the draft
-  - [ ] 65.1 Tests that fail on the current code: `countryCode` for names and codes, Property 71, `parseDocumentDate`, B14, B15 and L<nnn>.10 for an accepted "Germany", "12-NOV-2026" and an unknown origin
-  - [ ] 65.2 `src/core/parse.ts`, `reading.ts`, `draft.ts`
+- [x] 65. Every country name and code, and the printed date forms, reach the draft
+  - [x] 65.1 Tests that fail on the current code: `countryCode` for names and codes, Property 71, `parseDocumentDate`, B14, B15 and L<nnn>.10 for an accepted "Germany", "12-NOV-2026" and an unknown origin
+  - [x] 65.2 `src/core/parse.ts`, `reading.ts`, `draft.ts`
   - _Requirements: 52_
 
-- [ ] 66. The board: no box for a value outside the transcript, and the page above the lists
-  - [ ] 66.1 Board checks that fail on the current code: the bundle C upload with its recorded answer (the uncertain list, no box, the source strip, Confirm this value), the page image in view above the lists
-  - [ ] 66.2 `StitchBoard.tsx`
+- [x] 66. The board: no box for a value outside the transcript, and the page above the lists
+  - [x] 66.1 Board checks that fail on the current code: the bundle C upload with its recorded answer (the uncertain list, no box, the source strip, Confirm this value), the page image in view above the lists
+  - [x] 66.2 `StitchBoard.tsx`
   - _Requirements: 50.6, 53_
 
-- [ ] 67. (maintainer) The ISO 3166-1 table; the bundle C recording in the app; verifier items for Requirements 50 to 53; the recorded answers of bundles A, B and C replayed before and after
+- [x] 67. (maintainer) The ISO 3166-1 table; the bundle C recording in the app; verifier items for Requirements 50 to 53; the recorded answers of bundles A, B and C replayed before and after
   - _Requirements: 50, 51, 52, 53_
 
-- [ ] 68. A value put into a line the reader transcribed without it is rejected
-  - [ ] 68.1 Tests that fail on the current code: the sample bundle with every page an image page (line 7 origin rejected with quote_not_found and today's message, every other reading accepted), Property 72, a value at the start or the end of its quote still waits; the two older examples of 50.9 follow 50.1
-  - [ ] 68.2 `src/core/reading.ts`
+- [x] 68. A value put into a line the reader transcribed without it is rejected
+  - [x] 68.1 Tests that fail on the current code: the sample bundle with every page an image page (line 7 origin rejected with quote_not_found and today's message, every other reading accepted), Property 72, a value at the start or the end of its quote still waits; the two older examples of 50.9 follow 50.1
+  - [x] 68.2 `src/core/reading.ts`
   - _Requirements: 50.8, 50.9_
 
 ## Summary
