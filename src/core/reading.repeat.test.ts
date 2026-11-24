@@ -715,7 +715,7 @@ describe("Requirement 36.1: Low Confidence Readings", () => {
     }
   });
 
-  it("2. A low reading whose quote is not on the page is rejected with 'quote_not_found', not 'low_confidence'", () => {
+  it("2. A low reading whose quote is not on a text page is rejected with 'quote_not_found', not 'low_confidence'; on an image page it waits as not in the transcript (Requirements 50.1, 50.9)", () => {
     const lines = [
       { text: "TOTAL 77 4,980", box: { x: 0.1, y: 0.58, w: 0.8, h: 0.05 } },
     ];
@@ -736,9 +736,14 @@ describe("Requirement 36.1: Low Confidence Readings", () => {
 
     const verified = check(fields, [doc]);
 
-    expect(verified[0].status).toBe("rejected");
-    if (verified[0].status === "rejected") {
-      expect(verified[0].reason).toBe("quote_not_found");
+    expect(verified[0]).toMatchObject({ status: "uncertain", box: null, itemIds: [], notInTranscript: true });
+
+    const textDoc: DocumentText = { docId: "packingList", kind: "packingList", pages: [textPage([raw("TOTAL 77 4,980", 72, 700)])] };
+    const onText = check(fields, [textDoc]);
+
+    expect(onText[0].status).toBe("rejected");
+    if (onText[0].status === "rejected") {
+      expect(onText[0].reason).toBe("quote_not_found");
     }
   });
 

@@ -125,7 +125,7 @@ describe("Requirement 37: Image Pages with No Box", () => {
     expect(verified[1].status).toBe("accepted");
     if (verified[1].status === "accepted") {
       expect(verified[1].box).toBeDefined();
-      expect(verified[1].box.w).toBeGreaterThan(0);
+      expect(verified[1].box!.w).toBeGreaterThan(0);
     }
   });
 

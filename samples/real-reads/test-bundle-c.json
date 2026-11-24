@@ -1,0 +1,711 @@
+{
+ "ok": true,
+ "mode": "claude",
+ "output": {
+  "fields": [
+   {
+    "field": "invoice.number",
+    "value": "WLW-0457",
+    "quote": "Invoice No.: WLW-0457",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.date",
+    "value": "11/06/2026",
+    "quote": "Date: Nov 06, 2026",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.terms",
+    "value": "FOB Hai Phong",
+    "quote": "Terms: FOB Hai Phong",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.currency",
+    "value": "USD",
+    "quote": "Currency: USD",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.countryOfExport",
+    "value": "Viet Nam",
+    "quote": "Country of export: Viet Nam",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.seller.name",
+    "value": "Wispwood Lantern Works Co., Ltd.",
+    "quote": "Wispwood Lantern Works Co., Ltd.",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.seller.address",
+    "value": "Lot 9, Fernlight Industrial Cluster Viet Nam",
+    "quote": "Lot 9, Fernlight Industrial Cluster",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.buyer.name",
+    "value": "Gloamfield Mercantile LLC",
+    "quote": "Gloamfield Mercantile LLC",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.buyer.address",
+    "value": "5 Wickerbasket Way, Lanternfall, CA 00000, USA",
+    "quote": "5 Wickerbasket Way, Lanternfall, CA 00000, USA",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.itemNo",
+    "value": "WL-11",
+    "quote": "WL-11",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.description",
+    "value": "Paper lantern, bat print",
+    "quote": "Paper lantern, bat print",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.hts",
+    "value": "9505.90.6000",
+    "quote": "9505.90.6000",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.origin",
+    "value": "VN",
+    "quote": "VN",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.quantity",
+    "value": "3,000",
+    "quote": "3,000",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.unitPrice",
+    "value": "0.48",
+    "quote": "0.48",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.amount",
+    "value": "1,440.00",
+    "quote": "1,440.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.itemNo",
+    "value": "WL-12",
+    "quote": "WL-12",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.description",
+    "value": "Bamboo lantern with candle cup, non-electric",
+    "quote": "Bamboo lantern with candle cup, non-electric",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.hts",
+    "value": "9405.50.4000",
+    "quote": "9405.50.4000",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.origin",
+    "value": "VN",
+    "quote": "VN",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.quantity",
+    "value": "600",
+    "quote": "600",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.unitPrice",
+    "value": "4.20",
+    "quote": "4.20",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.amount",
+    "value": "2,520.00",
+    "quote": "2,520.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.itemNo",
+    "value": "WL-13",
+    "quote": "WL-13",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.description",
+    "value": "Party favor kit, 6 pcs per set",
+    "quote": "Party favor kit, 6 pcs per set",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.hts",
+    "value": "9505.90.9900",
+    "quote": "9505.90.9900",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.origin",
+    "value": "VN",
+    "quote": "VN",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.quantity",
+    "value": "500",
+    "quote": "500",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.unit",
+    "value": "SETS",
+    "quote": "SETS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.unitPrice",
+    "value": "2.10",
+    "quote": "2.10",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.amount",
+    "value": "1,050.00",
+    "quote": "1,050.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.itemNo",
+    "value": "WL-14",
+    "quote": "WL-14",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.description",
+    "value": "Resin ghost ornament",
+    "quote": "Resin ghost ornament",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.hts",
+    "value": "3926.40.0090",
+    "quote": "3926.40.0090",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.origin",
+    "value": "CN",
+    "quote": "CN",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.quantity",
+    "value": "1,200",
+    "quote": "1,200",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.unitPrice",
+    "value": "0.75",
+    "quote": "0.75",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.amount",
+    "value": "900.00",
+    "quote": "900.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.number",
+    "value": "WLW-PL-0457",
+    "quote": "Packing List No.: WLW-PL-0457",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.invoiceRef",
+    "value": "WLW-0457",
+    "quote": "Invoice Ref.: WLW-0457",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.blNumber",
+    "value": "CNDB2611HPH0233",
+    "quote": "B/L No.: CNDB2611HPH0233",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.itemNo",
+    "value": "WL-11",
+    "quote": "WL-11",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.cartons",
+    "value": "30",
+    "quote": "30",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.quantity",
+    "value": "3,000",
+    "quote": "3,000",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.netKg",
+    "value": "150.0",
+    "quote": "150.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.grossKg",
+    "value": "171.0",
+    "quote": "171.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.itemNo",
+    "value": "WL-12",
+    "quote": "WL-12",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.cartons",
+    "value": "25",
+    "quote": "25",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.quantity",
+    "value": "600",
+    "quote": "600",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.netKg",
+    "value": "210.0",
+    "quote": "210.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.grossKg",
+    "value": "236.0",
+    "quote": "236.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.itemNo",
+    "value": "WL-13",
+    "quote": "WL-13",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.cartons",
+    "value": "10",
+    "quote": "10",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.quantity",
+    "value": "500",
+    "quote": "500",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.netKg",
+    "value": "70.0",
+    "quote": "70.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.grossKg",
+    "value": "81.0",
+    "quote": "81.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalCartons",
+    "value": "65",
+    "quote": "65",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalQuantity",
+    "value": "4,100",
+    "quote": "4,100",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalNetKg",
+    "value": "430.0",
+    "quote": "430.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalGrossKg",
+    "value": "488.0",
+    "quote": "488.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.number",
+    "value": "CNDB2611HPH0233",
+    "quote": "B/L No.: CNDB2611HPH0233",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.carrier",
+    "value": "Cinderbuoy Lines (SAMPLE)",
+    "quote": "Carrier: Cinderbuoy Lines (SAMPLE)",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.consignee.name",
+    "value": "Gloamfield Mercantile LLC",
+    "quote": "Consignee: Gloamfield Mercantile LLC",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.vessel",
+    "value": "LANTERN PETREL",
+    "quote": "Vessel: LANTERN PETREL",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.voyage",
+    "value": "091E",
+    "quote": "Voyage: 091E",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.portOfLoading",
+    "value": "Hai Phong, Viet Nam",
+    "quote": "Port of loading: Hai Phong, Viet Nam",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.portOfDischarge",
+    "value": "Los Angeles, CA, USA",
+    "quote": "Port of discharge: Los Angeles, CA, USA",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.onBoardDate",
+    "value": "11/08/2026",
+    "quote": "Shipped on board: 08 NOV 2026",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.containerNo",
+    "value": "ZZZU 233019 8",
+    "quote": "ZZZU 233019 8 / SMPL-0002",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.packages",
+    "value": "77 CTNS",
+    "quote": "77 CTNS",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.grossKg",
+    "value": "521.0",
+    "quote": "521.0 KGS",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   }
+  ],
+  "transcripts": [
+   {
+    "doc": "invoice",
+    "page": 1,
+    "lines": [
+     {
+      "text": "COMMERCIAL INVOICE",
+      "box": {
+       "x": 0.227,
+       "y": 0.24,
+       "w": 0.5,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "Wispwood Lantern Works Co., Ltd.",
+      "box": {
+       "x": 0.275,
+       "y": 0.29,
+       "w": 0.2,
+       "h": 0.02
+      }
+     },
+     {
+      "text": "Invoice No.: WLW-0457",
+      "box": {
+       "x": 0.647,
+       "y": 0.318,
+       "w": 0.135,
+       "h": 0.02
+      }
+     },
+     {
+      "text": "Bill to:",
+      "box": {
+       "x": 0.26,
+       "y": 0.412,
+       "w": 0.04,
+       "h": 0.018
+      }
+     },
+     {
+      "text": "Payment: 30% deposit, balance before shipment",
+      "box": {
+       "x": 0.222,
+       "y": 0.675,
+       "w": 0.285,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "Packed in export cartons. Marks: GLOAMFIELD / LANTERNFALL",
+      "box": null
+     }
+    ]
+   },
+   {
+    "doc": "packingList",
+    "page": 1,
+    "lines": [
+     {
+      "text": "PACKING LIST",
+      "box": {
+       "x": 0.158,
+       "y": 0.22,
+       "w": 0.13,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "Packing List No.: WLW-PL-0457",
+      "box": {
+       "x": 0.168,
+       "y": 0.265,
+       "w": 0.16,
+       "h": 0.02
+      }
+     },
+     {
+      "text": "Invoice Ref.: WLW-0457",
+      "box": {
+       "x": 0.168,
+       "y": 0.285,
+       "w": 0.12,
+       "h": 0.018
+      }
+     },
+     {
+      "text": "B/L No.: CNDB2611HPH0233",
+      "box": {
+       "x": 0.168,
+       "y": 0.305,
+       "w": 0.145,
+       "h": 0.018
+      }
+     },
+     {
+      "text": "WL-14 packed separately, see PL 0457-B",
+      "box": {
+       "x": 0.46,
+       "y": 0.555,
+       "w": 0.215,
+       "h": 0.022
+      }
+     }
+    ]
+   }
+  ],
+  "invoiceLineCount": 4,
+  "reader": "claude-haiku-5-5"
+ },
+ "remaining": 0
+}

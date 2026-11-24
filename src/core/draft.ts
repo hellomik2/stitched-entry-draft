@@ -7,6 +7,7 @@ import {
   parseKgToTenths,
   parsePackages,
   parseUsDate,
+  parseDocumentDate,
   countryCode,
   formatCents,
 } from "./parse";
@@ -25,6 +26,22 @@ export const IMAGE_COMPUTED_REVIEW_REASON = "Computed from values the AI reader 
 
 export const IMAGE_WAITING_SUFFIX = "values read from an image are not confirmed yet.";
 
+export const UNPLACED_REVIEW_REASON =
+  "Read from an image by the AI reader, from a line that is not in its transcript, so there is no box on the page. Find it on the page, check it, then confirm it.";
+
+export const UNPLACED_COMPUTED_REVIEW_REASON =
+  "Computed from values the AI reader read from an image. At least one is from a line that is not in its transcript, so it has no box on the page. Check them against the page, then confirm it.";
+
+/** The four reasons of a value that waits only for a person's check of image values (Requirements 18.1, 26.1, 50.3). */
+export function isImageReviewReason(reason: string | null | undefined): boolean {
+  return (
+    reason === IMAGE_REVIEW_REASON ||
+    reason === IMAGE_COMPUTED_REVIEW_REASON ||
+    reason === UNPLACED_REVIEW_REASON ||
+    reason === UNPLACED_COMPUTED_REVIEW_REASON
+  );
+}
+
 export const CONFIRMED_NOTE = "Confirmed by a person against the page.";
 
 export const NO_LINE_REASON = "No 7501 line was built because no invoice line was read. A person reads the invoice lines.";
@@ -36,9 +53,10 @@ export type DocSource = {
   doc: string;
   page: number;
   quote: string;
-  box: Box;
+  box: Box | null;
   readingField: string;
   origin?: "imageTranscript";
+  notInTranscript?: true;
   cell?: string;
 };
 
@@ -142,6 +160,9 @@ function docSource(reading: VerifiedReading): DocSource {
   if (reading.origin === "imageTranscript") {
     source.origin = "imageTranscript";
   }
+  if (reading.notInTranscript) {
+    source.notInTranscript = true;
+  }
   if (reading.cell) {
     source.cell = reading.cell;
   }
@@ -188,13 +209,20 @@ export function buildDraft(input: {
   hts: HtsTable;
   overrides?: Override[];
   invoiceLineCount?: number | null;
+  packingListLineCount?: number | null;
   partsList?: PartsList | null;
 }): Draft {
   const { bundle, reader, readings, hts } = input;
   const overrides = input.overrides || [];
   const overrideMap = new Map(overrides.map((o) => [o.fieldId, o.value]));
 
-  const verified = readings;
+  const verified: VerifiedReading[] = readings.map((r) => {
+    if (r.status === "uncertain" && r.notInTranscript === true && r.confidence !== "low") {
+      const { message: _message, ...rest } = r;
+      return { ...rest, status: "accepted" as const };
+    }
+    return r;
+  });
   const accepted = acceptedReadings(verified);
 
   // Rejected readings
@@ -571,6 +599,28 @@ export function buildDraft(input: {
             : `line sum = ${packingCartonSum}, total = ${totalCartonResult.value}`,
       });
     }
+  }
+
+  // Requirement 51.5: the packing list line count of the reader against the lines the draft has readings for.
+  const packingCount = input.packingListLineCount;
+  if (typeof packingCount === "number") {
+    const packingLinesRead = new Set(
+      verified
+        .map((r) => /^packingList\.lines\.(\d+)\./.exec(r.field)?.[1])
+        .filter((n): n is string => n !== undefined && Number(n) >= 1 && Number(n) <= 8),
+    ).size;
+    const same = packingCount === packingLinesRead;
+    checks.push({
+      id: "P3.packing.lines",
+      rule: "P3",
+      label: "Packing list lines read",
+      ok: same,
+      detail:
+        (same
+          ? `the packing list shows ${packingCount} item lines and the draft has readings for ${packingLinesRead}`
+          : `the packing list shows ${packingCount} item lines, but the draft has readings for ${packingLinesRead}`) +
+        (packingCount > 8 ? "; this draft reads only the first 8" : ""),
+    });
   }
 
   // X checks: B/L vs packing, packing vs invoice, etc.
@@ -978,7 +1028,7 @@ export function buildDraft(input: {
   const onBoardReadingToUse = onBoardReading || onBoardUncertainReading;
   
   if (onBoardReadingToUse && onBoardReadingToUse.value) {
-    const dateResult = parseUsDate(normalizeSpace(onBoardReadingToUse.value));
+    const dateResult = parseDocumentDate(normalizeSpace(onBoardReadingToUse.value));
     if (dateResult.ok) {
       if (onBoardUncertainReading) {
         headerFields.push(
@@ -1785,16 +1835,14 @@ export function buildDraft(input: {
       !enteredValueField.value ||
       (enteredValueField.status === "needsReview" &&
         enteredValueField.reason &&
-        enteredValueField.reason !== IMAGE_REVIEW_REASON &&
-        enteredValueField.reason !== IMAGE_COMPUTED_REVIEW_REASON);
+        !isImageReviewReason(enteredValueField.reason));
 
     const rateWaits =
       !rateField ||
       !rateField.value ||
       (rateField.status === "needsReview" &&
         rateField.reason &&
-        rateField.reason !== IMAGE_REVIEW_REASON &&
-        rateField.reason !== IMAGE_COMPUTED_REVIEW_REASON);
+        !isImageReviewReason(rateField.reason));
 
     if (enteredValueWaits) {
       return field_helper({
@@ -1924,7 +1972,7 @@ export function buildDraft(input: {
               const codeResult = countryCode(originStr);
               if (!codeResult.ok) {
                 reasons.push(
-                  `Invoice line ${n}: the reader suggested "${originStr}" but its quote is not on the page, so it was rejected.`
+                  `Invoice line ${n}: the AI reader read "${originStr}", which is not a country name or code the app knows. A person checks it on the invoice.`
                 );
               }
             } else {
@@ -3379,13 +3427,15 @@ export function buildDraft(input: {
 
   // A value read from an image page is not final until a person confirms it (Requirement 18.1).
   // Computed values with an image source wait too (Requirement 26.1).
+  const hasUnplacedSource = (f: DraftField) => f.sources.some((s) => s.kind === "document" && s.notInTranscript === true);
+  
   for (const f of allFieldsList) {
     if (f.status === "copied" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
       f.status = "needsReview";
-      f.reason = IMAGE_REVIEW_REASON;
+      f.reason = hasUnplacedSource(f) ? UNPLACED_REVIEW_REASON : IMAGE_REVIEW_REASON;
     } else if (f.status === "computed" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
       f.status = "needsReview";
-      f.reason = IMAGE_COMPUTED_REVIEW_REASON;
+      f.reason = hasUnplacedSource(f) ? UNPLACED_COMPUTED_REVIEW_REASON : IMAGE_COMPUTED_REVIEW_REASON;
     }
   }
 
@@ -3400,7 +3450,7 @@ export function buildDraft(input: {
     let oldReason = field.reason;
 
     // Confirming an image value: the person applies the value that is shown (Requirement 18.3).
-    if (oldReason === IMAGE_REVIEW_REASON && oldValue !== null && override.value === oldValue) {
+    if ((oldReason === IMAGE_REVIEW_REASON || oldReason === UNPLACED_REVIEW_REASON) && oldValue !== null && override.value === oldValue) {
       // Back to "copied": the value is the document's, now checked by a person. Nothing computed from it changes.
       field.status = "copied";
       field.reason = null;
@@ -3409,7 +3459,7 @@ export function buildDraft(input: {
     }
 
     // Confirming a computed value from an image (Requirement 26.2).
-    if (oldReason === IMAGE_COMPUTED_REVIEW_REASON && oldValue !== null && override.value === oldValue) {
+    if ((oldReason === IMAGE_COMPUTED_REVIEW_REASON || oldReason === UNPLACED_COMPUTED_REVIEW_REASON) && oldValue !== null && override.value === oldValue) {
       // Back to "computed": the value is confirmed, but still computed.
       field.status = "computed";
       field.reason = null;
@@ -3946,16 +3996,16 @@ export function buildDraft(input: {
     if (!f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) continue;
     if (f.status === "copied") {
       f.status = "needsReview";
-      f.reason = IMAGE_REVIEW_REASON;
+      f.reason = hasUnplacedSource(f) ? UNPLACED_REVIEW_REASON : IMAGE_REVIEW_REASON;
     } else if (f.status === "computed") {
       f.status = "needsReview";
-      f.reason = IMAGE_COMPUTED_REVIEW_REASON;
+      f.reason = hasUnplacedSource(f) ? UNPLACED_COMPUTED_REVIEW_REASON : IMAGE_COMPUTED_REVIEW_REASON;
     }
   }
 
   // Waiting pass (Requirement 26.3): mark computed/copied fields that depend on image-waiting fields as needsReview
   const isImageWaiting = (f: DraftField): boolean => {
-    return f.status === "needsReview" && (f.reason === IMAGE_REVIEW_REASON || f.reason === IMAGE_COMPUTED_REVIEW_REASON);
+    return f.status === "needsReview" && isImageReviewReason(f.reason);
   };
 
   const depsOf = (f: DraftField): string[] => {

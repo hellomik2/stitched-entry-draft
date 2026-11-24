@@ -167,8 +167,8 @@ describe("Feature: document-intake, Property 37: Partial Quotes Keep a Box (Vali
             expect(verified[0].status).toBe("accepted");
             if (verified[0].status === "accepted") {
               // Box should have positive width and height
-              expect(verified[0].box.w).toBeGreaterThan(0);
-              expect(verified[0].box.h).toBeGreaterThan(0);
+              expect(verified[0].box!.w).toBeGreaterThan(0);
+              expect(verified[0].box!.h).toBeGreaterThan(0);
 
               // Box should equal the item for line k
               const expectedItem = page.items[k - 1];

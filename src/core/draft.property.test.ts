@@ -96,11 +96,12 @@ describe("Draft field sources and coverage", () => {
                         expect(page).toBeDefined();
 
                         if (page) {
+                          expect(source.box).not.toBeNull();
                           // Check box is within page bounds (with 0.01 tolerance)
-                          expect(source.box.x).toBeGreaterThanOrEqual(0);
-                          expect(source.box.y).toBeGreaterThanOrEqual(0);
-                          expect(source.box.x + source.box.w).toBeLessThanOrEqual(page.width + 0.01);
-                          expect(source.box.y + source.box.h).toBeLessThanOrEqual(page.height + 0.01);
+                          expect(source.box!.x).toBeGreaterThanOrEqual(0);
+                          expect(source.box!.y).toBeGreaterThanOrEqual(0);
+                          expect(source.box!.x + source.box!.w).toBeLessThanOrEqual(page.width + 0.01);
+                          expect(source.box!.y + source.box!.h).toBeLessThanOrEqual(page.height + 0.01);
                         }
                       }
                     }

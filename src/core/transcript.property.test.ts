@@ -139,8 +139,8 @@ describe("Transcript to PageText", () => {
             expect(reading.status).toBe("accepted");
             if (reading.status === "accepted") {
               expect(reading.box).toBeDefined();
-              expect(reading.box.x).toBeGreaterThanOrEqual(0);
-              expect(reading.box.y).toBeGreaterThanOrEqual(0);
+              expect(reading.box!.x).toBeGreaterThanOrEqual(0);
+              expect(reading.box!.y).toBeGreaterThanOrEqual(0);
             }
           },
         ),
@@ -188,9 +188,11 @@ describe("Transcript to PageText", () => {
           expect(verified).toHaveLength(1);
           const reading = verified[0];
 
+          // Requirement 50.9: on an image page a quote missing from the transcript is not rejected for that (50.1);
+          // the value "value" is not inside its quote, so it is rejected with value_not_in_quote.
           expect(reading.status).toBe("rejected");
           if (reading.status === "rejected") {
-            expect(reading.reason).toBe("quote_not_found");
+            expect(reading.reason).toBe("value_not_in_quote");
           }
         }),
         { numRuns: 200 },

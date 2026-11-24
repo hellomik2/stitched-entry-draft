@@ -1,4 +1,151 @@
 import { RuleResult } from "../rules/types";
+import iso3166Json from "../../data/codes/iso-3166-1.json";
+
+// Requirement 52.1: every ISO 3166-1 code and each of its names (normalized: spaces, upper case) give the code.
+const COUNTRY_CODES: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  for (const country of iso3166Json.countries) {
+    const code = country.code.toUpperCase();
+    map[code] = code;
+    for (const name of country.names) map[name.replace(/\s+/g, " ").trim().toUpperCase()] = code;
+  }
+  return map;
+})();
+
+/**
+ * Requirement 35.1: a printed date in a document as day, month, year components and span in text.
+ */
+export interface PrintedDate {
+  day: number;
+  month: number;
+  year: number;
+  span: { start: number; end: number };
+}
+
+/**
+ * Requirement 35.1: find all printed dates in text in formats: D Mon YYYY, Mon D YYYY, D Month YYYY, YYYY-MM-DD, DD.MM.YYYY
+ */
+export function findPrintedDates(text: string): PrintedDate[] {
+  const dates: PrintedDate[] = [];
+  
+  // Month names (case-insensitive)
+  const monthAbbr: { [key: string]: number } = {
+    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  };
+  const monthFull: { [key: string]: number } = {
+    january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+    july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+  };
+
+  // Helper: check if a span overlaps any existing date span
+  const hasOverlap = (newSpan: PrintedDate['span']): boolean => {
+    return dates.some(d => !(newSpan.end <= d.span.start || newSpan.start >= d.span.end));
+  };
+
+  // Pattern 1: D Mon YYYY or D-Mon-YYYY (case-insensitive, 1-2 digit day)
+  // Examples: "03 Nov 2026", "03-NOV-2026", "03 Nov 2026"
+  const pattern1 = /(\d{1,2})\s*[-\s]\s*([a-z]{3})\s*[-\s]\s*(\d{4})/gi;
+  let match1;
+  while ((match1 = pattern1.exec(text)) !== null) {
+    const day = parseInt(match1[1], 10);
+    const monthStr = match1[2].toLowerCase();
+    const year = parseInt(match1[3], 10);
+    const month = monthAbbr[monthStr];
+    if (month && day >= 1 && day <= 31) {
+      // Check it's a valid date
+      const checkDate = new Date(year, month - 1, day);
+      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
+        const span = { start: match1.index, end: match1.index + match1[0].length };
+        if (!hasOverlap(span)) {
+          dates.push({ day, month, year, span });
+        }
+      }
+    }
+  }
+
+  // Pattern 2: Mon D, YYYY or Mon D YYYY (case-insensitive)
+  // Examples: "Nov 03, 2026", "Nov 03 2026"
+  const pattern2 = /([a-z]{3})\s+(\d{1,2}),?\s+(\d{4})/gi;
+  let match2;
+  while ((match2 = pattern2.exec(text)) !== null) {
+    const monthStr = match2[1].toLowerCase();
+    const month = monthAbbr[monthStr];
+    const day = parseInt(match2[2], 10);
+    const year = parseInt(match2[3], 10);
+    if (month && day >= 1 && day <= 31) {
+      const checkDate = new Date(year, month - 1, day);
+      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
+        const span = { start: match2.index, end: match2.index + match2[0].length };
+        if (!hasOverlap(span)) {
+          dates.push({ day, month, year, span });
+        }
+      }
+    }
+  }
+
+  // Pattern 3: Full month name D, YYYY or D YYYY (case-insensitive)
+  // Examples: "November 3, 2026", "November 3 2026"
+  const pattern3 = /([a-z]+)\s+(\d{1,2}),?\s+(\d{4})/gi;
+  let match3;
+  while ((match3 = pattern3.exec(text)) !== null) {
+    const monthStr = match3[1].toLowerCase();
+    const month = monthFull[monthStr];
+    const day = parseInt(match3[2], 10);
+    const year = parseInt(match3[3], 10);
+    if (month && day >= 1 && day <= 31) {
+      const checkDate = new Date(year, month - 1, day);
+      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
+        const span = { start: match3.index, end: match3.index + match3[0].length };
+        if (!hasOverlap(span)) {
+          dates.push({ day, month, year, span });
+        }
+      }
+    }
+  }
+
+  // Pattern 4: YYYY-MM-DD
+  // Examples: "2026-11-03"
+  const pattern4 = /(\d{4})-(\d{2})-(\d{2})/g;
+  let match4;
+  while ((match4 = pattern4.exec(text)) !== null) {
+    const year = parseInt(match4[1], 10);
+    const month = parseInt(match4[2], 10);
+    const day = parseInt(match4[3], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      const checkDate = new Date(year, month - 1, day);
+      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
+        const span = { start: match4.index, end: match4.index + match4[0].length };
+        if (!hasOverlap(span)) {
+          dates.push({ day, month, year, span });
+        }
+      }
+    }
+  }
+
+  // Pattern 5: DD.MM.YYYY
+  // Examples: "03.11.2026" - first is day (03), second is month (11)
+  // Reject if first number > 31 or first number < 1, or second number not 1-12
+  const pattern5 = /(\d{2})\.(\d{2})\.(\d{4})/g;
+  let match5;
+  while ((match5 = pattern5.exec(text)) !== null) {
+    const day = parseInt(match5[1], 10);
+    const month = parseInt(match5[2], 10);
+    const year = parseInt(match5[3], 10);
+    // Validate: first number is day (1-31), second is month (1-12)
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      const checkDate = new Date(year, month - 1, day);
+      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
+        const span = { start: match5.index, end: match5.index + match5[0].length };
+        if (!hasOverlap(span)) {
+          dates.push({ day, month, year, span });
+        }
+      }
+    }
+  }
+
+  return dates;
+}
 
 /**
  * Parse money text to integer cents.
@@ -215,46 +362,43 @@ export function parseUsDate(text: string): RuleResult<string> {
 }
 
 /**
+ * Requirement 52.2: a document date as MM/DD/YYYY. A value parseUsDate accepts gives what it gives; else, when the
+ * whole value (spaces normalized) is one printed date of Requirement 35.1, that date; else the reason of parseUsDate.
+ */
+export function parseDocumentDate(text: string): RuleResult<string> {
+  const us = parseUsDate(text);
+  if (us.ok || typeof text !== "string") return us;
+  const t = text.replace(/\s+/g, " ").trim();
+  const dates = findPrintedDates(t);
+  if (dates.length === 1 && dates[0].span.start === 0 && dates[0].span.end === t.length) {
+    const d = dates[0];
+    return { ok: true, value: `${String(d.month).padStart(2, "0")}/${String(d.day).padStart(2, "0")}/${d.year}` };
+  }
+  return us;
+}
+
+/**
  * Parse country name or code to ISO 2-letter code.
- * Small table: VIETNAM/VIET NAM -> VN, PORTUGAL -> PT, CZECHIA/CZECH REPUBLIC -> CZ, CHINA -> CN, USA/UNITED STATES -> US
- * Also accepts the codes themselves (VN, PT, etc.)
- * Case-insensitive.
+ * Requirement 52.1: normalize with spaces, look up in iso-3166-1.json.
+ * Code itself or any name (all normalized the same way) gives the code.
+ * Returns the ISO 2-letter code if found, needs review otherwise.
  */
 export function countryCode(text: string): RuleResult<string> {
   if (typeof text !== "string") {
     return { ok: false, reason: "Country text must be a string" };
   }
 
-  const trimmed = text.trim().toUpperCase();
+  const trimmed = text.replace(/\s+/g, " ").trim().toUpperCase();
   if (!trimmed) {
     return { ok: false, reason: "Country text is empty" };
   }
 
-  // Mapping of country names and aliases to ISO codes
-  const countryMap: Record<string, string> = {
-    // Codes themselves
-    VN: "VN",
-    PT: "PT",
-    CZ: "CZ",
-    CN: "CN",
-    US: "US",
-    // Country names
-    VIETNAM: "VN",
-    "VIET NAM": "VN",
-    PORTUGAL: "PT",
-    CZECHIA: "CZ",
-    "CZECH REPUBLIC": "CZ",
-    CHINA: "CN",
-    USA: "US",
-    "UNITED STATES": "US",
-  };
-
-  const code = countryMap[trimmed];
-  if (!code) {
+  const result = COUNTRY_CODES[trimmed];
+  if (!result) {
     return { ok: false, reason: `Unknown country: "${text}"` };
   }
 
-  return { ok: true, value: code };
+  return { ok: true, value: result };
 }
 
 /**

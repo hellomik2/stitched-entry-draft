@@ -38,6 +38,7 @@ export type ReaderOutput = {
   fields: FieldReading[];
   transcripts: TranscriptPage[];
   invoiceLineCount?: number | null;
+  packingListLineCount?: number | null;
 };
 
 function isValidBase64(s: string): boolean {
@@ -436,6 +437,13 @@ export function validateReaderOutput(json: unknown, input: ReaderInput): RuleRes
     }
   }
 
+  // Check packingListLineCount if present
+  if (obj.packingListLineCount !== undefined) {
+    if (obj.packingListLineCount !== null && (!Number.isInteger(obj.packingListLineCount) || (obj.packingListLineCount as number) < 0 || (obj.packingListLineCount as number) > 999)) {
+      return { ok: false, reason: "packingListLineCount: must be null or an integer from 0 to 999" };
+    }
+  }
+
   // Track which image pages have transcripts
   const transcriptedPages = new Set<string>();
 
@@ -596,6 +604,9 @@ export function readerOutputToAnswer(input: ReaderInput, output: ReaderOutput): 
   };
   if (output.invoiceLineCount !== undefined) {
     answer.invoiceLineCount = output.invoiceLineCount;
+  }
+  if (output.packingListLineCount !== undefined) {
+    answer.packingListLineCount = output.packingListLineCount;
   }
   return answer;
 }

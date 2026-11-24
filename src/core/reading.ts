@@ -1,5 +1,6 @@
 import { RuleResult } from "../rules/types";
 import { normalizeSpace, DocKind, Box, DocumentText, PageText } from "./pdfText";
+import { findPrintedDates } from "./parse";
 
 export type FieldReading = {
   field: string;
@@ -17,6 +18,7 @@ export type ReadingAnswer = {
   documents: { docId: string; kind: DocKind }[];
   fields: FieldReading[];
   invoiceLineCount?: number | null;
+  packingListLineCount?: number | null;
 };
 
 export interface DocumentReader {
@@ -42,10 +44,13 @@ export type RejectReason =
   | "low_confidence"
   | "no_source_box";
 
+export const NOT_IN_TRANSCRIPT_MESSAGE =
+  "The AI reader read this value from a line that is not in its transcript of the image, so there is no box on the page. A person finds it on the page and checks it.";
+
 export type VerifiedReading = FieldReading &
   (
-    | { status: "accepted"; box: Box; itemIds: string[]; origin?: "imageTranscript"; lineText?: string; cell?: string }
-    | { status: "uncertain"; box: Box; itemIds: string[]; origin?: "imageTranscript"; message: string; lineText?: string; cell?: string }
+    | { status: "accepted"; box: Box | null; itemIds: string[]; origin?: "imageTranscript"; notInTranscript?: true; lineText?: string; cell?: string }
+    | { status: "uncertain"; box: Box | null; itemIds: string[]; origin?: "imageTranscript"; notInTranscript?: true; message: string; lineText?: string; cell?: string }
     | { status: "rejected"; reason: RejectReason; message: string }
   );
 
@@ -101,6 +106,13 @@ export function validateReadingAnswer(json: unknown): RuleResult<ReadingAnswer> 
   if (obj.invoiceLineCount !== undefined) {
     if (obj.invoiceLineCount !== null && (!Number.isInteger(obj.invoiceLineCount) || (obj.invoiceLineCount as number) < 0 || (obj.invoiceLineCount as number) > 999)) {
       return { ok: false, reason: "invoiceLineCount must be null or an integer from 0 to 999" };
+    }
+  }
+
+  // Check packingListLineCount if present
+  if (obj.packingListLineCount !== undefined) {
+    if (obj.packingListLineCount !== null && (!Number.isInteger(obj.packingListLineCount) || (obj.packingListLineCount as number) < 0 || (obj.packingListLineCount as number) > 999)) {
+      return { ok: false, reason: "packingListLineCount must be null or an integer from 0 to 999" };
     }
   }
 
@@ -175,6 +187,32 @@ function isLineField(fieldName: string): boolean {
   return /^(invoice|packingList)\.lines\.\d+\./.test(fieldName);
 }
 
+// Requirement 35.1: the value MM/DD/YYYY of a date field and exactly one printed date in the quote, the same day.
+function dateValueMatchesQuote(fieldName: string, v: string, q: string): boolean {
+  if ((fieldName === "invoice.date" || fieldName === "billOfLading.onBoardDate") && /^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+    // Parse the value as MM/DD/YYYY
+    const valueParts = v.split("/");
+    const valueMonth = parseInt(valueParts[0], 10);
+    const valueDay = parseInt(valueParts[1], 10);
+    const valueYear = parseInt(valueParts[2], 10);
+
+    // Validate it's a real date
+    const valueDate = new Date(valueYear, valueMonth - 1, valueDay);
+    if (valueDate.getFullYear() === valueYear && valueDate.getMonth() === valueMonth - 1 && valueDate.getDate() === valueDay) {
+      // Now check if quote contains exactly one printed date matching this day
+      const printedDates = findPrintedDates(q);
+      if (printedDates.length === 1) {
+        const printedDate = printedDates[0];
+        // For DD.MM.YYYY format in quote, validate that value's day matches first number and month matches second
+        if (printedDate.month === valueMonth && printedDate.day === valueDay && printedDate.year === valueYear) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 // Helper: extract line number from field name
 function getLineNumber(fieldName: string): number | null {
   const match = /^(invoice|packingList)\.lines\.(\d+)\./.exec(fieldName);
@@ -236,136 +274,6 @@ function getRowItems(page: PageText, anchorItems: string[]): string[] {
   }
   
   return result;
-}
-
-// Helper: find printed dates in Requirement 35.1 formats
-interface PrintedDate {
-  day: number;
-  month: number;
-  year: number;
-  span: { start: number; end: number };
-}
-
-function findPrintedDates(text: string): PrintedDate[] {
-  const dates: PrintedDate[] = [];
-  
-  // Month names (case-insensitive)
-  const monthAbbr: { [key: string]: number } = {
-    jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
-    jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
-  };
-  const monthFull: { [key: string]: number } = {
-    january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
-    july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
-  };
-
-  // Helper: check if a span overlaps any existing date span
-  const hasOverlap = (newSpan: PrintedDate['span']): boolean => {
-    return dates.some(d => !(newSpan.end <= d.span.start || newSpan.start >= d.span.end));
-  };
-
-  // Pattern 1: D Mon YYYY or D-Mon-YYYY (case-insensitive, 1-2 digit day)
-  // Examples: "03 Nov 2026", "03-NOV-2026", "03 Nov 2026"
-  const pattern1 = /(\d{1,2})\s*[-\s]\s*([a-z]{3})\s*[-\s]\s*(\d{4})/gi;
-  let match1;
-  while ((match1 = pattern1.exec(text)) !== null) {
-    const day = parseInt(match1[1], 10);
-    const monthStr = match1[2].toLowerCase();
-    const year = parseInt(match1[3], 10);
-    const month = monthAbbr[monthStr];
-    if (month && day >= 1 && day <= 31) {
-      // Check it's a valid date
-      const checkDate = new Date(year, month - 1, day);
-      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
-        const span = { start: match1.index, end: match1.index + match1[0].length };
-        if (!hasOverlap(span)) {
-          dates.push({ day, month, year, span });
-        }
-      }
-    }
-  }
-
-  // Pattern 2: Mon D, YYYY or Mon D YYYY (case-insensitive)
-  // Examples: "Nov 03, 2026", "Nov 03 2026"
-  const pattern2 = /([a-z]{3})\s+(\d{1,2}),?\s+(\d{4})/gi;
-  let match2;
-  while ((match2 = pattern2.exec(text)) !== null) {
-    const monthStr = match2[1].toLowerCase();
-    const month = monthAbbr[monthStr];
-    const day = parseInt(match2[2], 10);
-    const year = parseInt(match2[3], 10);
-    if (month && day >= 1 && day <= 31) {
-      const checkDate = new Date(year, month - 1, day);
-      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
-        const span = { start: match2.index, end: match2.index + match2[0].length };
-        if (!hasOverlap(span)) {
-          dates.push({ day, month, year, span });
-        }
-      }
-    }
-  }
-
-  // Pattern 3: Full month name D, YYYY or D YYYY (case-insensitive)
-  // Examples: "November 3, 2026", "November 3 2026"
-  const pattern3 = /([a-z]+)\s+(\d{1,2}),?\s+(\d{4})/gi;
-  let match3;
-  while ((match3 = pattern3.exec(text)) !== null) {
-    const monthStr = match3[1].toLowerCase();
-    const month = monthFull[monthStr];
-    const day = parseInt(match3[2], 10);
-    const year = parseInt(match3[3], 10);
-    if (month && day >= 1 && day <= 31) {
-      const checkDate = new Date(year, month - 1, day);
-      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
-        const span = { start: match3.index, end: match3.index + match3[0].length };
-        if (!hasOverlap(span)) {
-          dates.push({ day, month, year, span });
-        }
-      }
-    }
-  }
-
-  // Pattern 4: YYYY-MM-DD
-  // Examples: "2026-11-03"
-  const pattern4 = /(\d{4})-(\d{2})-(\d{2})/g;
-  let match4;
-  while ((match4 = pattern4.exec(text)) !== null) {
-    const year = parseInt(match4[1], 10);
-    const month = parseInt(match4[2], 10);
-    const day = parseInt(match4[3], 10);
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      const checkDate = new Date(year, month - 1, day);
-      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
-        const span = { start: match4.index, end: match4.index + match4[0].length };
-        if (!hasOverlap(span)) {
-          dates.push({ day, month, year, span });
-        }
-      }
-    }
-  }
-
-  // Pattern 5: DD.MM.YYYY
-  // Examples: "03.11.2026" - first is day (03), second is month (11)
-  // Reject if first number > 31 or first number < 1, or second number not 1-12
-  const pattern5 = /(\d{2})\.(\d{2})\.(\d{4})/g;
-  let match5;
-  while ((match5 = pattern5.exec(text)) !== null) {
-    const day = parseInt(match5[1], 10);
-    const month = parseInt(match5[2], 10);
-    const year = parseInt(match5[3], 10);
-    // Validate: first number is day (1-31), second is month (1-12)
-    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
-      const checkDate = new Date(year, month - 1, day);
-      if (checkDate.getDate() === day && checkDate.getMonth() === month - 1) {
-        const span = { start: match5.index, end: match5.index + match5[0].length };
-        if (!hasOverlap(span)) {
-          dates.push({ day, month, year, span });
-        }
-      }
-    }
-  }
-
-  return dates;
 }
 
 export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[]): VerifiedReading[] {
@@ -508,6 +416,45 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
       }
 
       if (quoteOccurrenceIndex === -1 && runItems === null) {
+        // Requirement 50.1: on an image page the page text is the reader's own transcript. A quote missing from it
+        // keeps the value for a person, with no box, when the value is inside its own quote.
+        if (page.origin === "imageTranscript") {
+          // Requirement 50.8: the transcript has this line without the value, so the value was put into it.
+          let searchStart = 0;
+          while ((searchStart = q.indexOf(v, searchStart)) !== -1) {
+            const left = q.slice(0, searchStart).trim();
+            const right = q.slice(searchStart + v.length).trim();
+            if (left !== "" && right !== "") {
+              if (page.text.indexOf(normalizeSpace(left + " " + right)) !== -1) {
+                return {
+                  ...field,
+                  status: "rejected" as const,
+                  reason: "quote_not_found" as const,
+                  message: `The quote "${q}" is not on ${doc.kind} page ${field.page}.`,
+                };
+              }
+            }
+            searchStart++;
+          }
+
+          if (q.indexOf(v) !== -1 || dateValueMatchesQuote(field.field, v, q)) {
+            return {
+              ...field,
+              status: "uncertain" as const,
+              box: null,
+              itemIds: [],
+              origin: "imageTranscript" as const,
+              notInTranscript: true as const,
+              message: NOT_IN_TRANSCRIPT_MESSAGE,
+            };
+          }
+          return {
+            ...field,
+            status: "rejected" as const,
+            reason: "value_not_in_quote" as const,
+            message: `The value "${v}" is not found within the quote "${q}" on ${doc.kind} page ${field.page}.`,
+          };
+        }
         return {
           ...field,
           status: "rejected" as const,
@@ -733,26 +680,8 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
 
     // If still not found, try date parsing (Requirement 35.1) for specific fields
     if (!valueFoundInQuote) {
-      if ((field.field === "invoice.date" || field.field === "billOfLading.onBoardDate") && /^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
-        // Parse the value as MM/DD/YYYY
-        const valueParts = v.split("/");
-        const valueMonth = parseInt(valueParts[0], 10);
-        const valueDay = parseInt(valueParts[1], 10);
-        const valueYear = parseInt(valueParts[2], 10);
-
-        // Validate it's a real date
-        const valueDate = new Date(valueYear, valueMonth - 1, valueDay);
-        if (valueDate.getFullYear() === valueYear && valueDate.getMonth() === valueMonth - 1 && valueDate.getDate() === valueDay) {
-          // Now check if quote contains exactly one printed date matching this day
-          const printedDates = findPrintedDates(q);
-          if (printedDates.length === 1) {
-            const printedDate = printedDates[0];
-            // For DD.MM.YYYY format in quote, validate that value's day matches first number and month matches second
-            if (printedDate.month === valueMonth && printedDate.day === valueDay && printedDate.year === valueYear) {
-              valueFoundInQuote = true;
-            }
-          }
-        }
+      if (dateValueMatchesQuote(field.field, v, q)) {
+        valueFoundInQuote = true;
       }
     }
 

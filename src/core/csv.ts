@@ -17,8 +17,10 @@ export const CSV_COLUMNS = [
 
 /**
  * Format a source for CSV output.
- * DocSource: `${doc} p.${page} [${x},${y},${w},${h}] "${quote}"`
+ * DocSource: `${doc} p.${page} [${x},${y},${w},${h}] "${quote}"` when box is not null.
+ *            `${doc} p.${page} [no box] "${quote}"` when box is null.
  * With origin === "imageTranscript", append ` (read from an image by the AI reader)` after the closing quote.
+ * With notInTranscript === true, append ` (not in its transcript)` after the image suffix.
  * With cell, append ` (cell <cell>)` after the closing quote.
  * HtsSource: `HTS ${revision} ${htsno}`
  * CodeTableSource: `${table} ${edition} ${code} "${name}"` with `, ${country}` inside the quotes when present.
@@ -30,14 +32,22 @@ export function formatSource(s: Source): string {
     return `${cts.table} ${cts.edition} ${cts.code} "${nameWithCountry}"`;
   } else if (s.kind === "document") {
     const docS = s as DocSource;
-    const x = docS.box.x.toFixed(1);
-    const y = docS.box.y.toFixed(1);
-    const w = docS.box.w.toFixed(1);
-    const h = docS.box.h.toFixed(1);
     const quote = docS.quote.replace(/"/g, '""'); // Escape quotes in the quote itself
-    let base = `${docS.doc} p.${docS.page} [${x},${y},${w},${h}] "${quote}"`;
+    let base: string;
+    if (docS.box === null) {
+      base = `${docS.doc} p.${docS.page} [no box] "${quote}"`;
+    } else {
+      const x = docS.box.x.toFixed(1);
+      const y = docS.box.y.toFixed(1);
+      const w = docS.box.w.toFixed(1);
+      const h = docS.box.h.toFixed(1);
+      base = `${docS.doc} p.${docS.page} [${x},${y},${w},${h}] "${quote}"`;
+    }
     if (docS.origin === "imageTranscript") {
       base += " (read from an image by the AI reader)";
+    }
+    if (docS.notInTranscript === true) {
+      base += " (not in its transcript)";
     }
     if (docS.cell) {
       base += ` (cell ${docS.cell})`;

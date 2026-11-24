@@ -21,10 +21,9 @@ import {
   draftToCsv,
   readerOutputToAnswer,
   composeDocumentTexts,
-  IMAGE_REVIEW_REASON,
-  IMAGE_COMPUTED_REVIEW_REASON,
   LOW_CONFIDENCE_REVIEW_REASON,
   CONFIRMED_NOTE,
+  isImageReviewReason,
 } from '../core'
 import UploadPanel, { type UploadResult } from './intake/UploadPanel'
 import { APP_NAME, BOARD_TITLE } from './appTitle'
@@ -206,6 +205,7 @@ export default function StitchBoard({
         hts,
         overrides,
         invoiceLineCount: readingAnswer.invoiceLineCount ?? null,
+        packingListLineCount: readingAnswer.packingListLineCount ?? null,
         partsList: upload?.partsList?.list ?? null,
       })
       return { verified, draft }
@@ -785,7 +785,7 @@ export default function StitchBoard({
 
   // Get readings for active document, active page only
   const activeReadings = verified.filter(
-    (r): r is Extract<VerifiedReading, { status: 'accepted' }> => r.doc === activeDocId && r.page === activePage && r.status === 'accepted'
+    (r): r is Extract<VerifiedReading, { status: 'accepted' }> => r.doc === activeDocId && r.page === activePage && r.status === 'accepted' && r.box !== null
   )
   const rejectedReadings = verified.filter((r): r is Extract<VerifiedReading, { status: 'rejected' | 'uncertain' }> => r.doc === activeDocId && r.page === activePage && (r.status === 'rejected' || r.status === 'uncertain'))
 
@@ -932,6 +932,7 @@ export default function StitchBoard({
             ref={pageViewRef}
             style={{
               flex: 1,
+              minHeight: 0,
               position: 'relative',
               overflow: 'auto',
               background: '#fff',
@@ -942,11 +943,13 @@ export default function StitchBoard({
 
             {/* Reading boxes overlaid on canvas */}
             {activeReadings.map((reading) => {
+              const box = reading.box;
+              if (!box) return null;
               const scale = pageScale
-              const left = reading.box.x * scale - 2
-              const top = reading.box.y * scale - 2
-              const width = reading.box.w * scale + 4
-              const height = reading.box.h * scale + 4
+              const left = box.x * scale - 2
+              const top = box.y * scale - 2
+              const width = box.w * scale + 4
+              const height = box.h * scale + 4
 
               return (
                 <div
@@ -976,13 +979,15 @@ export default function StitchBoard({
 
             {/* Uncertain reading boxes overlaid on canvas */}
             {rejectedReadings
-              .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain')
+              .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain' && r.box !== null)
               .map((reading) => {
+                const box = reading.box;
+                if (!box) return null;
                 const scale = pageScale
-                const left = reading.box.x * scale - 2
-                const top = reading.box.y * scale - 2
-                const width = reading.box.w * scale + 4
-                const height = reading.box.h * scale + 4
+                const left = box.x * scale - 2
+                const top = box.y * scale - 2
+                const width = box.w * scale + 4
+                const height = box.h * scale + 4
 
                 return (
                   <div
@@ -1014,7 +1019,7 @@ export default function StitchBoard({
             {draft && allFields(draft)
               .flatMap((field) =>
                 field.sources
-                  .filter((s): s is DocSource => s.kind === 'document')
+                  .filter((s): s is DocSource => s.kind === 'document' && s.box !== null)
                   .map((source) => ({ field, source }))
               )
               .filter((item) => item.source.doc === activeDocId && item.source.page === activePage)
@@ -1029,11 +1034,13 @@ export default function StitchBoard({
                 return unique;
               }, [] as Array<{ field: DraftField; source: DocSource }>)
               .map((item) => {
+                const box = item.source.box;
+                if (!box) return null;
                 const scale = pageScale
-                const left = item.source.box.x * scale - 2
-                const top = item.source.box.y * scale - 2
-                const width = item.source.box.w * scale + 4
-                const height = item.source.box.h * scale + 4
+                const left = box.x * scale - 2
+                const top = box.y * scale - 2
+                const width = box.w * scale + 4
+                const height = box.h * scale + 4
 
                 return (
                   <div
@@ -1056,32 +1063,34 @@ export default function StitchBoard({
               })}
           </div>
 
-          {/* Uncertain readings */}
-          <div data-testid="uncertain-readings">
-            {rejectedReadings
-              .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain')
-              .map((reading) => (
-                <div key={reading.field} style={{ padding: '0.5rem 0.5rem', marginBottom: '0.5rem', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px' }}>
-                  <span className="field-name" style={{ color: '#92400e' }}>{reading.field}</span>
-                  <span style={{ marginLeft: '0.5rem', color: '#78350f' }}>"{reading.value || ''}"</span>
-                  <div style={{ marginTop: '0.25rem', fontSize: 'var(--fs-small)', color: '#78350f' }}>
-                    not sure, not used until a person checks it
+          <div data-testid="reading-lists" style={{ flex: '0 1 auto', maxHeight: '30%', overflowY: 'auto', margin: '0 1rem' }}>
+            {/* Uncertain readings */}
+            <div data-testid="uncertain-readings">
+              {rejectedReadings
+                .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain')
+                .map((reading) => (
+                  <div key={reading.field} data-testid={`uncertain-reading-${reading.field}`} data-not-in-transcript={reading.notInTranscript ? "true" : undefined} style={{ padding: '0.5rem 0.5rem', marginBottom: '0.5rem', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px' }}>
+                    <span className="field-name" style={{ color: '#92400e' }}>{reading.field}</span>
+                    <span style={{ marginLeft: '0.5rem', color: '#78350f' }}>"{reading.value || ''}"</span>
+                    <div style={{ marginTop: '0.25rem', fontSize: 'var(--fs-small)', color: '#78350f' }}>
+                      {reading.notInTranscript ? 'not in the AI reader\'s transcript, so no box; a person finds it on the page and confirms it' : 'not sure, not used until a person checks it'}
+                    </div>
                   </div>
+                ))}
+            </div>
+
+            {/* Rejected readings */}
+            <div data-testid="rejected-readings">
+              {rejectedReadings
+                .filter((r): r is Extract<VerifiedReading, { status: 'rejected' }> => r.status === 'rejected')
+                .map((reading) => (
+                <div key={reading.field}>
+                  <span className="field-name">{reading.field}</span>
+                  <span className="rejected-tag">rejected, not used in the draft</span>
+                  <span className="reason">{'message' in reading ? reading.message : ''}</span>
                 </div>
               ))}
-          </div>
-
-          {/* Rejected readings */}
-          <div data-testid="rejected-readings">
-            {rejectedReadings
-              .filter((r): r is Extract<VerifiedReading, { status: 'rejected' }> => r.status === 'rejected')
-              .map((reading) => (
-              <div key={reading.field}>
-                <span className="field-name">{reading.field}</span>
-                <span className="rejected-tag">rejected, not used in the draft</span>
-                <span className="reason">{'message' in reading ? reading.message : ''}</span>
-              </div>
-            ))}
+            </div>
           </div>
         </div>
 
@@ -1588,7 +1597,7 @@ function SourceStrip({
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
                 <span data-testid="strip-status" style={{ color: 'var(--muted)', fontWeight: 500 }}>{statusWords[field.status]}</span>
 
-              {field.status === 'needsReview' && field.value && (field.reason === IMAGE_REVIEW_REASON || field.reason === IMAGE_COMPUTED_REVIEW_REASON || field.reason === LOW_CONFIDENCE_REVIEW_REASON) && (
+              {field.status === 'needsReview' && field.value && (isImageReviewReason(field.reason) || field.reason === LOW_CONFIDENCE_REVIEW_REASON) && (
                 <button
                   type="button"
                   data-testid="confirm-image-value"
@@ -1715,7 +1724,11 @@ function SourceStrip({
                           <>
                             {`${docMap.get(source.doc) || source.doc} p.${source.page}: "${source.quote}"${source.cell ? ` (cell ${source.cell})` : ''}`}
                             {source.origin === 'imageTranscript' && (
-                              <> (read from an image by the AI reader){lineText && <> Place estimated by the AI reader. Its transcript line: "{lineText}"</>}</>
+                              source.notInTranscript ? (
+                                <> (read from an image by the AI reader) Not in its transcript, so there is no box on the page.</>
+                              ) : (
+                                <> (read from an image by the AI reader){lineText && <> Place estimated by the AI reader. Its transcript line: "{lineText}"</>}</>
+                              )
                             )}
                           </>
                         ) : source.kind === 'codeTable' ? (
