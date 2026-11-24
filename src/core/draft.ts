@@ -12,6 +12,8 @@ import {
 } from "./parse";
 import { roundEnteredValue, computeDuty, allocateGrossWeight, totalEnteredValue, computeMPF, config } from "../rules";
 import { type PartsList, type LineParts, linePartsInfo } from "./partsList";
+import { type CodeTableSource, lookupUsPort, lookupForeignPort, codeTableSourceD, codeTableSourceK } from "./codeTables";
+import { suggestMid } from "./mid";
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
@@ -46,7 +48,7 @@ export type HtsSource = {
   htsno: string;
 };
 
-export type Source = DocSource | HtsSource;
+export type Source = DocSource | HtsSource | CodeTableSource;
 
 export type DraftField = {
   id: string;
@@ -61,6 +63,7 @@ export type DraftField = {
   reason: string | null;
   sources: Source[];
   inputs: string[];
+  candidates?: { value: string; label: string }[];
 };
 
 export type Check = {
@@ -706,7 +709,8 @@ export function buildDraft(input: {
     })
   );
 
-  // B6: needsReview
+  // B6: needsReview (Requirement 47.5), input B20
+  // B20 is computed later; B6 is a placeholder here
   headerFields.push(
     field_helper({
       id: "B6",
@@ -771,9 +775,13 @@ export function buildDraft(input: {
     );
   }
 
-  // B9 (Requirement 44.3): "11" computed only when a container number was accepted; otherwise it waits for a person
+  // B9 (Requirement 47.7): mode of transport from container number or vessel
   const containerReading = accepted.get("billOfLading.containerNo");
+  const containerAny = verified.find((r) => r.field === "billOfLading.containerNo");
+  const containerMissing = !containerAny || (containerAny.status === "rejected" && containerAny.reason === "value_missing");
+  
   if (containerReading) {
+    // Case 7a: container number accepted -> "11"
     headerFields.push(
       field_helper({
         id: "B9",
@@ -787,7 +795,23 @@ export function buildDraft(input: {
         sources: [docSource(containerReading)],
       })
     );
-  } else {
+  } else if (containerMissing && vesselReading) {
+    // Case 7b: container number missing, vessel accepted -> "10" (Requirement 47.7b)
+    headerFields.push(
+      field_helper({
+        id: "B9",
+        block: "9",
+        label: "Mode of transport",
+        value: "10",
+        unit: null,
+        status: "computed",
+        rule: "7501 p.8",
+        note: "Vessel, not containerized: no container number was read on the bill of lading. The 7501 instructions use 10 for a vessel when it is not known whether the goods were containerized.",
+        sources: [docSource(vesselReading)],
+      })
+    );
+  } else if (!containerMissing) {
+    // Case 7c: container rejected for another reason or uncertain -> needsReview (Requirement 44.3)
     headerFields.push(
       field_helper({
         id: "B9",
@@ -795,6 +819,17 @@ export function buildDraft(input: {
         label: "Mode of transport",
         status: "needsReview",
         reason: "The container number on the bill of lading was not read, so the mode of transport is not known. A person checks the bill of lading.",
+      })
+    );
+  } else {
+    // Case 7d: no vessel and no container -> needsReview (Requirement 47.7d)
+    headerFields.push(
+      field_helper({
+        id: "B9",
+        block: "9",
+        label: "Mode of transport",
+        status: "needsReview",
+        reason: "No vessel and no container number were read from the bill of lading, so the mode of transport is not known. A person checks the transport document.",
       })
     );
   }
@@ -868,7 +903,7 @@ export function buildDraft(input: {
     );
   }
 
-  // B13: needsReview
+  // B13: Manufacturer ID (Requirement 48.9) - placeholder, will be updated below when 7501 lines exist
   headerFields.push(
     field_helper({
       id: "B13",
@@ -994,27 +1029,217 @@ export function buildDraft(input: {
     );
   }
 
-  // B19: needsReview
-  headerFields.push(
-    field_helper({
-      id: "B19",
-      block: "19",
-      label: "Foreign port of lading",
-      status: "needsReview",
-      reason: "Schedule K code lookup not built. Port of loading from B/L required.",
-    })
-  );
+  // B19 (Requirement 47.6): foreign port of lading from Schedule K
+  const K_DATE = "Schedule K (CBP Appendix F list of 2024-08-27 with the changes to 04/2026 from the table of 2026-08-20; later Army Corps updates not included)";
+  const loadingReading = accepted.get("billOfLading.portOfLoading");
+  
+  if (loadingReading && loadingReading.value) {
+    const loadingText = normalizeSpace(loadingReading.value);
+    const k = lookupForeignPort(loadingText);
+    
+    if (k.kind === "one") {
+      // Case 6a: one code
+      const code = k.rows[0].code;
+      const name = k.rows[0].name;
+      const country = k.rows[0].country;
+      const sources = [docSource(loadingReading), ...k.rows.map(codeTableSourceK)];
+      
+      let b19Field: any = {
+        id: "B19",
+        block: "19",
+        label: "Foreign port of lading",
+        value: code,
+        status: "computed",
+        rule: "7501 p.11, Schedule K",
+        note: `${code} is "${name}" (${country}) in ${K_DATE}.`,
+        sources,
+      };
+      
+      headerFields.push(field_helper(b19Field));
+    } else if (k.kind === "several") {
+      // Case 6b: several codes
+      const distinctCodes = new Map<string, typeof k.rows[0]>();
+      for (const row of k.rows) {
+        if (!distinctCodes.has(row.code)) {
+          distinctCodes.set(row.code, row);
+        }
+      }
+      
+      const candidateRows = Array.from(distinctCodes.values());
+      const candidates = candidateRows.map((r) => ({ value: r.code, label: `${r.code} ${r.name} (${r.country})` }));
+      const sources = [docSource(loadingReading), ...k.rows.map(codeTableSourceK)];
+      const reasonLines = candidateRows.map((r) => `${r.code} ${r.name} (${r.country})`).join("; ");
+      
+      headerFields.push(
+        field_helper({
+          id: "B19",
+          block: "19",
+          label: "Foreign port of lading",
+          status: "needsReview",
+          reason: `The bill of lading names "${loadingText}". ${K_DATE} has more than one code for it: ${reasonLines}. A person picks the code.`,
+          sources,
+          candidates,
+        })
+      );
+    } else {
+      // Case 6c: no code
+      const sources: Source[] = [docSource(loadingReading)];
+      let candidates: { value: string; label: string }[] | undefined;
+      let reason = `The port of loading "${loadingText}" on the bill of lading is not in ${K_DATE}. A person looks up the code.`;
+      
+      if (k.allOther.length > 0) {
+        candidates = k.allOther.map((r) => ({ value: r.code, label: `${r.code} ${r.name} (${r.country})` }));
+        sources.push(...k.allOther.map(codeTableSourceK));
+        const codes = k.allOther.map((r) => r.code).join(", ");
+        reason += ` The 7501 instructions use the country's "All Other" code (${codes}) when the bill of lading names no port; a person decides whether it applies here.`;
+      }
+      
+      headerFields.push(
+        field_helper({
+          id: "B19",
+          block: "19",
+          label: "Foreign port of lading",
+          status: "needsReview",
+          reason,
+          sources,
+          candidates,
+        })
+      );
+    }
+  } else {
+    // Case 6d: not read
+    headerFields.push(
+      field_helper({
+        id: "B19",
+        block: "19",
+        label: "Foreign port of lading",
+        status: "needsReview",
+        reason: "The port of loading was not read from the bill of lading. A person looks up the Schedule K code.",
+      })
+    );
+  }
 
-  // B20: needsReview
-  headerFields.push(
-    field_helper({
-      id: "B20",
-      block: "20",
-      label: "U.S. port of unlading",
-      status: "needsReview",
-      reason: "Schedule D code lookup not built. Port of discharge from B/L required.",
-    })
-  );
+  // B20 (Requirement 47.4): U.S. port of unlading from Schedule D
+  const dischargeReading = accepted.get("billOfLading.portOfDischarge");
+  
+  if (dischargeReading && dischargeReading.value) {
+    const dischargeText = normalizeSpace(dischargeReading.value);
+    const u = lookupUsPort(dischargeText);
+    
+    if (u.kind === "one") {
+      // Case 4a: one row
+      const code = u.row.code;
+      const name = u.row.name;
+      const sources = [docSource(dischargeReading), codeTableSourceD(u.row)];
+      
+      let b20Field: any = {
+        id: "B20",
+        block: "20",
+        label: "U.S. port of unlading",
+        value: code,
+        status: "computed",
+        rule: "7501 p.12, Schedule D",
+        note: `${code} is "${name}" in Schedule D (CBP Appendix E, 2026-02-03).`,
+        sources,
+      };
+      
+      headerFields.push(field_helper(b20Field));
+    } else if (u.kind === "several") {
+      // Case 4b: several rows
+      const candidates = u.rows.map((r) => ({ value: r.code, label: `${r.code} ${r.name}` }));
+      const sources = [docSource(dischargeReading), ...u.rows.map(codeTableSourceD)];
+      const reasonLines = u.rows.map((r) => `${r.code} ${r.name}`).join("; ");
+      
+      headerFields.push(
+        field_helper({
+          id: "B20",
+          block: "20",
+          label: "U.S. port of unlading",
+          status: "needsReview",
+          reason: `The bill of lading names "${dischargeText}". Schedule D has more than one code for it: ${reasonLines}. A person picks the code.`,
+          sources,
+          candidates,
+        })
+      );
+    } else {
+      // Case 4c: no row
+      headerFields.push(
+        field_helper({
+          id: "B20",
+          block: "20",
+          label: "U.S. port of unlading",
+          status: "needsReview",
+          reason: `The port of discharge "${dischargeText}" on the bill of lading is not a port in Schedule D (CBP Appendix E, 2026-02-03). A person looks up the code.`,
+          sources: [docSource(dischargeReading)],
+        })
+      );
+    }
+  } else {
+    // Case 4d: not read
+    headerFields.push(
+      field_helper({
+        id: "B20",
+        block: "20",
+        label: "U.S. port of unlading",
+        status: "needsReview",
+        reason: "The port of discharge was not read from the bill of lading. A person looks up the Schedule D code.",
+      })
+    );
+  }
+
+  // B6: filled from B20 (Requirement 47.5)
+  const b20Field = headerFields.find((f) => f.id === "B20")!;
+  const b6Idx = headerFields.findIndex((f) => f.id === "B6");
+  if (b6Idx !== -1) {
+    const b20Sources = b20Field.sources;
+    const b20Candidates = b20Field.candidates;
+    
+    if (b20Field.status === "computed" && b20Field.value) {
+      // B20 has one code
+      let candidate: { value: string; label: string } | undefined;
+      const codeTableSource = b20Sources.find((s) => s.kind === "codeTable") as any;
+      if (b20Candidates && b20Candidates.length > 0) {
+        candidate = { value: b20Field.value, label: b20Candidates[0].label };
+      } else if (codeTableSource) {
+        candidate = { value: b20Field.value, label: `${b20Field.value} ${codeTableSource.name}` };
+      }
+      
+      headerFields[b6Idx] = field_helper({
+        id: "B6",
+        block: "6",
+        label: "Port code",
+        value: b20Field.value,
+        status: "needsReview",
+        reason: "Block 6 is the port where the entry is filed. It is the port of unlading (Block 20) unless the goods moved in bond to another port, so the Block 20 code is suggested. A person confirms it or enters the port of entry.",
+        sources: b20Sources,
+        inputs: ["B20"],
+        candidates: candidate ? [candidate] : undefined,
+      });
+    } else if (b20Field.status === "needsReview" && b20Candidates && b20Candidates.length > 0) {
+      // B20 has several codes
+      headerFields[b6Idx] = field_helper({
+        id: "B6",
+        block: "6",
+        label: "Port code",
+        status: "needsReview",
+        reason: "Block 6 is the port where the entry is filed. Schedule D has more than one code for the port of discharge, so a person picks it.",
+        sources: b20Sources,
+        inputs: ["B20"],
+        candidates: b20Candidates,
+      });
+    } else {
+      // B20 gave no code
+      headerFields[b6Idx] = field_helper({
+        id: "B6",
+        block: "6",
+        label: "Port code",
+        status: "needsReview",
+        reason: "Block 6 is the port where the entry is filed. The port of discharge gave no Schedule D code, so a person enters it.",
+        sources: b20Sources,
+        inputs: ["B20"],
+      });
+    }
+  }
 
   // B25: personInput
   headerFields.push(
@@ -2452,6 +2677,198 @@ export function buildDraft(input: {
     headerFields.push(b10Field);
   }
 
+  // B13: Implement MID suggestion (Requirement 48.9) - before the parts list may override it
+  // The rule runs after the 7501 lines exist, with their B10 (country of origin) values
+  const nameReading = accepted.get("invoice.seller.name");
+  const addressReading = accepted.get("invoice.seller.address");
+  
+  {
+    // We check B13 regardless of whether name or address is accepted (Requirement 48.9a with no sources)
+    const name = normalizeSpace(nameReading?.value ?? "");
+    const address = normalizeSpace(addressReading?.value ?? "");
+    
+    if (!name || !address) {
+      // 48.9a: name or address not accepted
+      const b13Index = headerFields.findIndex((f) => f.id === "B13");
+      if (b13Index >= 0) {
+        const sources: Source[] = [];
+        if (nameReading) sources.push(docSource(nameReading));
+        if (addressReading) sources.push(docSource(addressReading));
+        
+        headerFields[b13Index] = field_helper({
+          id: "B13",
+          block: "13",
+          label: "Manufacturer ID (MID)",
+          status: "needsReview",
+          rule: "7501 Appendix 2",
+          reason: "The invoice issuer's name or address was not read, so no MID is suggested. A person enters the manufacturer's MID.",
+          sources,
+          inputs: ["B10"],
+        });
+      }
+    } else {
+      // Build MID suggestion
+      const b13Index = headerFields.findIndex((f) => f.id === "B13");
+      if (b13Index >= 0) {
+        // 48.9b: Check if all lines have an origin (B10)
+        const allLineOrigins: string[] = [];
+        let anyLineHasNoOrigin = false;
+        
+        for (const line of draftLines) {
+          const b10Field = line.fields.find((f) => f.block === "10");
+          if (b10Field && b10Field.value) {
+            allLineOrigins.push(b10Field.value);
+          } else {
+            anyLineHasNoOrigin = true;
+          }
+        }
+        
+        if (anyLineHasNoOrigin || draftLines.length === 0) {
+          // 48.9b: a line without an origin
+          const sources: Source[] = [];
+          if (nameReading) sources.push(docSource(nameReading));
+          if (addressReading) sources.push(docSource(addressReading));
+          
+          headerFields[b13Index] = field_helper({
+            id: "B13",
+            block: "13",
+            label: "Manufacturer ID (MID)",
+            status: "needsReview",
+            rule: "7501 Appendix 2",
+            reason: "The country of origin of a line is not known, so the first two letters of the MID are not known. A person enters the MID.",
+            sources,
+            inputs: ["B10"],
+          });
+        } else {
+          // All lines have origins - group by origin
+          const originGroups = new Map<string, string[]>();
+          draftLines.forEach((line, idx) => {
+            const b10 = line.fields.find((f) => f.block === "10");
+            if (b10 && b10.value) {
+              const origin = b10.value;
+              if (!originGroups.has(origin)) {
+                originGroups.set(origin, []);
+              }
+              originGroups.get(origin)!.push(line.lineNumber);
+            }
+          });
+          
+          const distinctOrigins = Array.from(originGroups.keys());
+          
+          if (distinctOrigins.length === 1) {
+            // 48.9c: One origin - suggest MID
+            const origin = distinctOrigins[0];
+            const result = suggestMid({ name, address, origin });
+            
+            const sources: Source[] = [];
+            if (nameReading) sources.push(docSource(nameReading));
+            if (addressReading) sources.push(docSource(addressReading));
+            
+            if (!result.ok) {
+              // MID cannot be computed
+              headerFields[b13Index] = field_helper({
+                id: "B13",
+                block: "13",
+                label: "Manufacturer ID (MID)",
+                status: "needsReview",
+                rule: "7501 Appendix 2",
+                reason: result.reason,
+                sources,
+                inputs: ["B10"],
+              });
+            } else {
+              // MID computed successfully
+              const mid = result.value;
+              const parts = result.parts;
+              const genericPrefix = result.genericPrefix;
+              const withoutGeneric = result.withoutGeneric;
+              const notes = result.notes;
+              
+              const candidates: { value: string; label: string }[] = [{ value: mid, label: mid }];
+              if (withoutGeneric) {
+                candidates.push({ value: withoutGeneric, label: `${withoutGeneric} without "${genericPrefix}"` });
+              }
+              
+              let noteText = `${parts.country} + ${parts.name} + ${parts.number} + ${parts.city} from "${name}" and "${address}".`;
+              
+              // Add city-state note if present
+              const cityStateNote = notes.find((n) => n.includes("comes from the country name"));
+              if (cityStateNote) {
+                noteText += " " + cityStateNote;
+              }
+              
+              let reasonText = "Suggested from the invoice issuer's name and address by the MID rule of the 7501 instructions (Appendix 2). The MID names the manufacturer: a person checks that the invoice issuer made the goods or sold them directly, and confirms.";
+              
+              // Add generic prefix note if present
+              if (genericPrefix) {
+                reasonText += ` The name starts with "${genericPrefix}", a word for a kind of company. Appendix 2 leaves out some such words; a person decides whether to leave it out.`;
+              }
+              
+              // Add country of origin note if different from address
+              const originDiffNote = notes.find((n) => n.includes("The goods come from"));
+              if (originDiffNote) {
+                reasonText += " " + originDiffNote;
+              }
+              
+              // Add textile note if any line is textile
+              const hasTextile = draftLines.some((line) => {
+                const hts33a = line.fields.find((f) => f.block === "33A");
+                if (hts33a && hts33a.value && /^(5\d|6[0-3])/.test(hts33a.value)) {
+                  return true;
+                }
+                return false;
+              });
+              
+              if (hasTextile) {
+                reasonText += " Textile goods (chapters 50 to 63): the MID must be the actual manufacturer's (19 CFR 102.23), not a trading company's.";
+              }
+              
+              headerFields[b13Index] = field_helper({
+                id: "B13",
+                block: "13",
+                label: "Manufacturer ID (MID)",
+                value: mid,
+                status: "needsReview",
+                rule: "7501 Appendix 2",
+                note: noteText,
+                reason: reasonText,
+                sources,
+                inputs: ["B10"],
+                candidates,
+              });
+            }
+          } else {
+            // 48.9d: Multiple origins
+            const sources: Source[] = [];
+            if (nameReading) sources.push(docSource(nameReading));
+            if (addressReading) sources.push(docSource(addressReading));
+            
+            const midsPerOrigin = distinctOrigins.map((origin) => {
+              const result = suggestMid({ name, address, origin });
+              return { origin, mid: result.ok ? result.value : "", lines: originGroups.get(origin)! };
+            });
+            
+            const reasonLines = midsPerOrigin
+              .filter((m) => m.mid)
+              .map((m) => `${m.mid} for line ${m.lines.join(", ")}`)
+              .join("; ");
+            
+            headerFields[b13Index] = field_helper({
+              id: "B13",
+              block: "13",
+              label: "Manufacturer ID (MID)",
+              status: "needsReview",
+              rule: "7501 Appendix 2",
+              reason: `The lines come from more than one country, so the MID differs by line: ${reasonLines}. A person enters MULTI and the MID of each line.`,
+              sources,
+              inputs: ["B10"],
+            });
+          }
+        }
+      }
+    }
+  }
+
   // B13: Update if parts list has MIDs
   if (partsList) {
     const lines = draftLines.flatMap(l => l.invoiceLines).sort((a, b) => a - b);
@@ -3654,7 +4071,7 @@ export function buildDraft(input: {
  * Helper: create a DraftField with common defaults, renamed to avoid conflict.
  */
 function field_helper(overrides: Partial<DraftField>): DraftField {
-  return {
+  const result: DraftField = {
     id: "",
     block: "",
     line: null,
@@ -3669,6 +4086,11 @@ function field_helper(overrides: Partial<DraftField>): DraftField {
     inputs: [],
     ...overrides,
   };
+  // Only include candidates if it was explicitly provided
+  if (overrides.candidates === undefined) {
+    delete (result as any).candidates;
+  }
+  return result;
 }
 
 /**

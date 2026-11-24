@@ -77,6 +77,36 @@ const KIND_LABEL = {
   partsList: 'Customer parts list',
 }
 
+/** Calculate the width needed to draw all text in a sheet page, including text that runs into empty cells */
+function sheetDrawnWidth(pageText: { width: number; height: number; items: Array<{ str: string; box: { x: number; y: number; w: number; h: number } }> }): number {
+  if (typeof document === 'undefined') {
+    // Server render: no canvas available
+    return pageText.width
+  }
+
+  const fontSize = `${Math.min(10, Math.max(6, pageText.height * 0.05))}px sans-serif`
+  const canvas = document.createElement('canvas')
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return pageText.width
+
+  ctx.font = fontSize
+  
+  let need = pageText.width
+  for (const item of pageText.items) {
+    // Check if this item has another item to its right in the same row
+    const hasItemToRight = pageText.items.some(
+      (o) => o !== item && Math.abs(o.box.y - item.box.y) < 0.01 && o.box.x > item.box.x
+    )
+    if (!hasItemToRight) {
+      // No item to the right: measure the text width
+      const measured = ctx.measureText(item.str).width
+      need = Math.max(need, item.box.x + 3 + measured + 4)
+    }
+  }
+
+  return need
+}
+
 export default function StitchBoard({
   bundle,
   reading: readingData,
@@ -316,7 +346,7 @@ export default function StitchBoard({
     const pane = documentsPaneRef.current
     const activeDoc = documents.find((d) => d.docId === activeDocId)
     const activePageText = activeDoc?.documentText.pages.find((p) => p.page === activePage) ?? activeDoc?.documentText.pages[0]
-    const pageWidth = activePageText?.width || 612
+    const pageWidth = activePageText?.origin === 'sheet' ? sheetDrawnWidth(activePageText!) : (activePageText?.width || 612)
     const fit = () => {
       // page-view has a 1rem margin on each side and a vertical scrollbar (about 16 px)
       const margins = parseFloat(getComputedStyle(document.documentElement).fontSize) * 2
@@ -609,14 +639,14 @@ export default function StitchBoard({
         // Sheet page rendering
         const activePageText = activeDoc.documentText.pages.find((p) => p.page === activePage)
         if (activePageText && activePageText.origin === 'sheet' && activePageText.grid) {
-          const pageWidth = activePageText.width
+          const drawnWidth = sheetDrawnWidth(activePageText)
           const pageHeight = activePageText.height
           const grid = activePageText.grid
 
           const canvas = document.createElement('canvas')
-          canvas.width = pageWidth * pageScale * window.devicePixelRatio
+          canvas.width = drawnWidth * pageScale * window.devicePixelRatio
           canvas.height = pageHeight * pageScale * window.devicePixelRatio
-          canvas.style.width = `${pageWidth * pageScale}px`
+          canvas.style.width = `${drawnWidth * pageScale}px`
           canvas.style.height = `${pageHeight * pageScale}px`
 
           const ctx = canvas.getContext('2d')
@@ -625,11 +655,11 @@ export default function StitchBoard({
             
             // Fill white
             ctx.fillStyle = 'white'
-            ctx.fillRect(0, 0, pageWidth, pageHeight)
+            ctx.fillRect(0, 0, drawnWidth, pageHeight)
             
             // Fill top 20 points with light gray
             ctx.fillStyle = '#f3f4f6'
-            ctx.fillRect(0, 0, pageWidth, 20)
+            ctx.fillRect(0, 0, drawnWidth, 20)
             
             // Fill left 36 points with light gray
             ctx.fillRect(0, 0, 36, pageHeight)
@@ -652,7 +682,7 @@ export default function StitchBoard({
               const y = row.y + row.h
               ctx.beginPath()
               ctx.moveTo(0, y)
-              ctx.lineTo(pageWidth, y)
+              ctx.lineTo(drawnWidth, y)
               ctx.stroke()
             }
             
@@ -681,7 +711,7 @@ export default function StitchBoard({
 
             // A text runs on into the empty cells to its right, as in Excel; it stops at the next cell with text in its row
             const lastCol = grid.cols[grid.cols.length - 1]
-            const gridRight = lastCol ? lastCol.x + lastCol.w : pageWidth
+            const gridRight = lastCol ? lastCol.x + lastCol.w : activePageText.width
             for (const item of activePageText.items) {
               const box = item.box
               const clipRight = activePageText.items
@@ -689,7 +719,12 @@ export default function StitchBoard({
                 .reduce((m, o) => Math.min(m, o.box.x), gridRight)
               ctx.save()
               ctx.beginPath()
-              ctx.rect(box.x, box.y, Math.max(box.w, clipRight - box.x), box.h) // x, y, width, height
+              // For items with no item to their right, clip at drawnWidth; otherwise use clipRight
+              const hasItemToRight = activePageText.items.some(
+                (o) => o !== item && Math.abs(o.box.y - box.y) < 0.01 && o.box.x > box.x
+              )
+              const finalClipRight = hasItemToRight ? clipRight : drawnWidth
+              ctx.rect(box.x, box.y, Math.max(box.w, finalClipRight - box.x), box.h) // x, y, width, height
               ctx.clip()
               ctx.fillText(item.str, box.x + 3, box.y + box.h / 2)
               ctx.restore()
@@ -793,6 +828,8 @@ export default function StitchBoard({
               data-testid="back-to-sample"
               className="btn"
               onClick={() => {
+                setDocuments([])
+                setLoadState('loading')
                 setUpload(null)
                 setShowUpload(false)
               }}
@@ -841,6 +878,8 @@ export default function StitchBoard({
           {showUpload && (
             <UploadPanel
               onLoaded={(r) => {
+                setDocuments([])
+                setLoadState('loading')
                 setUpload(r)
                 setShowUpload(false)
               }}
@@ -1560,6 +1599,23 @@ function SourceStrip({
                 </button>
               )}
 
+              {/* Candidate buttons for needsReview with candidates */}
+              {field.status === 'needsReview' && field.candidates && field.candidates.length > 0 && (
+                <div data-testid="candidates" style={{ display: 'flex', flexWrap: 'wrap', columnGap: '0.5rem', rowGap: '0.25rem', marginBottom: '0.5rem' }}>
+                  {field.candidates.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      className="btn btn-small"
+                      data-testid={`candidate-${c.value}`}
+                      onClick={() => onApply(field.id, c.value)}
+                    >
+                      Use {c.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Override form for needsReview or personInput */}
               {(field.status === 'needsReview' || field.status === 'personInput') && (
                 <form
@@ -1662,6 +1718,8 @@ function SourceStrip({
                               <> (read from an image by the AI reader){lineText && <> Place estimated by the AI reader. Its transcript line: "{lineText}"</>}</>
                             )}
                           </>
+                        ) : source.kind === 'codeTable' ? (
+                          `${source.table} (${source.edition}): ${source.code} ${source.name}${source.country ? `, ${source.country}` : ''}`
                         ) : (
                           `Tariff schedule ${source.revision}, row ${source.htsno}`
                         )}

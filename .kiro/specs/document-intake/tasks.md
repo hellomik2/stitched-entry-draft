@@ -359,6 +359,24 @@
 - [x] 58. (maintainer) Verifier items for Requirements 45 and 46; the board flow with the parts-list test bundle
   - _Requirements: 45, 46_
 
+- [x] 59. Port codes and the mode of transport from the CBP code tables
+  - [x] 59.1 Tests that fail on the current code: `lookupUsPort` and `lookupForeignPort` cases; Property 64; B20, B6 and B19 for one, several and no rows; Property 65; B9 for 10, 11 and the waits; a code table source in the CSV
+  - [x] 59.2 `src/core/codeTables.ts`, `draft.ts` (B6, B9, B19, B20, candidates, the code table source), `csv.ts`, `index.ts`
+  - _Requirements: 47_
+
+- [x] 60. Block 13 MID suggested by the Appendix 2 rule
+  - [x] 60.1 Tests that fail on the current code: the 13 official examples, the short name, street and city examples of Appendix 2, `splitIssuerAddress`, Property 66, Property 67, B13 in the sample, a single origin, several origins, a generic prefix, textiles, the parts list MID first
+  - [x] 60.2 `src/core/mid.ts`, `draft.ts` (B13), `index.ts`
+  - _Requirements: 48_
+
+- [x] 61. The board: candidate buttons, code table sources, back to sample, sheet width
+  - [x] 61.1 Board checks that fail on the current code: candidate buttons, the code table source line, the bill of lading after "Back to sample", the right edge of a sheet page
+  - [x] 61.2 `StitchBoard.tsx`
+  - _Requirements: 47.8, 47.9, 49_
+
+- [x] 62. (maintainer) The two code tables extracted from the CBP PDFs; verifier items for Requirements 47 to 49; the sample's expected drafts, Needs review counts and CSV fingerprint updated
+  - _Requirements: 47, 48, 49_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -420,5 +438,9 @@
 56. An Excel document is read with cell addresses
 57. A customer parts list gives the HTS number, origin and MID
 58. (maintainer) Verifier items for Requirements 45 and 46; the board flow with the parts-list test bundle
+59. Port codes and the mode of transport from the CBP code tables
+60. Block 13 MID suggested by the Appendix 2 rule
+61. The board: candidate buttons, code table sources, back to sample, sheet width
+62. (maintainer) Code tables, verifier items and the sample's expected values
 
 **Total Sub-Tasks:** 204

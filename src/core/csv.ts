@@ -21,9 +21,14 @@ export const CSV_COLUMNS = [
  * With origin === "imageTranscript", append ` (read from an image by the AI reader)` after the closing quote.
  * With cell, append ` (cell <cell>)` after the closing quote.
  * HtsSource: `HTS ${revision} ${htsno}`
+ * CodeTableSource: `${table} ${edition} ${code} "${name}"` with `, ${country}` inside the quotes when present.
  */
 export function formatSource(s: Source): string {
-  if (s.kind === "document") {
+  if (s.kind === "codeTable") {
+    const cts = s as any;
+    const nameWithCountry = cts.country ? `${cts.name}, ${cts.country}` : cts.name;
+    return `${cts.table} ${cts.edition} ${cts.code} "${nameWithCountry}"`;
+  } else if (s.kind === "document") {
     const docS = s as DocSource;
     const x = docS.box.x.toFixed(1);
     const y = docS.box.y.toFixed(1);

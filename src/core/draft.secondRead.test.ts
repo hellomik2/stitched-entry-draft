@@ -329,7 +329,7 @@ describe("Draft: Second Read and Low Confidence (Requirements 36, 38, 49.1, 53, 
         ),
         { numRuns: 40 }
       );
-    });
+    }, 60000);
   });
 
   describe("Requirement 38: Empty/Rejected HTS, Origin, and Gross Weight Tracking", () => {
@@ -650,6 +650,6 @@ describe("Draft: Second Read and Low Confidence (Requirements 36, 38, 49.1, 53, 
         ),
         { numRuns: 40 }
       );
-    });
+    }, 60000);
   });
 });

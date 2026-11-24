@@ -1345,6 +1345,22 @@ For any invoice lines and parts list: when a line's item number equals exactly o
 For any invoice line whose accepted invoice HTS number (or origin) differs from its one matching row, the line's 33A (or 10) is needsReview with no value and has both sources, and for HTS its 35, 37A and 38 have no value; when they agree, the field has the value and both sources.
 **Validates: Requirements 46.4, 46.6**
 
+### Property 64: A Code Table Lookup Never Drops a Candidate
+For any row of Schedule K and any of its names, `lookupForeignPort("<name>, <country>")` gives a result whose rows include a row with that code, and when the result is one code, every row of that country with that name has that code. For any port row of Schedule D whose state part is a state name of Requirement 47.2, `lookupUsPort("<city>, <state postal code>, USA")` gives a result whose rows include that row's code.
+**Validates: Requirements 47.2, 47.3**
+
+### Property 65: A Port Code Is Filled Only From One Table Row
+For any bill of lading readings, B19 and B20 are computed only when the lookup gives one code, with that code as the value and a bill of lading reading and the code table rows as sources; with several codes they are needsReview with no value and one candidate per code; B6 is never computed or copied.
+**Validates: Requirements 47.4, 47.5, 47.6**
+
+### Property 66: The MID Has the Appendix 2 Shape and Ignores What the Rule Ignores
+For any name of words of two or more letters and digits, street, city, and ISO country code (or CA with a province), a successful `midFromParts` value has at most 15 characters, only A to Z and 0 to 9, and starts with the country or province code; it does not change when the inputs change case, gain or lose commas, apostrophes, ampersands, a period at the end of a word, extra spaces, or the words "the", "and" and "of" between words of the name.
+**Validates: Requirements 48.2, 48.4, 48.5, 48.6**
+
+### Property 67: The MID Number Is the Largest Street Number
+For any street of words and numbers (without leading zeros) separated by spaces, the number part is the first four digits of the largest number, and empty when there is no number.
+**Validates: Requirement 48.4**
+
 ---
 
 ## Error Handling

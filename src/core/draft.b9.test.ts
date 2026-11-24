@@ -23,8 +23,8 @@ describe("Feature: document-intake, Requirement 44.3: Block 9 waits without a co
     expect([f?.status, f?.value, f?.rule, f?.note, f?.sources.length]).toEqual(["computed", "11", "7501 p.8", "Vessel, containerized: the B/L lists a container.", 1]);
   });
 
-  it("container number not read: B9 waits with no value", async () => {
-    expect(waits(await b9Of((fs) => fs.filter((x) => x.field !== "billOfLading.containerNo")))).toEqual(["needsReview", null, null, null, B9_WAIT]);
+  it("container number not read, vessel read: B9 is 10 (Requirement 47.7)", async () => {
+    expect(waits(await b9Of((fs) => fs.filter((x) => x.field !== "billOfLading.containerNo")))).toEqual(["computed", "10", "7501 p.8", "Vessel, not containerized: no container number was read on the bill of lading. The 7501 instructions use 10 for a vessel when it is not known whether the goods were containerized.", null]);
   });
 
   it("container number rejected (quote not on the page): B9 waits with no value", async () => {

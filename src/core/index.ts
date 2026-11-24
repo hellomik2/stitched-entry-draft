@@ -11,6 +11,8 @@ export * from "./transcript";
 export * from "./readerContract";
 export * from "./budget";
 export * from "./partsList";
+export * from "./codeTables";
+export * from "./mid";
 
 import type { DocumentText } from "./pdfText";
 import type { DocumentReader } from "./reading";
