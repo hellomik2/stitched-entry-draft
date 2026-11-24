@@ -402,7 +402,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 1. `estimateReaderCall` SHALL count every text the uploader controls at one token per UTF-8 byte (a token always covers at least one byte, so this bounds any text, also characters outside the Basic Multilingual Plane). inputTokens = `promptOverheadTokens` (10,000: the fixed system prompt, field list and output schema) + for every page: `perPageOverheadTokens` (160: the fixed words the request puts around a page) + utf8Bytes(fileName) + 4 x utf8Bytes(docId) (the request repeats the file name and the document id on every page, and the output schema lists the document id twice) + utf8Bytes(text) for a text page or `imageTokensPerPage` (5,000) for an image page. utf8Bytes counts, for each code point, 1 byte below U+0080, 2 below U+0800, 3 below U+10000 (lone surrogates included), 4 otherwise.
 2. Any input that passes the per-call line (0.0108 USD, with at least 8,000 output tokens of room, Requirement 29.4) therefore has at most 68,000 input tokens, under the 100,000-token price step.
-3. AFTER a reader call that reports token usage (a valid answer, an invalid answer, or a ReaderError that carries usage), THE server SHALL compute the actual cost with `estimateCostNanoUsd(inputTokens, outputTokens)`. IF it is above the worst case reserved for the call, THE server SHALL add the difference to `reservedCostNanoUsd`: read the state, apply `addReservedCost`, write it, with the tries of Requirement 42.1; if they fail, log "usage cost top-up not written" (no document text). The answer to the person does not change.
+3. AFTER a reader call that reports token usage (a valid answer, an invalid answer, or a ReaderError that carries usage), THE server SHALL compute the actual cost with `estimateCostNanoUsd(inputTokens, outputTokens)`. IF it is above the worst case reserved for the call, THE server SHALL add the difference to `reservedCostNanoUsd`: read the state, apply `addReservedCost`, write it, with the tries of Requirement 42.1; if they fail, log "usage cost top-up not written" (no document text). The answer to the person does not change. A usage the call cannot have gets no top-up (Requirement 56.1), and the top-up runs after the record, within the time of Requirement 55.
 4. `addReservedCost(state, extraNanoUsd)` in `budget.ts` SHALL return a new state with `reservedCostNanoUsd` = (old value or 0) + extraNanoUsd and every other part unchanged; it never changes its input.
 
 ---
@@ -637,9 +637,9 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 #### Acceptance Criteria
 
-1. `createBlobsUsageStore().appendRecord` SHALL treat the record as saved only when the result has `modified: true` and a non-empty string `etag`; otherwise it SHALL throw "usage record write was not confirmed by the store; not written".
+1. `createBlobsUsageStore().appendRecord` SHALL write the record and judge the write as Requirement 54.1 says; WHEN the record is not saved it SHALL throw "usage record write was not confirmed by the store; not written".
 2. WHEN `appendRecord` throws in claude mode (success, error and cap-exceeded records), THE server SHALL log one line: `usage record not written: ` followed by the JSON of `{ timestamp, model, outcome, inputTokens, outputTokens, estimatedCostNanoUsd }` of that record (no file hashes, no error message, no document text). The status and body of the answer are the same as with a working store. The record is not written again (the library has already retried 429 and 5xx).
-3. WHEN the reader reports `inputTokens` or `outputTokens` that is not a non-negative safe integer, THE server SHALL NOT throw: the record has `inputTokens: null`, `outputTokens: null` and `estimatedCostNanoUsd` = the worst case reserved for the call (`estimateReaderCall(input).worstCaseCostNanoUsd`), the ledger gets no top-up, and the answer is the one for that outcome (200 with the output for a valid answer, 502 for an invalid answer or a reader error).
+3. WHEN the reader reports `inputTokens` or `outputTokens` that is not a non-negative safe integer, or a usage the call cannot have (Requirement 56.1), THE server SHALL NOT throw: the record has `inputTokens: null`, `outputTokens: null` and `estimatedCostNanoUsd` = the worst case reserved for the call (`estimateReaderCall(input).worstCaseCostNanoUsd`), the ledger gets no top-up, and the answer is the one for that outcome (200 with the output for a valid answer, 502 for an invalid answer or a reader error).
 
 ---
 
@@ -863,6 +863,59 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 54 (MUST): A Usage Record Is Written Without a Condition, So a Write Sent Again Is Counted Once
+
+**User Story:** As an operator, I want each paid call to leave exactly one usage record or one log line, so that counting the records plus the log lines never counts a call twice.
+
+**Background:** The record was written with `onlyIfNew`. When the store saved the record and then answered 503 or lost the connection, the library sent the same PUT again, got 412 and returned `{ modified: false }`, so the server logged "usage record not written" for a record that was saved: 1 record and 1 log line for one call (agy cross-check 3, R14). A record PUT answered 200 without an ETag also counted as not written.
+
+#### Acceptance Criteria
+
+1. `createBlobsUsageStore().appendRecord` SHALL write the record with `setJSON(key, record)` and no condition (no `onlyIfNew`, no `onlyIfMatch`). The key is new for every call (`usage/<the digits of the timestamp>-<a random UUID>`), so a PUT that the library sends again after a 5xx or a lost connection lands on the same record. IT SHALL count the record as saved WHEN `setJSON` resolves with `modified: true`, with or without an `etag` (for a PUT without a condition the installed `@netlify/blobs` resolves only for status 200 and throws for every other status after its retries). WHEN `setJSON` resolves with `modified: false` or throws, it SHALL throw "usage record write was not confirmed by the store; not written".
+2. Through the installed library, as on Netlify (`createBlobsUsageStore()` with the Blobs context and `fetch`): a record PUT that the store saves and then answers 503, or saves and then loses the connection, SHALL leave 1 record and no "usage record not written" line; a record PUT answered 200 without an ETag SHALL leave 1 record and no line; a record PUT answered 403, 503 on every try, or 503 with an ETag on every try SHALL leave no record and 1 line (Requirement 41.2), also for a cap-exceeded record. The cap state writes keep `onlyIfNew` and `onlyIfMatch` as today.
+
+---
+
+### Requirement 55 (MUST): The Store Writes After the Reader Stop in Time
+
+**User Story:** As an operator, I want the request to answer within the time limit of the function even when the store stops answering right after the reader, so that the person gets the answer and a record or a log line is left.
+
+**Background:** After the reader the server topped up the ledger and then wrote the record. When the store answered only 503 right after the reader, the library waited 5 s five times for each write, so the server held the request 50 s after the reader (25 s without a top-up). With the 45 s reader time limit this is past the 60 s limit of a Netlify synchronous function: the person lost the answer and neither the record nor a log line was left (agy cross-check 3, R16).
+
+#### Acceptance Criteria
+
+1. AFTER the reader returns or throws in claude mode, THE server SHALL write the record first and then do the top-up of Requirement 24.3.
+2. THE store calls after the reader (the record, and every read and write of the top-up) SHALL end by `intakeConfig.postReadStoreMs` (10,000 ms) after the reader returned or threw. Each store call waits at most for the time that is left; a store call that is still running then counts as failed and the server does not wait for it; a top-up try does not start when no time is left. A record that is not saved in that time gives the line of Requirement 41.2; a top-up that is not written in that time gives "usage cost top-up not written". A write that the store finishes after that time may still be saved; the count is then one too many, never short. The answer to the person does not change. `ReadDeps.postReadStoreMs?: number` (default `intakeConfig.postReadStoreMs`) sets the time, so tests do not wait. The reader time limit (`readerTimeoutMs`, 45,000 ms) and every other limit stay as they are.
+3. With the installed library and its 5 s waits, a store that answers only 503 right after the reader SHALL hold the request at most `postReadStoreMs` plus 1 s after the reader, with a top-up and without one, and leave the record line and, with a top-up, the top-up line.
+
+---
+
+### Requirement 56 (MUST): A Usage the Call Cannot Have, and an Answer Without Usage, Are Recorded at the Reserved Worst Case
+
+**User Story:** As an operator, I want a token count that no call can have, or an answer without a usage block, to leave a record at the reserved worst case without moving the ledger, so that one strange answer cannot close the budget or break the ledger.
+
+**Background:** A safe integer token count was used as it came: 1,000,000,000,000 input tokens added 500,000 USD to the ledger (the next request got 429), and 9,000,000,000,000,000 made the ledger larger than a safe integer (every later request got 503) (agy cross-check 3, R17). An SDK answer without `usage`, with `usage: null`, or with `content` that is not a list made the reader throw a TypeError, so the record had no cost (R18).
+
+#### Acceptance Criteria
+
+1. A reported usage SHALL count as one the call can have only WHEN `inputTokens` and `outputTokens` are non-negative safe integers, `outputTokens` is at most the output room of the call (`estimateReaderCall(input).outputTokens`, the `max_tokens` the request sends), and `inputTokens + outputTokens` is at most `intakeConfig.readerContextWindowTokens` (1,000,000, the context window of Claude Haiku 5.5). Any other usage SHALL be handled as Requirement 41.3 says: no throw, the record has `inputTokens: null`, `outputTokens: null` and the reserved worst case as its cost, the ledger gets no top-up, and the answer is the one for that outcome. A usage the call can have is recorded and topped up as today (Requirement 24.3).
+2. AFTER the SDK answered, `createClaudeReader` SHALL throw nothing but a `ReaderError`. It SHALL read `input_tokens` and `output_tokens` only WHEN `usage` is an object, and only a count that is a number; any other count is null in the reader's usage (`ReaderUsage` counts are `number | null`), so the record gets the reserved worst case (56.1, 41.3). WHEN the answer is not an object or its `content` is not a list, THE reader SHALL throw `ReaderError("The AI reader returned no answer.", usage)`. Every other answer is handled as today.
+
+---
+
+### Requirement 57 (MUST): The Chapter 99 Reason Says "See" Once
+
+**User Story:** As a licensed person, I want the Chapter 99 reason to read as one sentence, so that the draft does not look careless.
+
+**Background:** The reason was `See ${footnotes}. A person enters …`, and the tariff footnote already reads "See 9903.90.08.", so the sample's L005.ch99 said "See See 9903.90.08.. A person enters the additional duty (0.00 if none)."
+
+#### Acceptance Criteria
+
+1. `chapter99Reason(footnotes: string[]): string`, exported from `draft.ts` and `src/core/index.ts` and used for every L<nnn>.ch99 field, SHALL trim each footnote, remove its trailing periods and a leading "See" (any case) with the spaces after it, put "See " before it, join the footnotes with "; ", end them with one period and add " A person enters the additional duty (0.00 if none)." Examples: ["See 9903.90.08."] gives "See 9903.90.08. A person enters the additional duty (0.00 if none)."; ["9903.88.15", "See 9903.01.25."] gives "See 9903.88.15; See 9903.01.25. A person enters the additional duty (0.00 if none)."
+2. In the sample draft only the reason of L005.ch99 changes: in the CSV without the demo answers its "reason" cell, with the demo answers its "note" cell ("Entered by a person. Before: …"), and nothing else. The sample CSV fingerprints of Requirement 4.5 become 4276d1db29164275a6221adbfc284ba8c240ae1b75adea5ce1388c730a16f803 (without the demo answers) and 3312056aa79544807eeea352444ec1105bfe59e39dfe2ae8885ba75243c674a3 (with them).
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -920,6 +973,10 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 51. (MUST) The Reader Writes the Transcripts First and Counts the Packing List Lines
 52. (MUST) Every Country Name and Code, and the Printed Date Forms, Reach the Draft
 53. (MUST) The Page Comes First, and the Lists of Readings Stay Below It
+54. (MUST) A Usage Record Is Written Without a Condition, So a Write Sent Again Is Counted Once
+55. (MUST) The Store Writes After the Reader Stop in Time
+56. (MUST) A Usage the Call Cannot Have, and an Answer Without Usage, Are Recorded at the Reserved Worst Case
+57. (MUST) The Chapter 99 Reason Says "See" Once
 
 **NICE (if time is left):**
 

@@ -1330,7 +1330,7 @@ For any weight from 0 to 99,999,999.9 kg written with or without thousands comma
 **Validates: Requirements 40.1**
 
 ### Property 57: A Paid Call Leaves a Record or a Log Line
-For any outcome of a claude-mode call (valid answer, invalid answer, reader error with or without usage), any token counts (non-negative integers, fractions, negative numbers, missing) and a record store that confirms or refuses the write, the answer has the status and body it has with a working store, and either exactly one record is saved or exactly one line starting "usage record not written: " is logged; the record's cost is the cost of its tokens when they are non-negative safe integers and the reserved worst case when they are not.
+For any outcome of a claude-mode call (valid answer, invalid answer, reader error with or without usage), any token counts (non-negative integers, fractions, negative numbers, missing) and a record store that confirms or refuses the write, the answer has the status and body it has with a working store, and either exactly one record is saved or exactly one line starting "usage record not written: " is logged; the record's cost is the cost of its tokens when they are a usage the call can have (Requirement 56.1) and the reserved worst case when they are not.
 **Validates: Requirements 41.1, 41.2, 41.3**
 
 ### Property 58: The Ledger Keeps the Actual Cost After Conflicts
@@ -1392,6 +1392,22 @@ For any row of `data/codes/iso-3166-1.json` and any of its names, `countryCode` 
 ### Property 72: A Value Put Into a Transcribed Line Is Rejected
 For any image page and any reading whose quote does not occur in the page text: when its value occurs in its quote with a non-empty part before it and a non-empty part after it, and the part before, one space and the part after (spaces normalized) occur in the page text, `verifyReadings` rejects it with "quote_not_found", whatever its confidence; when they do not occur there, Property 68 holds.
 **Validates: Requirement 50.8**
+
+### Property 73: A Saved Record Is Counted Once
+For any sequence of claude-mode calls and, for each call, any answer of the store to its record PUT through the installed library (saved and 200 with or without an ETag; saved and then 503 or a lost connection, then a saved 200; 403, 503 or 503 with an ETag on every try), each call leaves one saved record and no "usage record not written" line when the store saved it, and no record and one line when it did not; no record PUT carries a condition.
+**Validates: Requirements 54.1, 54.2**
+
+### Property 74: The Store Writes After the Reader End in Time
+For any store whose calls after the reader answer after 0 ms up to 3 x `postReadStoreMs` or never, and any outcome, a claude-mode call answers within `postReadStoreMs` plus a small margin after the reader; the record is written before the top-up starts; the record is saved or its line is logged; and, when the actual cost is above the reserved worst case, the top-up is written or "usage cost top-up not written" is logged.
+**Validates: Requirements 55.1, 55.2**
+
+### Property 75: A Usage the Call Cannot Have Does Not Move the Ledger
+For any reported counts (any safe integers up to 2^53 - 1, fractions, negative numbers, missing) and any outcome (valid answer, invalid answer, reader error with usage), the record's cost is `estimateCostNanoUsd(inputTokens, outputTokens)` when the counts are a usage the call can have (Requirement 56.1) and the reserved worst case otherwise, and `reservedCostNanoUsd` ends at the larger of the reserved worst case and that cost.
+**Validates: Requirements 56.1, 41.3, 24.3**
+
+### Property 76: The Chapter 99 Reason Says "See" Once
+For any one to three footnotes made of optional spaces or an optional "See " (any case), a heading 99NN.NN.NN, optional trailing periods and optional spaces, `chapter99Reason` starts with "See ", has no "See See" (any case) and no "..", names every heading in order, and ends with ". A person enters the additional duty (0.00 if none)."
+**Validates: Requirements 57.1, 57.2**
 
 ---
 

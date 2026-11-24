@@ -405,6 +405,24 @@
   - [x] 68.2 `src/core/reading.ts`
   - _Requirements: 50.8, 50.9_
 
+- [ ] 69. A usage record is written without a condition, and the store writes after the reader stop in time
+  - [ ] 69.1 Tests that fail on the current code: `appendRecord` writes without a condition and counts `modified: true` as saved; through the installed library a record saved and then answered 503 or cut, or answered 200 without an ETag, leaves one record and no line; Property 73; the record before the top-up; a store that does not answer after the reader gives the answer within the post-read time with the lines; Property 74; the older tests of Requirement 41.1 and Property 57 follow 54.1 and 56.1
+  - [ ] 69.2 `src/server/usageStoreBlobs.ts`, `intakeService.ts`, `src/core/intakeConfig.ts` (`postReadStoreMs`, `readerContextWindowTokens`)
+  - _Requirements: 54, 55_
+
+- [ ] 70. A usage the call cannot have, and an answer without usage, are recorded at the reserved worst case
+  - [ ] 70.1 Tests that fail on the current code: the counts of 56.1 on the three outcomes (no top-up, the next request answered), the largest usage the call can have, Property 75; `createClaudeReader` with no `usage`, `usage: null`, `content` that is not a list, a null answer, a valid answer without usage
+  - [ ] 70.2 `src/server/intakeService.ts`, `claudeReader.ts`, `readerTypes.ts`
+  - _Requirements: 56_
+
+- [ ] 71. The Chapter 99 reason says "See" once
+  - [ ] 71.1 Tests that fail on the current code: the `chapter99Reason` examples, the sample's L005.ch99 reason, Property 76, the sample CSV fingerprints
+  - [ ] 71.2 `src/core/draft.ts`, `index.ts`
+  - _Requirements: 57_
+
+- [ ] 72. (maintainer) Verifier items for Requirements 54 to 57 with the cross-check 3 reproductions; the CBP Form 7501 (11/26) page check in the steering; the recorded answers of bundles A, B and C replayed before and after
+  - _Requirements: 54, 55, 56, 57_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -476,5 +494,9 @@
 66. The board: no box for a value outside the transcript, and the page above the lists
 67. (maintainer) ISO table, bundle C recording, verifier items and replays
 68. A value put into a line the reader transcribed without it is rejected
+69. A usage record is written without a condition, and the store writes after the reader stop in time
+70. A usage the call cannot have, and an answer without usage, are recorded at the reserved worst case
+71. The Chapter 99 reason says "See" once
+72. (maintainer) Verifier items, the CBP Form 7501 (11/26) page check and replays
 
-**Total Sub-Tasks:** 206
+**Total Sub-Tasks:** 212
