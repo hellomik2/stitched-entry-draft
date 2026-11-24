@@ -798,6 +798,71 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 50 (MUST): A Value Read From an Image Line That Is Not in the Transcript Waits for a Person
+
+**User Story:** As an entry writer, I want a value the AI reader read from a photo to come to me for a check, with no box, when the reader left that line out of its transcript, so that a right value is not thrown away and I only confirm it instead of typing it.
+
+**Background:** In a real read of test bundle C (photos of the invoice and of the packing list), the AI reader read all 77 values right but gave transcripts of only 6 and 5 lines for pages of 27 and 23 printed rows. `verifyReadings` rejected 58 right values with "quote_not_found", because the page text of an image page is the reader's own transcript; the board then had 47 values for a person to type. On an image page this check only compares the reader with itself. On a text page (PDF text layer or a sheet) the page text does not come from the reader, so the check keeps its meaning there.
+
+#### Acceptance Criteria
+
+1. WHEN the page of a reading has origin "imageTranscript" and its quote (spaces normalized) does not occur in the page text, `verifyReadings` SHALL NOT reject it with "quote_not_found", except as 50.8 says. WHEN its value (spaces normalized) is inside its quote, or the field is `invoice.date` or `billOfLading.onBoardDate` and the date rule of Requirement 35.1 holds for the value and the quote, the reading SHALL get status "uncertain" with `box: null`, `itemIds: []`, origin "imageTranscript", `notInTranscript: true`, no `lineText`, no `cell`, and the message `NOT_IN_TRANSCRIPT_MESSAGE` = "The AI reader read this value from a line that is not in its transcript of the image, so there is no box on the page. A person finds it on the page and checks it." Otherwise it is rejected with "value_not_in_quote" and today's message. The checks before the quote search (document, page, value missing, empty quote) come first as today. This holds for any confidence. Example: bundle C, `invoice.lines.1.description` "Paper lantern, bat print" with the same quote, not in the 6-line transcript: "uncertain", no box; `invoice.seller.address` "Lot 9, Fernlight Industrial Cluster Viet Nam" with the quote "Lot 9, Fernlight Industrial Cluster": rejected with "value_not_in_quote".
+2. ON a text page (a PDF text layer or a sheet), a quote that is not on the page SHALL still be rejected with "quote_not_found". On an image page, a quote found in the transcript once or more, and a value on a line with no box ("no_source_box"), are checked as today.
+3. THE draft SHALL use a reading with `notInTranscript: true` whose confidence is not "low" like an accepted reading of an image page (Requirements 18.1, 26.1, 26.3 and 30.1): its value goes into every field and check that an accepted reading would reach, and no field built from it is final before a person confirms it. Where Requirement 18.1 or 26.1 gives a field `IMAGE_REVIEW_REASON` or `IMAGE_COMPUTED_REVIEW_REASON` and one of its document sources has `notInTranscript: true`, the field SHALL get instead `UNPLACED_REVIEW_REASON` = "Read from an image by the AI reader, from a line that is not in its transcript, so there is no box on the page. Find it on the page, check it, then confirm it." or `UNPLACED_COMPUTED_REVIEW_REASON` = "Computed from values the AI reader read from an image. At least one is from a line that is not in its transcript, so it has no box on the page. Check them against the page, then confirm it." A field that waits on such a field waits as Requirement 26.3 says. The document source made from such a reading has `box: null` and `notInTranscript: true`. A reading with `notInTranscript: true` and confidence "low" is an "uncertain" reading of Requirement 36 (36.2 and 36.3 apply; its document source has `box: null` and `notInTranscript: true`).
+4. THE two reasons of 50.3 SHALL work everywhere the two image reasons work: the "Confirm this value" button, a person's value equal to the shown value (status "copied" or "computed" with `CONFIRMED_NOTE`, Requirements 18.3 and 26.2), the image rule after a person's edit (30.1), the waiting pass (26.3) and the rule for 38 (32.2). Any other person's value is handled as today.
+5. THE draft's `rejectedReadings` SHALL NOT list a reading that the draft uses by 50.3; a reading of 50.3 with confidence "low" is listed as other "uncertain" readings are.
+6. THE board SHALL draw no box and no thread end for a reading or a document source with no box. It lists the page's readings with `notInTranscript: true` in the "uncertain-readings" block, each with `data-testid` "uncertain-reading-<field>" and `data-not-in-transcript` "true": the field name, the value in quotes, and "not in the AI reader's transcript, so no box; a person finds it on the page and confirms it". The source strip of such a source reads `<document label> p.<n>: "<quote>" (read from an image by the AI reader) Not in its transcript, so there is no box on the page.` The CSV source of such a source is `<doc> p.<page> [no box] "<quote>" (read from an image by the AI reader) (not in its transcript)`.
+7. THE sample bundle with or without the demo answers, the upload test recordings, the verifier's expected drafts and the recorded real answers of bundles A and B keep every reading status and every draft field: their image quotes are in the transcripts or are rejected for another reason.
+8. ON an image page, WHEN a quote is not in the page text and the value occurs in it with a non-empty part of the quote before it and a non-empty part after it, and the part before, one space and the part after (spaces normalized) occur in the page text, the reader's own transcript has that line without the value. `verifyReadings` SHALL reject the reading with "quote_not_found" and today's message, before the rule of 50.1 and whatever its confidence. A value at the start or the end of its quote, and a date that is not written inside its quote, are not checked this way. Example: the sample bundle with every page an image page (Requirement 30.4 and Property 35), `invoice.lines.7.origin` "CN" with the quote "LH-107 Resin raven figurine, 18 cm 3926.40.0090 CN 90 PCS 5.40 486.00": the page has "LH-107 Resin raven figurine, 18 cm 3926.40.0090 90 PCS 5.40 486.00", so the reading is rejected as on the text page, and confirming every image value still gives the text-page draft. None of the 57 values of bundle C in 50.1 is such a reading.
+9. Two older examples follow 50.1: in Requirement 36.1, a low reading whose quote is not on an image page waits as 50.1 says, and on a text page it is still rejected with "quote_not_found" before its confidence counts; in Property 28, a quote that is not on an image page, with a value not inside it, is rejected with "value_not_in_quote".
+
+---
+
+### Requirement 51 (MUST): The Reader Writes the Transcripts First and Counts the Packing List Lines
+
+**User Story:** As an entry writer, I want the AI reader to write a photo's lines before it quotes them, and to say how many item lines the packing list has, so that a value is not lost for a short transcript and I know when lines were left out.
+
+**Background:** The output schema asks for "fields" before "transcripts", and structured outputs keep the schema's order of required properties. In bundle C the reader wrote its 74 fields first and then short transcripts; only 5 of its 63 quotes on image pages were in its own transcripts (bundle A: 43 of 43). In bundle B it gave only line 1 of an Excel packing list of 6 item lines (the net weight column is in pounds), and nothing told the app that lines were left out.
+
+#### Acceptance Criteria
+
+1. THE output schema SHALL list its properties in the order "transcripts", "fields", "invoiceLineCount", "packingListLineCount", every one required, so that the reader writes the transcripts before the fields. The schema sent in a request keeps this order.
+2. THE system prompt SHALL have, in place of today's transcript paragraph, the paragraph: `For every image page add one transcript, before the fields: every printed line in reading order, one table row per line, each as {"t": the line text, "b": [x, y, w, h]} where x, y, w and h are whole numbers from 0 to 1000 in thousandths of the page width and height, origin top-left. A quote for an image page must be copied from one of your transcript lines, so put every line you quote in the transcript. Text pages get no transcript.`
+3. THE system prompt SHALL have, after the "invoiceLineCount" paragraph, the paragraphs: `Give every item row of a packing list as packingList.lines.<n> fields in printed order. When one value of a row cannot be given as asked (for example a weight printed in pounds, LB or LBS, for a kg field), leave out only that field and give the other fields of the row; never convert a unit.` and `Set "packingListLineCount" to the number of item lines printed on the packing list, counting lines whose fields you leave out; use null when no packing list is given.`
+4. "packingListLineCount" SHALL follow Requirement 19.2 for "invoiceLineCount": integer or null in the schema; the output validator accepts it absent (older recordings) and otherwise requires null or an integer from 0 to 999 (reason "packingListLineCount: must be null or an integer from 0 to 999"); `readerOutputToAnswer` copies it into the reading answer (optional `packingListLineCount`), `validateReadingAnswer` checks it as it checks `invoiceLineCount`, and the board passes it to `buildDraft` (optional input `packingListLineCount`).
+5. WHEN `packingListLineCount` is a number, the draft SHALL add the check "P3.packing.lines" (rule "P3", label "Packing list lines read"): with m the number of packing list lines n from 1 to 8 that have at least one reading of a field `packingList.lines.<n>.*` (any status), ok is true when the count equals m and the detail is "the packing list shows <count> item lines and the draft has readings for <m>"; else ok is false and the detail is "the packing list shows <count> item lines, but the draft has readings for <m>". When the count is more than 8, the detail ends with "; this draft reads only the first 8". With no count (null or absent) the checks are as today.
+6. `max_tokens`, the cost line of one call, the input token estimate, the bounds of the output room, the caps, the model and thinking off SHALL stay as they are. The fake reader and its recordings stay as they are (they have no `packingListLineCount`).
+
+---
+
+### Requirement 52 (MUST): Every Country Name and Code, and the Printed Date Forms, Reach the Draft
+
+**User Story:** As an entry writer, I want an accepted country name or code and an accepted printed date to fill their blocks, so that a right value does not wait only because the app does not know its form.
+
+**Background:** In bundle B, B14 waited with "Country not recognized: "Germany"" and B15 with "Invalid date format: "12-NOV-2026"" although both readings were accepted, and L001.10 said that the accepted origin "DE" was "rejected" because its quote was not on the page: `countryCode` knew only VN, PT, CZ, CN and US, and the draft read only MM/DD/YYYY dates, while the quote check of Requirement 35.1 reads the printed date forms.
+
+#### Acceptance Criteria
+
+1. `countryCode` SHALL accept, case-insensitively and with spaces normalized, each of the 249 officially assigned ISO 3166-1 alpha-2 codes and each name that the table `data/codes/iso-3166-1.json` lists for it (the CLDR English name, the CLDR short name where there is one, and the listed aliases), and give the two-letter code. VIETNAM, VIET NAM, PORTUGAL, CZECHIA, CZECH REPUBLIC, CHINA, USA and UNITED STATES still give VN, PT, CZ, CN, US. Text that is not in the table is refused with "Unknown country" as today.
+2. THE draft SHALL read the B15 value with `parseDocumentDate`: a value that `parseUsDate` accepts gives what it gives today; else, when the whole value (spaces normalized) is one printed date of Requirement 35.1 ("D Mon YYYY", "D-Mon-YYYY" such as "12-NOV-2026", "Mon D, YYYY", "Month D, YYYY", "YYYY-MM-DD", "DD.MM.YYYY"), the date as MM/DD/YYYY; else the reason of `parseUsDate`. The quote check and `parseDocumentDate` SHALL use one function for the printed date forms (`findPrintedDates`, moved to `parse.ts`).
+3. IN the reason of L<nnn>.10, the part for an invoice line whose origin reading is accepted but not a country that `countryCode` knows SHALL read `Invoice line <n>: the AI reader read "<v>", which is not a country name or code the app knows. A person checks it on the invoice.` (today it says that the quote is not on the page and that the reading was rejected).
+4. THE sample bundle with or without the demo answers and the verifier's expected drafts SHALL be unchanged.
+
+---
+
+### Requirement 53 (MUST): The Page Comes First, and the Lists of Readings Stay Below It
+
+**User Story:** As an entry writer, I want to see the photo of a page even when many of its readings were not used, so that I can check the values against it.
+
+**Background:** On the photo of the bundle C invoice, the list of 39 rejected readings filled the documents pane and the photo could not be seen.
+
+#### Acceptance Criteria
+
+1. THE "uncertain-readings" and "rejected-readings" blocks SHALL be in one block below the page view, with `data-testid` "reading-lists", at most 30% of the documents pane high and scrolling inside itself. The page view SHALL keep the rest of the pane's height. On the bundle C invoice photo with 39 readings in the lists, the page image is in view and at least half of the documents pane is the page view.
+2. EACH list keeps its `data-testid`, its entries and its words.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -851,6 +916,10 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 47. (MUST) Port Codes and the Mode of Transport From Public CBP Code Tables
 48. (MUST) Block 13 MID Suggested by the Appendix 2 Rule
 49. (MUST) The Board Draws Only the Active Documents, and a Sheet Is Not Cut
+50. (MUST) A Value Read From an Image Line That Is Not in the Transcript Waits for a Person
+51. (MUST) The Reader Writes the Transcripts First and Counts the Packing List Lines
+52. (MUST) Every Country Name and Code, and the Printed Date Forms, Reach the Draft
+53. (MUST) The Page Comes First, and the Lists of Readings Stay Below It
 
 **NICE (if time is left):**
 

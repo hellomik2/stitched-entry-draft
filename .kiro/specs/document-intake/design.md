@@ -1017,6 +1017,18 @@ export default function StitchBoard(...) {
 
 ---
 
+## Third Real Read Fixes (2026-11-24)
+
+**Requirement 50 (A Value Read From an Image Line That Is Not in the Transcript Waits for a Person):** `reading.ts`: on an image page a quote missing from the transcript gives "uncertain" with `box: null` and `notInTranscript: true` when the value is in the quote; `VerifiedReading` (accepted and uncertain) and `DocSource` allow `box: null` with the optional flag `notInTranscript`. `draft.ts`: `buildDraft` first turns such a reading with confidence other than "low" into an accepted reading (same box null and flag), so every rule for accepted image readings applies; the image rule picks the two "unplaced" reasons when a source has the flag, and every place that tests for the two image reasons tests for the four. `csv.ts` and `StitchBoard.tsx` show "no box" and draw nothing for a null box.
+
+**Requirement 51 (The Reader Writes the Transcripts First and Counts the Packing List Lines):** `claudeReader.ts`: schema order transcripts, fields, invoiceLineCount, packingListLineCount; three prompt paragraphs. `readerContract.ts`, `reading.ts`, `StitchBoard.tsx` and `draft.ts` carry `packingListLineCount` as they carry `invoiceLineCount`; `draft.ts` adds the check "P3.packing.lines".
+
+**Requirement 52 (Every Country Name and Code, and the Printed Date Forms, Reach the Draft):** `data/codes/iso-3166-1.json` (maintainer): 249 codes with the CLDR English names and aliases. `parse.ts`: `countryCode` reads it; `findPrintedDates` moves here from `reading.ts`; new `parseDocumentDate`. `draft.ts`: B15 uses `parseDocumentDate`; the L<nnn>.10 reason for an accepted origin that is not a known country.
+
+**Requirement 53 (The Page Comes First, and the Lists of Readings Stay Below It):** `StitchBoard.tsx`: the two lists move into one block of at most 30% of the documents pane with its own scroll bar.
+
+---
+
 ## Correctness Properties
 
 *Properties are numbered to validate specific requirements and are verified by property-based and example tests. Property tests use fast-check to generate random inputs; example tests use concrete data. Properties 1 to 28 are defined above, 29 to 32 are defined in tasks 17 and 22, and 33 to 55 are defined below (55 in total).*
@@ -1360,6 +1372,26 @@ For any name of words of two or more letters and digits, street, city, and ISO c
 ### Property 67: The MID Number Is the Largest Street Number
 For any street of words and numbers (without leading zeros) separated by spaces, the number part is the first four digits of the largest number, and empty when there is no number.
 **Validates: Requirement 48.4**
+
+### Property 68: An Image Value Missing From the Transcript Waits, Without a Box
+For any image page and any reading whose quote does not occur in the page text: when its value is inside its quote, `verifyReadings` gives "uncertain" with `box: null`, `itemIds: []`, `notInTranscript: true` and `NOT_IN_TRANSCRIPT_MESSAGE`, whatever its confidence; it is never "accepted" and never rejected with "quote_not_found" except as Property 72 says; when its value is not inside its quote, it is rejected with "value_not_in_quote".
+**Validates: Requirement 50.1**
+
+### Property 69: A Text Page Still Rejects a Quote It Does Not Have
+For any text page (PDF items or sheet cells) and any reading whose quote does not occur in the page text and is not a stacked run of Requirement 35.3, `verifyReadings` rejects it with "quote_not_found", whatever its confidence.
+**Validates: Requirement 50.2**
+
+### Property 70: No Draft Value From a Line Outside the Transcript Is Final Without a Person
+For any set of readings of the bundle C recording in which any subset of the image readings is `notInTranscript` (confidence high) and the rest are accepted image readings with a box, every draft field with a document source that has `notInTranscript: true` is "needsReview" with `UNPLACED_REVIEW_REASON`, `UNPLACED_COMPUTED_REVIEW_REASON` or a "Waiting on" reason, and every field has the same value as in the draft where all those readings are accepted image readings with a box.
+**Validates: Requirements 50.3, 50.4**
+
+### Property 71: Every ISO Code and Name Gives Its Code
+For any row of `data/codes/iso-3166-1.json` and any of its names, `countryCode` gives the row's code for the name and for the code, in any letter case and with extra spaces.
+**Validates: Requirement 52.1**
+
+### Property 72: A Value Put Into a Transcribed Line Is Rejected
+For any image page and any reading whose quote does not occur in the page text: when its value occurs in its quote with a non-empty part before it and a non-empty part after it, and the part before, one space and the part after (spaces normalized) occur in the page text, `verifyReadings` rejects it with "quote_not_found", whatever its confidence; when they do not occur there, Property 68 holds.
+**Validates: Requirement 50.8**
 
 ---
 
