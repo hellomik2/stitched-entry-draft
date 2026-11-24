@@ -104,9 +104,16 @@ export function createBlobsUsageStore(options: { blobs?: BlobsLike; storeName?: 
     async appendRecord(r: UsageRecord): Promise<void> {
       const blobs = await getBlobs();
       const key = `usage/${r.timestamp.replace(/[^0-9]/g, "")}-${randomUUID()}`;
-      const result = await blobs.setJSON(key, r, { onlyIfNew: true });
-      
-      if (!result.modified || typeof result.etag !== "string" || result.etag.length === 0) {
+      // Requirement 54.1: no condition. The key is new for every call, so a PUT that the library sends again after a 5xx or a
+      // lost connection lands on the same record. For a PUT without a condition the library resolves only for status 200 and
+      // throws for every other status after its retries.
+      let result: { modified: boolean; etag?: string };
+      try {
+        result = await blobs.setJSON(key, r);
+      } catch {
+        throw new Error("usage record write was not confirmed by the store; not written");
+      }
+      if (result.modified !== true) {
         throw new Error("usage record write was not confirmed by the store; not written");
       }
     },

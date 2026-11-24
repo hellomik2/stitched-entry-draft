@@ -15,7 +15,7 @@ describe("CSV output verification", () => {
 
       // Expected hash: the CSV is stable and should not change
       // This hash will be verified by the maintainer's test run
-      expect(hash).toBe("f00bdd5ed8072533ed268f2a134b5552d722a9b6c2e0c1ba9b674db47c3b930b");
+      expect(hash).toBe("4276d1db29164275a6221adbfc284ba8c240ae1b75adea5ce1388c730a16f803");
     });
 
     it("should produce stable CSV output for lantern-hollow bundle with demo overrides", async () => {
@@ -28,7 +28,7 @@ describe("CSV output verification", () => {
       const hash = createHash("sha256").update(csv, "utf8").digest("hex");
 
       // Expected hash: the CSV with demo overrides is stable and should not change
-      expect(hash).toBe("3b12c854322be4d87d369743925e513abd668671cc97ba7d94316563c50c05ba");
+      expect(hash).toBe("3312056aa79544807eeea352444ec1105bfe59e39dfe2ae8885ba75243c674a3");
     });
   });
 });

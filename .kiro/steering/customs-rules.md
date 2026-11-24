@@ -10,6 +10,7 @@ Sources:
 - **[7501]** CBP Form 7501 (02/26), "CBP Form 7501 Instructions", 27 pages, published at
   cbp.gov (forms page "Form 7501 Entry Summary with Continuation Sheets"). Page numbers below
   are "Page N of 27" in that PDF.
+  CBP Form 7501 (11/26), also 27 pages, has every rule cited below on the same page (checked 2026-11-24).
 - **[MPF]** CBP Dec. 26-14, Merchandise Processing Fee for fiscal year 2027 (Federal
   Register public inspection document 2026-15530).
 

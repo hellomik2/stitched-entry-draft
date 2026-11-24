@@ -14,6 +14,11 @@ export const intakeConfig = {
   // Fewest output tokens a call gets; with less room under perCall.maxCallCostNanoUsd the call is refused (the output size of the approved cost assumption).
   readerMinOutputTokens: 8_000,
   readerTimeoutMs: 45_000,
+  // Requirement 55.2: the store calls after the reader end this long after the reader returned or threw, so the request stays
+  // inside the 60 s limit of a Netlify synchronous function (the 45 s reader time limit, these 10 s and the reservation).
+  postReadStoreMs: 10_000,
+  // Requirement 56.1: the context window of Claude Haiku 5.5; a reported usage above it is one no call can have.
+  readerContextWindowTokens: 1_000_000,
   prices: {
     inputNanoUsdPerToken: 100,
     outputNanoUsdPerToken: 500,

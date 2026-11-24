@@ -198,6 +198,12 @@ function acceptedReadings(verified: VerifiedReading[]): Map<string, VerifiedRead
   return map;
 }
 
+// Requirement 57.1: the tariff footnotes already read "See 9903.90.08.", so "See" and the period are put on once.
+export function chapter99Reason(footnotes: string[]): string {
+  const parts = footnotes.map((f) => `See ${f.trim().replace(/[\s.]+$/, "").replace(/^see\b\s*/i, "")}`);
+  return `${parts.join("; ")}. A person enters the additional duty (0.00 if none).`;
+}
+
 /**
  * Build a draft for CBP Form 7501.
  * Part 1: checks, header (except B10), rejectedReadings.
@@ -2399,7 +2405,6 @@ export function buildDraft(input: {
     // L<nnn>.ch99: Chapter 99 additional duty (if applicable)
     if (htsLookup.found && htsLookup.chapter99.length > 0) {
       const id = `L${lineNum}.ch99`;
-      const footnoteText = htsLookup.chapter99.join("; ");
 
       const htsSource: HtsSource = {
         kind: "hts",
@@ -2415,7 +2420,7 @@ export function buildDraft(input: {
           label: "Chapter 99 additional duty (USD)",
           unit: null,
           status: "needsReview",
-          reason: `See ${footnoteText}. A person enters the additional duty (0.00 if none).`,
+          reason: chapter99Reason(htsLookup.chapter99),
           sources: [htsSource],
         })
       );

@@ -17,24 +17,71 @@ function isTokenCount(v: unknown): v is number {
   return typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 }
 
-// Requirement 41.3: counts that are not non-negative safe integers give null tokens and the reserved worst case.
+// Requirement 56.1: a usage the call can have. The output is at most the call's max_tokens (its output room) and input + output
+// at most the model's context window; any other usage is handled as Requirement 41.3 says.
+function isCallUsage(
+  usage: { inputTokens: unknown; outputTokens: unknown },
+  outputRoom: number,
+): usage is { inputTokens: number; outputTokens: number } {
+  return (
+    isTokenCount(usage.inputTokens) &&
+    isTokenCount(usage.outputTokens) &&
+    usage.outputTokens <= outputRoom &&
+    usage.inputTokens + usage.outputTokens <= intakeConfig.readerContextWindowTokens
+  );
+}
+
+// Requirements 41.3 and 56.1: a usage the call cannot have gives null tokens and the reserved worst case.
 function recordUsage(
   usage: { inputTokens: unknown; outputTokens: unknown } | null,
   reservedNanoUsd: number,
+  outputRoom: number,
 ): { inputTokens: number | null; outputTokens: number | null; estimatedCostNanoUsd: number | null } {
   if (usage === null) {
     return { inputTokens: null, outputTokens: null, estimatedCostNanoUsd: null };
   }
-  if (!isTokenCount(usage.inputTokens) || !isTokenCount(usage.outputTokens)) {
+  if (!isCallUsage(usage, outputRoom)) {
     return { inputTokens: null, outputTokens: null, estimatedCostNanoUsd: reservedNanoUsd };
   }
   return { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, estimatedCostNanoUsd: estimateCostNanoUsd(usage.inputTokens, usage.outputTokens) };
 }
 
-// Requirement 41.2: a record the store did not confirm is logged with its counts (no file hashes, no error text, no document text).
-async function writeRecord(store: UsageStore, record: UsageRecord, log?: (message: string) => void): Promise<void> {
+// Requirement 55.2: a store call after the reader waits at most until the deadline. A call that is still running then counts as
+// failed and is not waited for; no call starts when no time is left.
+class PostReadTimeoutError extends Error {
+  constructor() {
+    super("store call after the reader ran out of time");
+    this.name = "PostReadTimeoutError";
+  }
+}
+
+async function beforeDeadline<T>(deadline: number, run: () => Promise<T>): Promise<T> {
+  const left = deadline - Date.now();
+  if (left <= 0) {
+    throw new PostReadTimeoutError();
+  }
+  const call = run();
+  call.catch(() => {}); // a call that ends after the deadline is not awaited
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new PostReadTimeoutError()), left);
+  });
   try {
-    await store.appendRecord(record);
+    return await Promise.race([call, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// Requirement 41.2: a record the store did not confirm is logged with its counts (no file hashes, no error text, no document text).
+// After the reader the write ends by the deadline of Requirement 55.2.
+async function writeRecord(store: UsageStore, record: UsageRecord, log?: (message: string) => void, deadline?: number): Promise<void> {
+  try {
+    if (deadline === undefined) {
+      await store.appendRecord(record);
+    } else {
+      await beforeDeadline(deadline, () => store.appendRecord(record));
+    }
   } catch {
     log?.(
       "usage record not written: " +
@@ -54,13 +101,17 @@ export type ReadDeps = {
   body: unknown;
   log?: (message: string) => void; // server log; never pass document text, images or the key
   sleep?: (ms: number) => Promise<void>; // Requirement 42.1; default waits with setTimeout
+  postReadStoreMs?: number; // Requirement 55.2; default intakeConfig.postReadStoreMs
 };
 
-// Requirement 24.3: the ledger gets the actual cost when it is above the reserved worst case.
+// Requirement 24.3: the ledger gets the actual cost when it is above the reserved worst case. Requirement 55.2: every store call
+// ends by the deadline; a try that runs out of time ends the top-up.
 async function topUpCost(
   store: UsageStore,
   usage: { inputTokens: unknown; outputTokens: unknown } | null,
   reservedNanoUsd: number,
+  outputRoom: number,
+  deadline: number,
   log?: (message: string) => void,
   sleep: (ms: number) => Promise<void> = defaultSleep,
 ): Promise<void> {
@@ -68,7 +119,7 @@ async function topUpCost(
     return;
   }
 
-  if (!isTokenCount(usage.inputTokens) || !isTokenCount(usage.outputTokens)) {
+  if (!isCallUsage(usage, outputRoom)) {
     return;
   }
 
@@ -91,8 +142,8 @@ async function topUpCost(
       await sleep(base + Math.floor(Math.random() * base));
     }
     try {
-      const s = await store.readState();
-      await store.writeState(addReservedCost(s, extra));
+      const s = await beforeDeadline(deadline, () => store.readState());
+      await beforeDeadline(deadline, () => store.writeState(addReservedCost(s, extra)));
       return;
     } catch (e) {
       if (!(e instanceof UsageStateConflictError)) {
@@ -104,7 +155,7 @@ async function topUpCost(
 }
 
 export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse> {
-  const { setup, store, fakeStore, readers, nowIso, ip, bodyBytes, body, log, sleep } = deps;
+  const { setup, store, fakeStore, readers, nowIso, ip, bodyBytes, body, log, sleep, postReadStoreMs } = deps;
 
   // 1. Check if mode is off
   if (setup.mode === "off") {
@@ -295,22 +346,23 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
       output = result.output;
       usage = result.usage;
     } catch (e) {
+      const postReadDeadline = Date.now() + (postReadStoreMs ?? intakeConfig.postReadStoreMs);
       const errorMessage = e instanceof ReaderError ? e.message : "The AI reader failed.";
       const errorUsage = e instanceof ReaderError ? e.usage : null;
 
-      await topUpCost(store, errorUsage, estimate.worstCaseCostNanoUsd, log, sleep ?? defaultSleep);
-
+      // Requirement 55.1: the record first, then the top-up, both by the deadline of Requirement 55.2.
       const record: UsageRecord = {
         timestamp: nowIso,
         model: intakeConfig.readerModel,
-        ...recordUsage(errorUsage, estimate.worstCaseCostNanoUsd),
+        ...recordUsage(errorUsage, estimate.worstCaseCostNanoUsd, estimate.outputTokens),
         filesSha256,
         readerMode: "claude",
         outcome: "error",
         errorMessage: e instanceof ReaderError ? e.message : "reader failed",
       };
 
-      await writeRecord(store, record, log);
+      await writeRecord(store, record, log, postReadDeadline);
+      await topUpCost(store, errorUsage, estimate.worstCaseCostNanoUsd, estimate.outputTokens, postReadDeadline, log, sleep ?? defaultSleep);
 
       return {
         status: 502,
@@ -321,22 +373,24 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
       };
     }
 
+    // Requirement 55.2: the store calls after the reader end by this time.
+    const postReadDeadline = Date.now() + (postReadStoreMs ?? intakeConfig.postReadStoreMs);
+
     // Validate output
     const outputValidation = validateReaderOutput(output, input);
     if (!outputValidation.ok) {
-      await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log, sleep ?? defaultSleep);
-
       const record: UsageRecord = {
         timestamp: nowIso,
         model: intakeConfig.readerModel,
-        ...recordUsage(usage, estimate.worstCaseCostNanoUsd),
+        ...recordUsage(usage, estimate.worstCaseCostNanoUsd, estimate.outputTokens),
         filesSha256,
         readerMode: "claude",
         outcome: "error",
         errorMessage: `The reader answer was not valid: ${outputValidation.reason}`,
       };
 
-      await writeRecord(store, record, log);
+      await writeRecord(store, record, log, postReadDeadline);
+      await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, estimate.outputTokens, postReadDeadline, log, sleep ?? defaultSleep);
 
       return {
         status: 502,
@@ -347,20 +401,19 @@ export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse
       };
     }
 
-    // Success: append record
-    await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, log, sleep ?? defaultSleep);
-
+    // Success: the record first, then the top-up (Requirement 55.1)
     const record: UsageRecord = {
       timestamp: nowIso,
       model: intakeConfig.readerModel,
-      ...recordUsage(usage, estimate.worstCaseCostNanoUsd),
+      ...recordUsage(usage, estimate.worstCaseCostNanoUsd, estimate.outputTokens),
       filesSha256,
       readerMode: "claude",
       outcome: "success",
       errorMessage: null,
     };
 
-    await writeRecord(store, record, log);
+    await writeRecord(store, record, log, postReadDeadline);
+    await topUpCost(store, usage, estimate.worstCaseCostNanoUsd, estimate.outputTokens, postReadDeadline, log, sleep ?? defaultSleep);
 
     return {
       status: 200,

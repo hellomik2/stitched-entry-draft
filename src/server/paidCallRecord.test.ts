@@ -38,7 +38,7 @@ function reader(outcome: Outcome, usage: unknown): IntakeReader & { calls: numbe
   return r;
 }
 
-// An in-memory BlobsLike with the library's answer shapes. refuseRecords: a "usage/" write answers { modified: true, etag: "" } and
+// An in-memory BlobsLike with the library's answer shapes. refuseRecords: a "usage/" write throws, as the library does for a PUT without a condition (Requirement 54.1), and
 // is not saved. conflicts: after the first "caps-state" write (the reservation), the next writes answer { modified: false }.
 // topUpStoreError: the second "caps-state" write answers { modified: true, etag: "" } (a store error, not a changed state).
 type Knobs = { refuseRecords?: boolean; conflicts?: number; topUpStoreError?: boolean; initial?: unknown };
@@ -55,7 +55,7 @@ function fakeBlobs(k: Knobs = {}) {
     },
     async setJSON(key, data, o) {
       if (key.startsWith("usage/")) {
-        if (k.refuseRecords) return { modified: true, etag: "" };
+        if (k.refuseRecords) throw new Error("store refused the record");
         records.push(structuredClone(data) as Record<string, unknown>);
         return { modified: true, etag: `r${++n}` };
       }
@@ -124,9 +124,9 @@ const sleeper = () => {
 };
 
 describe("Feature: document-intake, Property 57: A Paid Call Leaves a Record or a Log Line (Validates: Requirements 41.1, 41.2, 41.3)", () => {
-  it("41.1 appendRecord throws unless the store confirms the write", async () => {
+  it("41.1 appendRecord throws unless the store saves the write (Requirement 54.1)", async () => {
     const rec = { timestamp: "2026-12-10T03:00:00.000Z", model: "m", inputTokens: 1, outputTokens: 1, estimatedCostNanoUsd: 600, filesSha256: [], readerMode: "claude" as const, outcome: "success" as const, errorMessage: null };
-    for (const answer of [{ modified: true, etag: "" }, { modified: true }, { modified: false }]) {
+    for (const answer of [{ modified: false }]) {
       const store = createBlobsUsageStore({ blobs: { getWithMetadata: async () => null, setJSON: async () => answer } });
       await expect(store.appendRecord(rec)).rejects.toThrow("usage record write was not confirmed by the store; not written");
     }
@@ -192,7 +192,8 @@ describe("Feature: document-intake, Property 57: A Paid Call Leaves a Record or 
         const lines = recordLines(logs);
         expect(f.records.length + lines.length).toBe(1);
         const rec = f.records[0] ?? lines[0];
-        const expected = outcome === "errorNoUsage" ? null : isCount(inputTokens) && isCount(outputTokens) ? estimateCostNanoUsd(inputTokens, outputTokens) : worst;
+        // Requirement 56.1: counts the call can have (output within the call's max_tokens, input + output within the 1,000,000-token context window)
+        const expected = outcome === "errorNoUsage" ? null : isCount(inputTokens) && isCount(outputTokens) && outputTokens <= estimateReaderCall(body).outputTokens && inputTokens + outputTokens <= 1_000_000 ? estimateCostNanoUsd(inputTokens, outputTokens) : worst;
         expect(rec.estimatedCostNanoUsd).toBe(expected);
       }),
       { numRuns: 40 },

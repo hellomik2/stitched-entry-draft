@@ -1,6 +1,7 @@
 import type { ReaderOutput } from "../core/readerContract";
 
-export type ReaderUsage = { inputTokens: number; outputTokens: number };
+// Requirement 56.2: a count the SDK answer does not give is null.
+export type ReaderUsage = { inputTokens: number | null; outputTokens: number | null };
 export type ReaderResult = { output: ReaderOutput; usage: ReaderUsage };
 
 export interface IntakeReader {

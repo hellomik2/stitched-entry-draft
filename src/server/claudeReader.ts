@@ -280,11 +280,20 @@ export function createClaudeReader(config: {
         throw mapSdkError(e);
       }
 
-      // Extract usage
+      // Requirement 56.2: read the counts only from a usage object, and only a count that is a number; any other count is null,
+      // so the record gets the reserved worst case. An answer that is not an object is no answer.
+      const answer: unknown = response;
+      const rawUsage = typeof answer === "object" && answer !== null ? (answer as { usage?: unknown }).usage : undefined;
+      const usageObject = typeof rawUsage === "object" && rawUsage !== null ? (rawUsage as Record<string, unknown>) : null;
+      const inputCount = usageObject !== null ? usageObject.input_tokens : undefined;
+      const outputCount = usageObject !== null ? usageObject.output_tokens : undefined;
       const usage: ReaderUsage = {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
+        inputTokens: typeof inputCount === "number" ? inputCount : null,
+        outputTokens: typeof outputCount === "number" ? outputCount : null,
       };
+      if (typeof answer !== "object" || answer === null) {
+        throw new ReaderError("The AI reader returned no answer.", usage);
+      }
 
       // Check stop reason
       if (response.stop_reason === "refusal") {
@@ -302,8 +311,10 @@ export function createClaudeReader(config: {
         );
       }
 
-      // Find first text block
-      const textBlock = response.content.find((block) => block.type === "text");
+      // Requirement 56.2: content that is not a list, or a block that is not an object, is no answer.
+      const textBlock = Array.isArray(response.content)
+        ? response.content.find((block) => typeof block === "object" && block !== null && block.type === "text")
+        : undefined;
       if (!textBlock || textBlock.type !== "text" || !textBlock.text) {
         throw new ReaderError("The AI reader returned no answer.", usage);
       }
