@@ -32,13 +32,21 @@ export const UNPLACED_REVIEW_REASON =
 export const UNPLACED_COMPUTED_REVIEW_REASON =
   "Computed from values the AI reader read from an image. At least one is from a line that is not in its transcript, so it has no box on the page. Check them against the page, then confirm it.";
 
-/** The four reasons of a value that waits only for a person's check of image values (Requirements 18.1, 26.1, 50.3). */
+export const LINE_WITHOUT_BOX_REVIEW_REASON =
+  "Read from an image by the AI reader, from a transcript line it gave no usable place for, so there is no box on the page. Find it on the page, check it, then confirm it.";
+
+export const LINE_WITHOUT_BOX_COMPUTED_REVIEW_REASON =
+  "Computed from values the AI reader read from an image. At least one is from a transcript line it gave no usable place for, so it has no box on the page. Check them against the page, then confirm it.";
+
+/** The six reasons of a value that waits only for a person's check of image values (Requirements 18.1, 26.1, 50.3, 58.3). */
 export function isImageReviewReason(reason: string | null | undefined): boolean {
   return (
     reason === IMAGE_REVIEW_REASON ||
     reason === IMAGE_COMPUTED_REVIEW_REASON ||
     reason === UNPLACED_REVIEW_REASON ||
-    reason === UNPLACED_COMPUTED_REVIEW_REASON
+    reason === UNPLACED_COMPUTED_REVIEW_REASON ||
+    reason === LINE_WITHOUT_BOX_REVIEW_REASON ||
+    reason === LINE_WITHOUT_BOX_COMPUTED_REVIEW_REASON
   );
 }
 
@@ -57,6 +65,7 @@ export type DocSource = {
   readingField: string;
   origin?: "imageTranscript";
   notInTranscript?: true;
+  lineWithoutBox?: true;
   cell?: string;
 };
 
@@ -163,6 +172,9 @@ function docSource(reading: VerifiedReading): DocSource {
   if (reading.notInTranscript) {
     source.notInTranscript = true;
   }
+  if (reading.lineWithoutBox) {
+    source.lineWithoutBox = true;
+  }
   if (reading.cell) {
     source.cell = reading.cell;
   }
@@ -223,7 +235,7 @@ export function buildDraft(input: {
   const overrideMap = new Map(overrides.map((o) => [o.fieldId, o.value]));
 
   const verified: VerifiedReading[] = readings.map((r) => {
-    if (r.status === "uncertain" && r.notInTranscript === true && r.confidence !== "low") {
+    if (r.status === "uncertain" && (r.notInTranscript === true || r.lineWithoutBox === true) && r.confidence !== "low") {
       const { message: _message, ...rest } = r;
       return { ...rest, status: "accepted" as const };
     }
@@ -3433,14 +3445,27 @@ export function buildDraft(input: {
   // A value read from an image page is not final until a person confirms it (Requirement 18.1).
   // Computed values with an image source wait too (Requirement 26.1).
   const hasUnplacedSource = (f: DraftField) => f.sources.some((s) => s.kind === "document" && s.notInTranscript === true);
+  const hasLineWithoutBoxSource = (f: DraftField) => f.sources.some((s) => s.kind === "document" && s.lineWithoutBox === true);
   
   for (const f of allFieldsList) {
     if (f.status === "copied" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
       f.status = "needsReview";
-      f.reason = hasUnplacedSource(f) ? UNPLACED_REVIEW_REASON : IMAGE_REVIEW_REASON;
+      if (hasUnplacedSource(f)) {
+        f.reason = UNPLACED_REVIEW_REASON;
+      } else if (hasLineWithoutBoxSource(f)) {
+        f.reason = LINE_WITHOUT_BOX_REVIEW_REASON;
+      } else {
+        f.reason = IMAGE_REVIEW_REASON;
+      }
     } else if (f.status === "computed" && f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) {
       f.status = "needsReview";
-      f.reason = hasUnplacedSource(f) ? UNPLACED_COMPUTED_REVIEW_REASON : IMAGE_COMPUTED_REVIEW_REASON;
+      if (hasUnplacedSource(f)) {
+        f.reason = UNPLACED_COMPUTED_REVIEW_REASON;
+      } else if (hasLineWithoutBoxSource(f)) {
+        f.reason = LINE_WITHOUT_BOX_COMPUTED_REVIEW_REASON;
+      } else {
+        f.reason = IMAGE_COMPUTED_REVIEW_REASON;
+      }
     }
   }
 
@@ -3455,7 +3480,7 @@ export function buildDraft(input: {
     let oldReason = field.reason;
 
     // Confirming an image value: the person applies the value that is shown (Requirement 18.3).
-    if ((oldReason === IMAGE_REVIEW_REASON || oldReason === UNPLACED_REVIEW_REASON) && oldValue !== null && override.value === oldValue) {
+    if ((oldReason === IMAGE_REVIEW_REASON || oldReason === UNPLACED_REVIEW_REASON || oldReason === LINE_WITHOUT_BOX_REVIEW_REASON) && oldValue !== null && override.value === oldValue) {
       // Back to "copied": the value is the document's, now checked by a person. Nothing computed from it changes.
       field.status = "copied";
       field.reason = null;
@@ -3464,7 +3489,7 @@ export function buildDraft(input: {
     }
 
     // Confirming a computed value from an image (Requirement 26.2).
-    if ((oldReason === IMAGE_COMPUTED_REVIEW_REASON || oldReason === UNPLACED_COMPUTED_REVIEW_REASON) && oldValue !== null && override.value === oldValue) {
+    if ((oldReason === IMAGE_COMPUTED_REVIEW_REASON || oldReason === UNPLACED_COMPUTED_REVIEW_REASON || oldReason === LINE_WITHOUT_BOX_COMPUTED_REVIEW_REASON) && oldValue !== null && override.value === oldValue) {
       // Back to "computed": the value is confirmed, but still computed.
       field.status = "computed";
       field.reason = null;
@@ -4001,10 +4026,22 @@ export function buildDraft(input: {
     if (!f.sources.some((s) => s.kind === "document" && s.origin === "imageTranscript")) continue;
     if (f.status === "copied") {
       f.status = "needsReview";
-      f.reason = hasUnplacedSource(f) ? UNPLACED_REVIEW_REASON : IMAGE_REVIEW_REASON;
+      if (hasUnplacedSource(f)) {
+        f.reason = UNPLACED_REVIEW_REASON;
+      } else if (hasLineWithoutBoxSource(f)) {
+        f.reason = LINE_WITHOUT_BOX_REVIEW_REASON;
+      } else {
+        f.reason = IMAGE_REVIEW_REASON;
+      }
     } else if (f.status === "computed") {
       f.status = "needsReview";
-      f.reason = hasUnplacedSource(f) ? UNPLACED_COMPUTED_REVIEW_REASON : IMAGE_COMPUTED_REVIEW_REASON;
+      if (hasUnplacedSource(f)) {
+        f.reason = UNPLACED_COMPUTED_REVIEW_REASON;
+      } else if (hasLineWithoutBoxSource(f)) {
+        f.reason = LINE_WITHOUT_BOX_COMPUTED_REVIEW_REASON;
+      } else {
+        f.reason = IMAGE_COMPUTED_REVIEW_REASON;
+      }
     }
   }
 

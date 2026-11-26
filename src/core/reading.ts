@@ -47,10 +47,13 @@ export type RejectReason =
 export const NOT_IN_TRANSCRIPT_MESSAGE =
   "The AI reader read this value from a line that is not in its transcript of the image, so there is no box on the page. A person finds it on the page and checks it.";
 
+export const LINE_WITHOUT_BOX_MESSAGE =
+  "The AI reader read this value from a line of its transcript that it gave no usable place for, so there is no box on the page. A person finds it on the page and checks it.";
+
 export type VerifiedReading = FieldReading &
   (
-    | { status: "accepted"; box: Box | null; itemIds: string[]; origin?: "imageTranscript"; notInTranscript?: true; lineText?: string; cell?: string }
-    | { status: "uncertain"; box: Box | null; itemIds: string[]; origin?: "imageTranscript"; notInTranscript?: true; message: string; lineText?: string; cell?: string }
+    | { status: "accepted"; box: Box | null; itemIds: string[]; origin?: "imageTranscript"; notInTranscript?: true; lineWithoutBox?: true; lineText?: string; cell?: string }
+    | { status: "uncertain"; box: Box | null; itemIds: string[]; origin?: "imageTranscript"; notInTranscript?: true; lineWithoutBox?: true; message: string; lineText?: string; cell?: string }
     | { status: "rejected"; reason: RejectReason; message: string }
   );
 
@@ -223,6 +226,164 @@ function getLineNumber(fieldName: string): number | null {
 function getFieldType(fieldName: string): string | null {
   const match = /^(invoice|packingList)\.lines\.\d+\.(.+)$/.exec(fieldName);
   return match ? match[2] : null;
+}
+
+// Number fields that should match printed numbers with commas
+const NUMBER_FIELD = /^(invoice\.lines\.\d+\.(quantity|unitPrice|amount)|invoice\.(subtotal|total)|packingList\.lines\.\d+\.(cartons|quantity|netKg|grossKg)|packingList\.total(Cartons|Quantity|NetKg|GrossKg)|billOfLading\.grossKg)$/;
+
+// Helper: find a printed number with commas that matches the value
+function printedNumberWithCommas(fieldName: string, v: string, q: string): { start: number; length: number } | null {
+  if (!NUMBER_FIELD.test(fieldName) || !/^\d+(\.\d+)?$/.test(v)) {
+    return null;
+  }
+
+  // Look for patterns like 1,234 or 1,234,567.89 that match v when commas are removed
+  for (let startIdx = 0; startIdx < q.length; startIdx++) {
+    // Try to match /\d{1,3}(,\d{3})+(\.\d+)?/ at this position
+    let endIdx = startIdx;
+    let matchText = "";
+    let hasComma = false;
+
+    // Match the pattern greedily at this start position
+    if (/\d/.test(q[startIdx])) {
+      // Start with up to 3 digits
+      let digitCount = 0;
+      while (endIdx < q.length && /\d/.test(q[endIdx]) && digitCount < 3) {
+        matchText += q[endIdx];
+        endIdx++;
+        digitCount++;
+      }
+
+      // Then match (,\d{3})+ and optional .\d+
+      while (endIdx < q.length && q[endIdx] === ",") {
+        matchText += q[endIdx];
+        endIdx++;
+        hasComma = true;
+        digitCount = 0;
+        while (endIdx < q.length && /\d/.test(q[endIdx]) && digitCount < 3) {
+          matchText += q[endIdx];
+          endIdx++;
+          digitCount++;
+        }
+        if (digitCount !== 3) {
+          // Invalid comma group
+          endIdx -= digitCount + 1;
+          matchText = matchText.slice(0, matchText.length - digitCount - 1);
+          break;
+        }
+      }
+
+      // Optional decimal part
+      if (endIdx < q.length && q[endIdx] === ".") {
+        matchText += q[endIdx];
+        endIdx++;
+        while (endIdx < q.length && /\d/.test(q[endIdx])) {
+          matchText += q[endIdx];
+          endIdx++;
+        }
+      }
+
+      // Check if this is a valid match (has comma)
+      if (hasComma) {
+        // Check boundaries: char before and after should not be digit, comma, or period
+        const charBefore = startIdx === 0 ? " " : q[startIdx - 1];
+        const charAfter = endIdx >= q.length ? " " : q[endIdx];
+        const isValidBoundary =
+          ((charBefore === " " || charBefore === "" || /[^\d,.]/.test(charBefore)) &&
+          (charAfter === " " || charAfter === "" || /[^\d,.]/.test(charAfter))) ||
+          (startIdx === 0 && (charAfter === " " || charAfter === "" || /[^\d,.]/.test(charAfter))) ||
+          (endIdx >= q.length && (charBefore === " " || charBefore === "" || /[^\d,.]/.test(charBefore)));
+
+        const cleanedText = matchText.replace(/,/g, "");
+        if (isValidBoundary && cleanedText === v) {
+          return { start: startIdx, length: matchText.length };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// Address field pattern
+const ADDRESS_FIELD = /^invoice\.(seller|buyer|shipTo)\.address$/;
+
+// Helper: find address lines
+function addressLineItems(page: PageText, quoteStart: number, quoteLength: number, v: string): PageText["items"] | null {
+  // Find the item whose span starts at quoteStart
+  let startItem: (typeof page.items)[0] | null = null;
+  for (const item of page.items) {
+    const span = page.spans.find(s => s.itemId === item.id);
+    if (span && span.start === quoteStart) {
+      startItem = item;
+      break;
+    }
+  }
+
+  if (!startItem) {
+    return null;
+  }
+
+  // Find lines under S
+  const lines: (typeof page.items)[0][] = [startItem];
+
+  if (page.origin === "imageTranscript") {
+    // On image pages: next up to 3 items in page.items order
+    const startIndex = page.items.indexOf(startItem);
+    for (let i = startIndex + 1; i < page.items.length && lines.length < 4; i++) {
+      lines.push(page.items[i]);
+    }
+  } else {
+    // On text pages: stacked runs (up to 3 more items)
+    let currentItem = startItem;
+    for (let lineIdx = 1; lineIdx < 4; lineIdx++) {
+      let nearestItem: (typeof page.items)[0] | null = null;
+      let minDistance = Infinity;
+
+      for (const item of page.items) {
+        // Must be below current item
+        if (item.box.y <= currentItem.box.y + currentItem.box.h) continue;
+        // Left edge within 2 points of start item
+        if (Math.abs(item.box.x - startItem.box.x) > 2) continue;
+        // Not already taken
+        if (lines.includes(item)) continue;
+
+        const distance = item.box.y - (currentItem.box.y + currentItem.box.h);
+        // Gap > 0 and ≤ 2 × current height
+        if (distance > 0 && distance <= 2 * currentItem.box.h && distance < minDistance) {
+          minDistance = distance;
+          nearestItem = item;
+        }
+      }
+
+      if (nearestItem) {
+        lines.push(nearestItem);
+        currentItem = nearestItem;
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Check if k lines joined with ", " equal v, and last char of quote is in one of these k items
+  for (let k = 2; k <= lines.length; k++) {
+    const selectedLines = lines.slice(0, k);
+    const joinedText = selectedLines.map(item => normalizeSpace(item.str)).join(", ");
+
+    if (joinedText === v) {
+      const quoteLastIndex = quoteStart + quoteLength - 1;
+      const quoteEndsInLines = selectedLines.some((item) => {
+        const span = page.spans.find((s) => s.itemId === item.id);
+        return span !== undefined && span.start <= quoteLastIndex && quoteLastIndex < span.end;
+      });
+
+      if (quoteEndsInLines) {
+        return selectedLines;
+      }
+    }
+  }
+
+  return null;
 }
 
 // Helper: union of boxes
@@ -437,7 +598,22 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
             searchStart++;
           }
 
-          if (q.indexOf(v) !== -1 || dateValueMatchesQuote(field.field, v, q)) {
+          // Requirement 59.3: a number written without its thousands commas is checked at its printed place.
+          const printedPlace = q.indexOf(v) === -1 ? printedNumberWithCommas(field.field, v, q) : null;
+          if (printedPlace !== null) {
+            const left = q.slice(0, printedPlace.start).trim();
+            const right = q.slice(printedPlace.start + printedPlace.length).trim();
+            if (left !== "" && right !== "" && page.text.indexOf(normalizeSpace(left + " " + right)) !== -1) {
+              return {
+                ...field,
+                status: "rejected" as const,
+                reason: "quote_not_found" as const,
+                message: `The quote "${q}" is not on ${doc.kind} page ${field.page}.`,
+              };
+            }
+          }
+
+          if (q.indexOf(v) !== -1 || dateValueMatchesQuote(field.field, v, q) || printedNumberWithCommas(field.field, v, q) !== null) {
             return {
               ...field,
               status: "uncertain" as const,
@@ -603,6 +779,8 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
     // 6. Check value is inside quote
     let valueIndexInQuote = -1;
     let valueFoundInQuote = false;
+    let valueLengthInQuote = v.length;
+    let addressItems: (typeof page.items) | null = null;
 
     // If runItems is set (from stacked runs), check value inside runItems
     if (runItems !== null) {
@@ -676,12 +854,32 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
           }
         }
       }
+
     }
 
     // If still not found, try date parsing (Requirement 35.1) for specific fields
     if (!valueFoundInQuote) {
       if (dateValueMatchesQuote(field.field, v, q)) {
         valueFoundInQuote = true;
+      }
+    }
+
+    // If still not found, check for numbers with thousands commas (Requirement 59, only on the normal path)
+    if (!valueFoundInQuote && runItems === null) {
+      const numberMatch = printedNumberWithCommas(field.field, v, q);
+      if (numberMatch) {
+        valueFoundInQuote = true;
+        valueLengthInQuote = numberMatch.length;
+        valueIndexInQuote = numberMatch.start;
+      }
+    }
+
+    // If still not found, check for address lines (Requirement 60, only on the normal path)
+    if (!valueFoundInQuote && runItems === null && ADDRESS_FIELD.test(field.field)) {
+      const addrItems = addressLineItems(page, quoteOccurrenceIndex, q.length, v);
+      if (addrItems) {
+        valueFoundInQuote = true;
+        addressItems = addrItems;
       }
     }
 
@@ -697,14 +895,17 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
     // 7. Find box and itemIds
     let selectedItems: typeof page.items;
     
-    if (runItems !== null) {
+    if (addressItems !== null) {
+      // Use address items directly
+      selectedItems = addressItems;
+    } else if (runItems !== null) {
       // Use the run items directly
       selectedItems = runItems;
     } else {
       const quoteStart = quoteOccurrenceIndex;
       const quoteEnd = quoteOccurrenceIndex + q.length;
       const valueStart = quoteStart + valueIndexInQuote;
-      const valueEnd = valueStart + v.length;
+      const valueEnd = valueStart + valueLengthInQuote;
 
       const relevantItems = page.items.filter((item) => {
         const span = page.spans.find((s) => s.itemId === item.id);
@@ -740,7 +941,20 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
       }
     }
 
-    // Check for noBox items
+    // Check for noBox items (Requirement 58.2)
+    if (selectedItems.some(item => item.noBox) && page.origin === "imageTranscript") {
+      return {
+        ...field,
+        status: "uncertain" as const,
+        box: null,
+        itemIds: [],
+        origin: "imageTranscript" as const,
+        lineWithoutBox: true as const,
+        lineText: selectedItems.map((item) => item.str).join(" "),
+        message: LINE_WITHOUT_BOX_MESSAGE,
+      };
+    }
+
     if (selectedItems.some(item => item.noBox)) {
       return {
         ...field,

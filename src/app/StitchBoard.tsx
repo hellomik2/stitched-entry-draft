@@ -1069,11 +1069,15 @@ export default function StitchBoard({
               {rejectedReadings
                 .filter((r): r is Extract<VerifiedReading, { status: 'uncertain' }> => r.status === 'uncertain')
                 .map((reading) => (
-                  <div key={reading.field} data-testid={`uncertain-reading-${reading.field}`} data-not-in-transcript={reading.notInTranscript ? "true" : undefined} style={{ padding: '0.5rem 0.5rem', marginBottom: '0.5rem', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px' }}>
+                  <div key={reading.field} data-testid={`uncertain-reading-${reading.field}`} data-not-in-transcript={reading.notInTranscript ? "true" : undefined} data-line-without-box={(reading as any).lineWithoutBox ? "true" : undefined} style={{ padding: '0.5rem 0.5rem', marginBottom: '0.5rem', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: '4px' }}>
                     <span className="field-name" style={{ color: '#92400e' }}>{reading.field}</span>
                     <span style={{ marginLeft: '0.5rem', color: '#78350f' }}>"{reading.value || ''}"</span>
                     <div style={{ marginTop: '0.25rem', fontSize: 'var(--fs-small)', color: '#78350f' }}>
-                      {reading.notInTranscript ? 'not in the AI reader\'s transcript, so no box; a person finds it on the page and confirms it' : 'not sure, not used until a person checks it'}
+                      {reading.notInTranscript
+                        ? 'not in the AI reader\'s transcript, so no box; a person finds it on the page and confirms it'
+                        : (reading as any).lineWithoutBox
+                          ? `on a transcript line with no usable place, so no box; a person finds it on the page and confirms it. Its transcript line: "${(reading as any).lineText ?? ''}"`
+                          : 'not sure, not used until a person checks it'}
                     </div>
                   </div>
                 ))}
@@ -1726,6 +1730,8 @@ function SourceStrip({
                             {source.origin === 'imageTranscript' && (
                               source.notInTranscript ? (
                                 <> (read from an image by the AI reader) Not in its transcript, so there is no box on the page.</>
+                              ) : (source as any).lineWithoutBox ? (
+                                <> (read from an image by the AI reader) Its transcript line has no usable place, so there is no box on the page.{lineText && <> Its transcript line: "{lineText}"</>}</>
                               ) : (
                                 <> (read from an image by the AI reader){lineText && <> Place estimated by the AI reader. Its transcript line: "{lineText}"</>}</>
                               )

@@ -78,7 +78,7 @@ describe("Requirement 37: Image Pages with No Box", () => {
     expect((page.items[0] as any).noBox).toBeUndefined();
   });
 
-  it("3. billOfLading.portOfLoading rejected with 'no_source_box' on no-box line; billOfLading.vessel accepted on box line", () => {
+  it("3. billOfLading.portOfLoading waits with no box on the no-box line (Requirement 58.1); billOfLading.vessel accepted on box line", () => {
     const lines = [
       { text: "Vessel: OWLFERRY DAWN Voyage: 047W", box: { x: 0.17, y: 0.22, w: 0.65, h: 0.04 } },
       { text: "Port of loading: Leixoes", box: null as any },
@@ -114,10 +114,9 @@ describe("Requirement 37: Image Pages with No Box", () => {
 
     const verified = verifyReadings(answer, [doc]);
 
-    // Port reading should be rejected with no_source_box
-    expect(verified[0].status).toBe("rejected");
-    if (verified[0].status === "rejected") {
-      expect(verified[0].reason).toBe("no_source_box");
+    // Port reading waits for a person with no box (Requirement 58.1)
+    expect(verified[0]).toMatchObject({ status: "uncertain", box: null, itemIds: [], lineWithoutBox: true, lineText: "Port of loading: Leixoes" });
+    if (verified[0].status === "uncertain") {
       expect(verified[0].message).toContain("no usable place");
     }
 
@@ -189,11 +188,8 @@ describe("Requirement 37: Image Pages with No Box", () => {
                 expect((verified[i] as any).box.w).toBeGreaterThan(0);
               }
             } else {
-              // Should be rejected with no_source_box
-              expect(verified[i].status).toBe("rejected");
-              if (verified[i].status === "rejected") {
-                expect((verified[i] as any).reason).toBe("no_source_box");
-              }
+              // Waits for a person with no box (Requirement 58.1)
+              expect(verified[i]).toMatchObject({ status: "uncertain", box: null, itemIds: [], lineWithoutBox: true });
             }
           }
         },
@@ -247,10 +243,7 @@ describe("Feature: document-intake, Property 54: A Bad Box Spoils Only Its Line 
 
           for (let i = 0; i < count; i++) {
             if (i === noBoxIndex) {
-              expect(verified[i].status).toBe("rejected");
-              if (verified[i].status === "rejected") {
-                expect((verified[i] as any).reason).toBe("no_source_box");
-              }
+              expect(verified[i]).toMatchObject({ status: "uncertain", box: null, itemIds: [], lineWithoutBox: true });
             } else {
               expect(verified[i].status).toBe("accepted");
             }

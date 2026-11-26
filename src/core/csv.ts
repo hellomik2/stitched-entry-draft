@@ -21,6 +21,7 @@ export const CSV_COLUMNS = [
  *            `${doc} p.${page} [no box] "${quote}"` when box is null.
  * With origin === "imageTranscript", append ` (read from an image by the AI reader)` after the closing quote.
  * With notInTranscript === true, append ` (not in its transcript)` after the image suffix.
+ * With lineWithoutBox === true, append " (transcript line with no place)" after the image suffix.
  * With cell, append ` (cell <cell>)` after the closing quote.
  * HtsSource: `HTS ${revision} ${htsno}`
  * CodeTableSource: `${table} ${edition} ${code} "${name}"` with `, ${country}` inside the quotes when present.
@@ -48,6 +49,9 @@ export function formatSource(s: Source): string {
     }
     if (docS.notInTranscript === true) {
       base += " (not in its transcript)";
+    }
+    if (docS.lineWithoutBox === true) {
+      base += " (transcript line with no place)";
     }
     if (docS.cell) {
       base += ` (cell ${docS.cell})`;

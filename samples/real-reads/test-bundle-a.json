@@ -1,0 +1,1020 @@
+{
+ "ok": true,
+ "mode": "claude",
+ "output": {
+  "transcripts": [
+   {
+    "doc": "packingList",
+    "page": 1,
+    "lines": [
+     {
+      "text": "PACKING LIST",
+      "box": {
+       "x": 0.115,
+       "y": 0.095,
+       "w": 0.22,
+       "h": 0.04
+      }
+     },
+     {
+      "text": "SAMPLE / FICTIONAL",
+      "box": null
+     },
+     {
+      "text": "Packing List No.: MCA-PL-2611-07",
+      "box": {
+       "x": 0.125,
+       "y": 0.17,
+       "w": 0.3,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Invoice Ref.: MCA-INV-2611-07",
+      "box": {
+       "x": 0.125,
+       "y": 0.2,
+       "w": 0.26,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "B/L No.: OWFL2611LXS0419",
+      "box": {
+       "x": 0.125,
+       "y": 0.23,
+       "w": 0.24,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Shipper: Mothlight Ceramics Atelier, Lda.",
+      "box": {
+       "x": 0.125,
+       "y": 0.26,
+       "w": 0.33,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Consignee: Bramblewick Home Goods LLC",
+      "box": {
+       "x": 0.125,
+       "y": 0.29,
+       "w": 0.35,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Item Description Ctn Nos. Ctns Qty (PCS) Net kg Gross kg",
+      "box": null
+     },
+     {
+      "text": "MCA-101 Stoneware owl figurine 1-20 20 1,200 420.0 468.0",
+      "box": null
+     },
+     {
+      "text": "MCA-102 Glass votive candle holder 21-44 24 2,400 336.0 384.0",
+      "box": null
+     },
+     {
+      "text": "MCA-103 Tin lantern 45-59 15 300 255.0 285.0",
+      "box": null
+     },
+     {
+      "text": "MCA-104 Artificial bittersweet stems 60-65 6 600 30.0 39.0",
+      "box": null
+     },
+     {
+      "text": "MCA-105 Ceramic pumpkin, small 66-77 12 480 456 62.0 72.0",
+      "box": null
+     },
+     {
+      "text": "TOTAL 77 4,980 1,103.0 1,248.0",
+      "box": null
+     },
+     {
+      "text": "chk 11/04",
+      "box": {
+       "x": 0.87,
+       "y": 0.67,
+       "w": 0.08,
+       "h": 0.02
+      }
+     },
+     {
+      "text": "SAMPLE / FICTIONAL. Invented companies, goods and addresses. Not a real shipment.",
+      "box": {
+       "x": 0.05,
+       "y": 0.88,
+       "w": 0.6,
+       "h": 0.02
+      }
+     }
+    ]
+   },
+   {
+    "doc": "billOfLading",
+    "page": 1,
+    "lines": [
+     {
+      "text": "BILL OF LADING",
+      "box": {
+       "x": 0.16,
+       "y": 0.29,
+       "w": 0.17,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Non-negotiable copy",
+      "box": {
+       "x": 0.16,
+       "y": 0.325,
+       "w": 0.12,
+       "h": 0.02
+      }
+     },
+     {
+      "text": "Carrier: Owlferry Container Lines (SAMPLE)",
+      "box": {
+       "x": 0.45,
+       "y": 0.25,
+       "w": 0.24,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "B/L No.: OWFL2611LXS0419",
+      "box": {
+       "x": 0.45,
+       "y": 0.28,
+       "w": 0.2,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "Shipper: Mothlight Ceramics Atelier, Lda. Rua das Corujas 12, Vila Nevoa, Portugal",
+      "box": {
+       "x": 0.17,
+       "y": 0.38,
+       "w": 0.6,
+       "h": 0.06
+      }
+     },
+     {
+      "text": "Consignee: Bramblewick Home Goods LLC 88 Thistle Lane, Fernhollow, GA 00000, USA",
+      "box": {
+       "x": 0.17,
+       "y": 0.46,
+       "w": 0.6,
+       "h": 0.06
+      }
+     },
+     {
+      "text": "Notify party: Same as consignee",
+      "box": {
+       "x": 0.18,
+       "y": 0.57,
+       "w": 0.3,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "Vessel: OWLFERRY DAWN Voyage: 047W",
+      "box": {
+       "x": 0.18,
+       "y": 0.62,
+       "w": 0.6,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "Port of loading: Leixoes, Portugal Port of discharge: Savannah, GA, USA",
+      "box": {
+       "x": 0.18,
+       "y": 0.66,
+       "w": 0.7,
+       "h": 0.05
+      }
+     },
+     {
+      "text": "Shipped on board: 05 NOV 2026",
+      "box": {
+       "x": 0.18,
+       "y": 0.69,
+       "w": 0.4,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Container / Seal Packages Description of goods Gross weight Measurement",
+      "box": {
+       "x": 0.18,
+       "y": 0.7,
+       "w": 0.78,
+       "h": 0.06
+      }
+     },
+     {
+      "text": "ZZZU 418207 3 / SMPL-0000 77 CTNS Ceramic and glass home decor, tin lanterns, artificial stems 1,284.0 KGS 9.8 CBM",
+      "box": {
+       "x": 0.18,
+       "y": 0.75,
+       "w": 0.8,
+       "h": 0.08
+      }
+     },
+     {
+      "text": "Freight: COLLECT",
+      "box": {
+       "x": 0.21,
+       "y": 0.85,
+       "w": 0.2,
+       "h": 0.03
+      }
+     },
+     {
+      "text": "Shipper's load, stow and count. Said to contain.",
+      "box": {
+       "x": 0.21,
+       "y": 0.88,
+       "w": 0.4,
+       "h": 0.025
+      }
+     },
+     {
+      "text": "SAMPLE / FICTIONAL. Invented companies, goods and addresses. Not a real shipment.",
+      "box": null
+     }
+    ]
+   }
+  ],
+  "fields": [
+   {
+    "field": "invoice.number",
+    "value": "MCA-INV-2611-07",
+    "quote": "Invoice No.: MCA-INV-2611-07",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.date",
+    "value": "11/03/2026",
+    "quote": "Date: 03 Nov 2026",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.terms",
+    "value": "FOB Leixoes, Portugal",
+    "quote": "Terms: FOB Leixoes, Portugal",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.currency",
+    "value": "USD",
+    "quote": "Currency: USD",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.countryOfExport",
+    "value": "Portugal",
+    "quote": "Country of export: Portugal",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.seller.name",
+    "value": "Mothlight Ceramics Atelier, Lda.",
+    "quote": "Mothlight Ceramics Atelier, Lda.",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.seller.address",
+    "value": "Rua das Corujas 12, Vila Nevoa, 0000-000 Portugal",
+    "quote": "Rua das Corujas 12, Vila Nevoa",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.buyer.name",
+    "value": "Bramblewick Home Goods LLC",
+    "quote": "Bramblewick Home Goods LLC",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.buyer.address",
+    "value": "88 Thistle Lane, Fernhollow, GA 00000, USA",
+    "quote": "88 Thistle Lane, Fernhollow, GA 00000, USA",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.shipTo.name",
+    "value": "Bramblewick Home Goods LLC",
+    "quote": "Same as importer",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.shipTo.address",
+    "value": "88 Thistle Lane, Fernhollow, GA 00000, USA",
+    "quote": "Same as importer",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.itemNo",
+    "value": "MCA-101",
+    "quote": "MCA-101 Stoneware owl figurine 6913.90.5000 PT 1,200 PCS 2.85 3,420.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.description",
+    "value": "Stoneware owl figurine, hand-glazed",
+    "quote": "Stoneware owl figurine, hand-glazed",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.hts",
+    "value": "6913.90.5000",
+    "quote": "6913.90.5000",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.origin",
+    "value": "PT",
+    "quote": "PT",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.quantity",
+    "value": "1,200",
+    "quote": "1,200",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.unitPrice",
+    "value": "2.85",
+    "quote": "2.85",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.1.amount",
+    "value": "3,420.00",
+    "quote": "3,420.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.itemNo",
+    "value": "MCA-102",
+    "quote": "MCA-102 Glass votive candle holder, amber 7013.99.3500 PT 2,400 PCS 0.95 2,280.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.description",
+    "value": "Glass votive candle holder, amber",
+    "quote": "Glass votive candle holder, amber",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.hts",
+    "value": "7013.99.3500",
+    "quote": "7013.99.3500",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.origin",
+    "value": "PT",
+    "quote": "PT",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.quantity",
+    "value": "2,400",
+    "quote": "2,400",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.unitPrice",
+    "value": "0.95",
+    "quote": "0.95",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.2.amount",
+    "value": "2,280.00",
+    "quote": "2,280.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.itemNo",
+    "value": "MCA-103",
+    "quote": "MCA-103 Tin lantern with glass panes 9405.05.4000 PT 300 PCS 6.40 1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.description",
+    "value": "Tin lantern with glass panes",
+    "quote": "Tin lantern with glass panes",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.hts",
+    "value": "9405.05.4000",
+    "quote": "9405.05.4000",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.origin",
+    "value": "PT",
+    "quote": "PT",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.quantity",
+    "value": "300",
+    "quote": "300",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.unitPrice",
+    "value": "6.40",
+    "quote": "6.40",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.3.amount",
+    "value": "1,920.00",
+    "quote": "1,920.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.itemNo",
+    "value": "MCA-104",
+    "quote": "MCA-104 Artificial bittersweet stems, polyester 6702.90.6500 CN 600 PCS 1.10 660.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.description",
+    "value": "Artificial bittersweet stems, polyester",
+    "quote": "Artificial bittersweet stems, polyester",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.hts",
+    "value": "6702.90.6500",
+    "quote": "6702.90.6500",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.origin",
+    "value": "CN",
+    "quote": "CN",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.quantity",
+    "value": "600",
+    "quote": "600",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.unitPrice",
+    "value": "1.10",
+    "quote": "1.10",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.4.amount",
+    "value": "660.00",
+    "quote": "660.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.itemNo",
+    "value": "MCA-105",
+    "quote": "MCA-105 Ceramic pumpkin, small 6913.90.5000 PT 480 PCS 3.25 1,560.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.description",
+    "value": "Ceramic pumpkin, small",
+    "quote": "Ceramic pumpkin, small",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.hts",
+    "value": "6913.90.5000",
+    "quote": "6913.90.5000",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.origin",
+    "value": "PT",
+    "quote": "PT",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.quantity",
+    "value": "480",
+    "quote": "480",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.unit",
+    "value": "PCS",
+    "quote": "PCS",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.unitPrice",
+    "value": "3.25",
+    "quote": "3.25",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.lines.5.amount",
+    "value": "1,560.00",
+    "quote": "1,560.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.subtotal",
+    "value": "9,840.00",
+    "quote": "Subtotal: 9,840.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "invoice.total",
+    "value": "9,840.00",
+    "quote": "TOTAL USD 9,840.00",
+    "doc": "invoice",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.number",
+    "value": "MCA-PL-2611-07",
+    "quote": "Packing List No.: MCA-PL-2611-07",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.invoiceRef",
+    "value": "MCA-INV-2611-07",
+    "quote": "Invoice Ref.: MCA-INV-2611-07",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.blNumber",
+    "value": "OWFL2611LXS0419",
+    "quote": "B/L No.: OWFL2611LXS0419",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.itemNo",
+    "value": "MCA-101",
+    "quote": "MCA-101 Stoneware owl figurine 1-20 20 1,200 420.0 468.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.cartons",
+    "value": "20",
+    "quote": "20",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.quantity",
+    "value": "1,200",
+    "quote": "1,200",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.netKg",
+    "value": "420.0",
+    "quote": "420.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.1.grossKg",
+    "value": "468.0",
+    "quote": "468.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.itemNo",
+    "value": "MCA-102",
+    "quote": "MCA-102 Glass votive candle holder 21-44 24 2,400 336.0 384.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.cartons",
+    "value": "24",
+    "quote": "24",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.quantity",
+    "value": "2,400",
+    "quote": "2,400",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.netKg",
+    "value": "336.0",
+    "quote": "336.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.2.grossKg",
+    "value": "384.0",
+    "quote": "384.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.itemNo",
+    "value": "MCA-103",
+    "quote": "MCA-103 Tin lantern 45-59 15 300 255.0 285.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.cartons",
+    "value": "15",
+    "quote": "15",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.quantity",
+    "value": "300",
+    "quote": "300",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.netKg",
+    "value": "255.0",
+    "quote": "255.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.3.grossKg",
+    "value": "285.0",
+    "quote": "285.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.itemNo",
+    "value": "MCA-104",
+    "quote": "MCA-104 Artificial bittersweet stems 60-65 6 600 30.0 39.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.cartons",
+    "value": "6",
+    "quote": "6",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.quantity",
+    "value": "600",
+    "quote": "600",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.netKg",
+    "value": "30.0",
+    "quote": "30.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.4.grossKg",
+    "value": "39.0",
+    "quote": "39.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.itemNo",
+    "value": "MCA-105",
+    "quote": "MCA-105 Ceramic pumpkin, small 66-77 12 480 456 62.0 72.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "low"
+   },
+   {
+    "field": "packingList.lines.5.cartons",
+    "value": "12",
+    "quote": "12",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.netKg",
+    "value": "62.0",
+    "quote": "62.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.lines.5.grossKg",
+    "value": "72.0",
+    "quote": "72.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalCartons",
+    "value": "77",
+    "quote": "77",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalQuantity",
+    "value": "4,980",
+    "quote": "4,980",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "low"
+   },
+   {
+    "field": "packingList.totalNetKg",
+    "value": "1,103.0",
+    "quote": "1,103.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "packingList.totalGrossKg",
+    "value": "1,248.0",
+    "quote": "1,248.0",
+    "doc": "packingList",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.number",
+    "value": "OWFL2611LXS0419",
+    "quote": "B/L No.: OWFL2611LXS0419",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.carrier",
+    "value": "Owlferry Container Lines (SAMPLE)",
+    "quote": "Carrier: Owlferry Container Lines (SAMPLE)",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.consignee.name",
+    "value": "Bramblewick Home Goods LLC",
+    "quote": "Consignee: Bramblewick Home Goods LLC",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.vessel",
+    "value": "OWLFERRY DAWN",
+    "quote": "Vessel: OWLFERRY DAWN",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.voyage",
+    "value": "047W",
+    "quote": "Voyage: 047W",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.portOfLoading",
+    "value": "Leixoes, Portugal",
+    "quote": "Port of loading: Leixoes, Portugal",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.portOfDischarge",
+    "value": "Savannah, GA, USA",
+    "quote": "Port of discharge: Savannah, GA, USA",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.onBoardDate",
+    "value": "11/05/2026",
+    "quote": "Shipped on board: 05 NOV 2026",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.containerNo",
+    "value": "ZZZU 418207 3",
+    "quote": "ZZZU 418207 3 / SMPL-0000",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.packages",
+    "value": "77 CTNS",
+    "quote": "77 CTNS",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   },
+   {
+    "field": "billOfLading.grossKg",
+    "value": "1284.0",
+    "quote": "1,284.0 KGS",
+    "doc": "billOfLading",
+    "page": 1,
+    "confidence": "high"
+   }
+  ],
+  "invoiceLineCount": 5,
+  "packingListLineCount": 5,
+  "reader": "claude-haiku-5-5"
+ },
+ "remaining": 0
+}

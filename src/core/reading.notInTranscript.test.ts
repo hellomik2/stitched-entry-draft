@@ -184,9 +184,9 @@ describe("Feature: document-intake, Property 68: An Image Value Missing From the
     expect(r.notInTranscript).toBeUndefined();
   });
 
-  it("a value on a transcript line with no box is still rejected with no_source_box", () => {
+  it("a value on a transcript line with no box waits with no box (Requirement 58.1)", () => {
     const page = transcriptToPageText("invoice", 1, 1000, 1000, [{ text: "Terms: ZQ9", box: null }]);
-    expect(verifyOne(page, "ZQ9", "Terms: ZQ9", "high")).toMatchObject({ status: "rejected", reason: "no_source_box" });
+    expect(verifyOne(page, "ZQ9", "Terms: ZQ9", "high")).toMatchObject({ status: "uncertain", box: null, itemIds: [], lineWithoutBox: true, lineText: "Terms: ZQ9" });
   });
 });
 
