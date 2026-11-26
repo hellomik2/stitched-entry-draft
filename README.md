@@ -74,15 +74,17 @@ not) is in [`docs/kiro-journal.md`](docs/kiro-journal.md).
 |---|---|
 | [`.kiro/specs/entry-math/`](.kiro/specs/entry-math/) | Spec for the 7501 math: requirements, design with correctness properties, tasks. |
 | [`.kiro/specs/document-intake/`](.kiro/specs/document-intake/) | Spec for the upload path and the AI reader boundary, grown requirement by requirement after each real read and each outside review. |
-| [`.kiro/steering/`](.kiro/steering/) | Product, tech, structure and pipeline rules (always included), CBP Form 7501 rules with page numbers (for `src/rules/**`), demo data rules (for `samples/**`). |
+| [`.kiro/steering/`](.kiro/steering/) | Product, tech, structure and pipeline rules (always included), CBP Form 7501 rules with page numbers (for `src/rules/**`), demo data rules (for `samples/**`), and eight ways a property test here once passed without testing anything (for `**/*.property.test.ts`). |
 | [`.kiro/hooks/demo-data-check.json`](.kiro/hooks/demo-data-check.json) | Agent hook on file save under `samples/`: checks that names are invented, pages are marked DEMO / FICTITIOUS, mail uses example.com, phones use 555-01xx, and HTS numbers exist. |
-| [`.kiro/agents/`](.kiro/agents/) | Two custom agents for the Kiro CLI, `app-builder` and `rules-builder`, with file tools only and write paths limited per agent. |
+| [`.kiro/hooks/turn-check.json`](.kiro/hooks/turn-check.json) | Stop hook: after each agent turn, [`scripts/kiro-turn-check.mjs`](scripts/kiro-turn-check.mjs) type-checks the project and runs the Vitest tests related to the changed files under `src/`, with no AI key in reach. A failure goes back to the agent for one more turn, at most twice per session. |
+| [`.kiro/agents/`](.kiro/agents/) | Three custom agents for the Kiro CLI. `app-builder` and `rules-builder` write, with file tools only and write paths limited per agent. `entry-reviewer` only reads: it reviews a change against the specs, steering and tests, its rules let it call `lookup_hts` without asking, and it may not read `.env` files. |
 | [`.kiro/settings/mcp.json`](.kiro/settings/mcp.json) | The `hts-lookup` MCP server ([`tools/hts-mcp/server.ts`](tools/hts-mcp/server.ts)) that answers tariff lookups from the shipped HTS subset. |
+| [`tools/kiro-power/cbp-7501-entry/`](tools/kiro-power/cbp-7501-entry/) | A Kiro power in the Agent Plugins format: three skills (check a printed HTS number, turn a defect into a spec requirement and a test that fails first, review a property test) and the `hts-lookup` server. We installed it with `kiro-cli powers install` and `entry-reviewer` loaded its skill. Its copy of the MCP server does not start from the install folder (the path in its `mcp.json` is relative), so the workspace server answered. |
 | `*.property.test.ts` and other tests | Property-based tests with fast-check. Each property names the requirement it validates. |
 
-Counted on 2026-11-26: 2 specs with 78 requirements and 141 correctness properties in their
-designs, 6 steering files, 1 hook, 2 custom agents, 1 MCP server, 71 test files with 156
-`fc.assert` properties.
+Counted on 2026-11-26: 2 specs with 79 requirements and 142 correctness properties in their
+designs, 7 steering files, 2 hooks, 3 custom agents, 1 MCP server, 1 power, 73 test files with
+164 `fc.assert` properties.
 
 ## Run it yourself
 
@@ -118,7 +120,8 @@ src/server/   the AI reader, usage caps and the cost ledger
 src/app/      Next.js board, upload panel, /api/read and /api/reader-status
 data/         HTS 2026 Rev. 23 subset, CBP port code tables, country codes
 samples/      invented documents, recorded reader answers, sample layout
-tools/        hts-lookup MCP server
+scripts/      command-line draft, sample builder, PDF worker copy, the Stop hook's turn check
+tools/        hts-lookup MCP server, the cbp-7501-entry Kiro power
 docs/         Kiro journal
 ```
 
@@ -146,10 +149,11 @@ sections that the steering files and specs cite by page and section.
 One person directed the work with two AI tools, Kiro and Claude Code:
 
 - **Kiro wrote the application files.** Each commit that changes code under `src/`, `scripts/` or
-  `tools/` (62 of the first 128 commits) names the Kiro run that wrote it: 55 in the commit
+  `tools/` (66 of the first 141 commits) names the Kiro run that wrote it: 59 in the commit
   message, 7 only in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
-  and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 124 of
-  the 128 journal rows). Kiro's spec mode also wrote the spec files.
+  and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 133 of
+  the 138 journal rows); a third, read-only agent, `entry-reviewer`, reviewed one change. Kiro's spec
+  mode also wrote the spec files.
 - **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
   steering files it wrote 14 requirements, a design with 54 correctness properties and a task list
   of 16 tasks with 34 sub-tasks, then the project skeleton and the first rule modules with their tests); the first
@@ -166,9 +170,9 @@ One person directed the work with two AI tools, Kiro and Claude Code:
   word for word. Claude Code ran the tests, type checks, builds and screen checks that decided
   whether a task was done, and made every commit, which is why each commit carries a
   `Co-Authored-By: Claude` line.
-- **Written outside Kiro:** the first five steering files, the two custom agent files, the sample
-  documents and the data files (the custom agents cannot write to `samples/` or `data/`), and
-  `docs/kiro-journal.md` (22 commits change only the journal). Reviews by Claude and by a second
+- **Written outside Kiro:** the first five steering files, the first two custom agent files, the
+  sample documents and the data files (the custom agents cannot write to `samples/` or `data/`), and
+  `docs/kiro-journal.md` (24 commits change only the journal). Reviews by Claude and by a second
   AI coding tool (agy) found problems that became new `document-intake` requirements before any
   code changed.
 
