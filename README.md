@@ -83,8 +83,8 @@ not) is in [`docs/kiro-journal.md`](docs/kiro-journal.md).
 | `*.property.test.ts` and other tests | Property-based tests with fast-check. Each property names the requirement it validates. |
 
 Counted on 2026-11-26: 2 specs with 79 requirements and 142 correctness properties in their
-designs, 7 steering files, 2 hooks, 3 custom agents, 1 MCP server, 1 power, 73 test files with
-164 `fc.assert` properties.
+designs, 7 steering files, 2 hooks, 3 custom agents, 1 MCP server, 1 power, 72 test files that
+`npm test` runs, with 164 `fc.assert` properties.
 
 ## Run it yourself
 
@@ -149,16 +149,18 @@ sections that the steering files and specs cite by page and section.
 One person directed the work with two AI tools, Kiro and Claude Code:
 
 - **Kiro wrote the application files.** Each commit that changes code under `src/`, `scripts/` or
-  `tools/` (66 of the first 141 commits) names the Kiro run that wrote it: 59 in the commit
+  `tools/` (67 of the first 146 commits) names the Kiro run that wrote it: 60 in the commit
   message, 7 only in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
   and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 133 of
-  the 139 journal rows); a third, read-only agent, `entry-reviewer`, reviewed one change, once on
-  Claude Haiku 4.5 and once on Claude Opus 5.5. Kiro's spec mode also wrote the spec files.
+  the 140 journal rows, Claude Opus 5.5 in 2); a third, read-only agent, `entry-reviewer`, reviewed
+  one change, once on Claude Haiku 4.5 and once on Claude Opus 5.5. Kiro's spec mode also wrote the
+  spec files.
 - **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
   steering files it wrote 14 requirements, a design with 54 correctness properties and a task list
   of 16 tasks with 34 sub-tasks, then the project skeleton and the first rule modules with their tests); the first
   draft of the second spec, `document-intake`, which we corrected in a 13-point review; and the
-  prompt of the demo-data hook, revised twice on our instructions. Where a request gave only the
+  prompt of the demo-data hook, revised twice on our instructions; and the rewrite of the tests of
+  Requirement 65 after the Opus review, from the review and the spec alone. Where a request gave only the
   spec, Kiro also chose the implementation; for the port code tables, the tests caught seven
   places where its first version went wrong.
 - **What Claude Code did.** It planned the other changes and wrote the requests that Kiro carried
