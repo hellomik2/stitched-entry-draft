@@ -1436,7 +1436,7 @@ For any text page with an item S, items stacked under it in its column and items
 **Validates: Requirements 60.1, 60.2**
 
 ### Property 81: The New Rules Keep Only What the Old Check Rejected
-For any text page or image transcript (with any lines without a box) and any readings, `verifyReadings` gives for each reading what the check before these changes gives (`verifyReadings` of `src/core/reading.before58.ts`), except a reading it rejected with "no_source_box" and the message of a line with no usable place, which is now "uncertain" with `lineWithoutBox: true`, and a reading of a number field or an address field it rejected with "value_not_in_quote", which may now be accepted or "uncertain". On a text page no reading gets `lineWithoutBox`, and every other reading has the same status, reason, message, box, item ids and cell.
+For any text page or image transcript (with any lines without a box) and any readings, `verifyReadings` gives for each reading what the check before these changes gives (`verifyReadings` of `src/core/reading.before58.ts`), except a reading it rejected with "no_source_box" and the message of a line with no usable place, which is now "uncertain" with `lineWithoutBox: true`, and a reading of a number field or an address field it rejected with "value_not_in_quote", which may now be accepted, "uncertain", or rejected with "quote_not_found" (Requirement 59.3: on an image page the check of 50.8 uses the printed number in place of the value). On a text page no reading gets `lineWithoutBox`, and every other reading has the same status, reason, message, box, item ids and cell.
 **Validates: Requirements 58.2, 59.4, 60.3**
 
 ---

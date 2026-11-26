@@ -423,28 +423,28 @@
 - [x] 72. (maintainer) Verifier items for Requirements 54 to 57 with the cross-check 3 reproductions; the CBP Form 7501 (11/26) page check in the steering; the recorded answers of bundles A, B and C replayed before and after
   - _Requirements: 54, 55, 56, 57_
 
-- [ ] 73. A value on a transcript line with no usable place waits for a person
-  - [ ] 73.1 Tests that fail on the current code: the image part of the recorded read of bundle A (`samples/real-reads/test-bundle-a.json`) and the examples of 58.7, Property 77, Property 78, the draft reasons, the document source, the CSV source, confirming, `rejectedReadings`, low confidence; the older tests of Requirement 37.3 and Property 54 follow 58.1
-  - [ ] 73.2 `src/core/reading.ts`
-  - [ ] 73.3 `src/core/draft.ts`, `csv.ts`
-  - [ ] 73.4 `src/app/StitchBoard.tsx`
+- [x] 73. A value on a transcript line with no usable place waits for a person
+  - [x] 73.1 Tests that fail on the current code: the image part of the recorded read of bundle A (`samples/real-reads/test-bundle-a.json`) and the examples of 58.7, Property 77, Property 78, the draft reasons, the document source, the CSV source, confirming, `rejectedReadings`, low confidence; the older tests of Requirement 37.3 and Property 54 follow 58.1
+  - [x] 73.2 `src/core/reading.ts`
+  - [x] 73.3 `src/core/draft.ts`, `csv.ts`
+  - [x] 73.4 `src/app/StitchBoard.tsx`
   - _Requirements: 58_
 
-- [ ] 74. A number written without its thousands commas is inside its quote
-  - [ ] 74.1 Tests that fail on the current code: the example of 59.5, the cases of 59.2 and 59.4 on text and image pages, Property 79
-  - [ ] 74.2 `src/core/reading.ts`
+- [x] 74. A number written without its thousands commas is inside its quote
+  - [x] 74.1 Tests that fail on the current code: the example of 59.5, the cases of 59.2 and 59.4 on text and image pages, Property 79
+  - [x] 74.2 `src/core/reading.ts`
   - _Requirements: 59_
 
-- [ ] 75. An address printed over several lines under its quote is inside its quote
-  - [ ] 75.1 Tests that fail on the current code: the examples of 60.4 on pages made of the printed items, Property 80
-  - [ ] 75.2 `src/core/reading.ts`
+- [x] 75. An address printed over several lines under its quote is inside its quote
+  - [x] 75.1 Tests that fail on the current code: the examples of 60.4 on pages made of the printed items, Property 80
+  - [x] 75.2 `src/core/reading.ts`
   - _Requirements: 60_
 
-- [ ] 76. The new rules keep only what the old check rejected
-  - [ ] 76.1 `src/core/reading.before58.ts` (a byte copy of `src/core/reading.ts` at d4bfff6) and the test of Property 81
+- [x] 76. The new rules keep only what the old check rejected
+  - [x] 76.1 `src/core/reading.before58.ts` (a byte copy of `src/core/reading.ts` at d4bfff6) and the test of Property 81
   - _Requirements: 58.2, 59.4, 60.3_
 
-- [ ] 77. (maintainer) Verifier items for Requirements 58 to 60; the recorded reads of bundles A, B and C replayed before and after; the board with the recorded read of bundle A
+- [x] 77. (maintainer) Verifier items for Requirements 58 to 60; the recorded reads of bundles A, B and C replayed before and after; the board with the recorded read of bundle A
   - _Requirements: 58, 59, 60_
 
 ## Summary
