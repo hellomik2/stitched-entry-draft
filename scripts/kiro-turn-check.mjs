@@ -115,7 +115,7 @@ if (!tests.ok) {
   );
 }
 const reason = [
-  `The turn check failed (${failures + 1} of 2). Fix the cause with the smallest change in the files of this request, then stop. Full output: ${logPath}`,
+  `The turn check failed (${failures + 1} of 2). If this request asked for tests that fail on the current code, these may be the expected failures: do not change or delete those tests; say which ones fail and stop. Otherwise fix the cause with the smallest change in the files of this request, then stop. Full output: ${logPath}`,
   ...lines.slice(0, 40),
 ].join("\n");
 process.stdout.write(`${JSON.stringify({ decision: "block", reason })}\n`);
