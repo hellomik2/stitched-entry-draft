@@ -460,6 +460,20 @@
 - [ ] 80. (maintainer) Verifier items for Requirements 61 and 62; the recorded reads replayed before and after
   - _Requirements: 61, 62_
 
+- [ ] 81. A person's exchange rate converts the amounts of an invoice that is not in USD
+  - [ ] 81.1 Tests that fail on the current code: the examples of 63.8, Properties 84 to 90, the CSV text of 63.6
+  - [ ] 81.2 `src/core/exchangeRate.ts`, `src/core/index.ts`, `src/core/draft.ts`, `src/core/csv.ts`
+  - [ ] 81.3 `src/app/StitchBoard.tsx`; the steering notes in `product.md` and `customs-rules.md`
+  - _Requirements: 63_
+
+- [ ] 82. Three screen texts read as sentences and equations
+  - [ ] 82.1 Tests that fail on the current code: the examples of 64.1 to 64.3, Property 91; the older tests that read these texts
+  - [ ] 82.2 `src/core/draft.ts`
+  - _Requirements: 64_
+
+- [ ] 83. (maintainer) Verifier items for Requirements 63 and 64; the sample CSV fingerprints; the recorded reads replayed with and without a rate; the board with the recorded read of bundle B and a rate
+  - _Requirements: 63, 64_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -543,5 +557,8 @@
 78. A number inside a longer printed number is not inside its quote
 79. The lines for a record or a top-up not written name the record key and the missing amount
 80. (maintainer) Verifier items for Requirements 61 and 62, replays
+81. A person's exchange rate converts the amounts of an invoice that is not in USD
+82. Three screen texts read as sentences and equations
+83. (maintainer) Verifier items for Requirements 63 and 64, replays and the board with a rate
 
-**Total Sub-Tasks:** 225
+**Total Sub-Tasks:** 230

@@ -1045,6 +1045,12 @@ export default function StitchBoard(...) {
 
 **Test baseline:** `src/core/reading.before61.ts` is a byte copy of `src/core/reading.ts` at commit b41d1cc. Only the test of Property 82 imports it.
 
+## Exchange Rate and Screen Texts (2026-11-26)
+
+**Requirement 63 (A Person's Exchange Rate Converts the Amounts of an Invoice That Is Not in USD):** a new module `src/core/exchangeRate.ts` (re-exported by `src/core/index.ts`) holds the types `ExchangeRateInput` and `ExchangeRateSource`, `EXCHANGE_RATE_FIELD_ID` ("FX.RATE"), `EXCHANGE_RATE_HELP` (the text of 63.5), `invoiceForeignCurrency`, `exchangeRateProblem`, `decimalCommaCents`, `mixesNumberForms`, `convertedEnteredValue` (BigInt: the exact product, its text, and `roundEnteredValue` of its whole cents rounded down) and `exchangeRateSourceText`. `Source` gets `ExchangeRateSource`. `draft.ts`: the `exchangeRate` input is checked once after the accepted readings; `FX.RATE` goes after B47; the 36A block computes with the rate only when it is usable; the override loop skips `FX.RATE`. `csv.ts` and the board's source strip print `exchangeRateSourceText`. `StitchBoard.tsx` keeps the rate in its state (cleared on a new upload), passes it to `buildDraft`, shows the box above the line items and leaves `FX.RATE` out of the header blocks. The steering notes in `product.md` and `customs-rules.md` say that a person enters the rate and the app only multiplies.
+
+**Requirement 64 (Three Screen Texts Read as Sentences and Equations):** `draft.ts`: the note of `deriveNetQuantity` for several invoice lines in piece units, the reason of the last case of `packingQuantityProblem`, and the reason of the P1 case of 36A.
+
 ---
 
 ## Correctness Properties
@@ -1454,6 +1460,38 @@ For any text page or image transcript and any readings, `verifyReadings` gives f
 ### Property 83: A Line Not Written Names Only the Key, the Counts and the Missing Amount
 For any request in claude mode with any file hashes and page texts, any provider key in the environment, any reader usage the call can have, and any store whose record write or top-up fails or runs out of time: every "usage record not written" line is that prefix and the JSON of exactly `key`, `timestamp`, `model`, `outcome`, `inputTokens`, `outputTokens` and `estimatedCostNanoUsd`, its `key` is the key the store was asked to write and has the form of `newUsageRecordKey`; every "usage cost top-up not written" line is that prefix and the JSON of exactly `missingNanoUsd`, which is the actual cost minus the reserved cost; no line contains a file hash, a page text, the provider key or an error message; and the status and body of the answer are those of the same request with a working store.
 **Validates: Requirements 62.1, 62.2, 62.3, 62.4**
+
+### Property 84: Without a Usable Rate the Draft Is As Before
+For any readings and any exchange rate input that is not usable (null, a currency that is USD, not read, not sure or rejected, or a rate, a date or a source that `exchangeRateProblem` refuses), `buildDraft` gives a draft deeply equal to the draft built without the input, and `draftToCsv` gives the same text; for an invoice in USD every rate gives that draft.
+**Validates: Requirements 63.1, 63.4**
+
+### Property 85: A Rate of 1 Gives the Values of the Same Invoice in USD
+For any invoice whose line amounts are in today's money form, with the currency "EUR" and the rate "1", every 36A, 38, B39, FEE.MPF and B41 to B44 has the value and the status of the same invoice with the currency "USD"; the same invoice with the same amounts printed with a decimal comma gives the same values.
+**Validates: Requirements 63.3, 63.4**
+
+### Property 86: The Entered Value Is P4 of the Exact Product and Does Not Go Down When the Rate Goes Up
+For any amount in cents and any rates r1 ≤ r2 of the form of 63.1, `convertedEnteredValue` gives P4 (half up) of the exact product computed apart as a fraction, its text is the exact product with every digit, and its whole dollars for r1 are at most those for r2; in a draft every 36A and B39 for r1 are at most those for r2.
+**Validates: Requirement 63.3**
+
+### Property 87: The Totals Add Up With Converted Values
+For any invoice with a usable rate whose 36A values are all computed, B39 is the sum of the 36A values (mode `sumOfRoundedLines`), each 38 is the duty of its 36A at its rate, and when B41, B42, B43 and B44 have values, B44 is B41 + B42 + B43.
+**Validates: Requirement 63.3**
+
+### Property 88: A Converted Value From an Image Reading Waits for a Person
+For any invoice with a usable rate where the currency reading or an amount reading came from an image page, no 36A computed with the rate is "computed" before a person confirms it: it is "needsReview" with an image reason and keeps its value and its sources; confirming the shown value makes it "computed".
+**Validates: Requirements 63.3, 26.1**
+
+### Property 89: The Decimal Comma Reading Takes Only Texts With One Meaning
+For any text, when `parseMoneyToCents` takes it `decimalCommaCents` gives null, so no text has two values; `decimalCommaCents` gives cents only for the two forms of 63.4, and then the number its digits make; a text with three digits after a comma or a period ("1.800", "1,800"), one or three digits after the comma, a period that is not between groups of three digits, a sign, a currency or any other character gives null. For any invoice with a usable rate whose money readings mix a decimal comma form with another form with a comma or a period, every 36A waits; with the currency "USD" a decimal comma amount is never read.
+**Validates: Requirements 63.4, 63.1**
+
+### Property 90: A Person's 36A Comes Before the Rate
+For any invoice with a usable rate, any line and any whole-dollar value, a person's 36A value is that line's 36A ("personEdited") whatever the rate, and B39 adds it.
+**Validates: Requirement 63.3**
+
+### Property 91: A Quantity Note in Piece Units Is an Equation That Holds
+For any 7501 line of two or more invoice lines in piece units, the note of its computed 35 is "<q1> <u1> + … = <s> PCS" followed by " = <v> <unit>" when it has a unit, with s the sum of the q and v the field's value; the reason of a quantity that is not the packing list sum starts with "Invoice line <n> says "; and the reason of the P1 case of 36A ends with ". A person decides." with no digit right before " A person decides.".
+**Validates: Requirements 64.1, 64.2, 64.3**
 
 ---
 
