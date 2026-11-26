@@ -1,0 +1,10 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "hts-lookup": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["tsx", "tools/hts-mcp/server.ts"]
+    }
+  }
+}

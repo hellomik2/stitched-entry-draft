@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "cbp-7501-entry",
+  "version": "1.0.0",
+  "description": "Work on the CBP Form 7501 draft helper: check printed HTS numbers against the shipped 2026 HTS subset without proposing one, turn a found defect into a spec requirement and a test that fails first, and review fast-check property tests for the ways they pass without testing anything.",
+  "author": {
+    "name": "hellomik2"
+  },
+  "keywords": ["7501", "entry summary", "HTS", "tariff number", "property test", "fast-check", "spec defect"],
+  "license": "MIT"
+}
