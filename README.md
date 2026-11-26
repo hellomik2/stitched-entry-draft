@@ -152,8 +152,8 @@ One person directed the work with two AI tools, Kiro and Claude Code:
   `tools/` (66 of the first 141 commits) names the Kiro run that wrote it: 59 in the commit
   message, 7 only in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
   and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 133 of
-  the 138 journal rows); a third, read-only agent, `entry-reviewer`, reviewed one change. Kiro's spec
-  mode also wrote the spec files.
+  the 139 journal rows); a third, read-only agent, `entry-reviewer`, reviewed one change, once on
+  Claude Haiku 4.5 and once on Claude Opus 5.5. Kiro's spec mode also wrote the spec files.
 - **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
   steering files it wrote 14 requirements, a design with 54 correctness properties and a task list
   of 16 tasks with 34 sub-tasks, then the project skeleton and the first rule modules with their tests); the first
@@ -172,7 +172,7 @@ One person directed the work with two AI tools, Kiro and Claude Code:
   `Co-Authored-By: Claude` line.
 - **Written outside Kiro:** the first five steering files, the first two custom agent files, the
   sample documents and the data files (the custom agents cannot write to `samples/` or `data/`), and
-  `docs/kiro-journal.md` (24 commits change only the journal). Reviews by Claude and by a second
+  `docs/kiro-journal.md` (25 commits change only the journal). Reviews by Claude and by a second
   AI coding tool (agy) found problems that became new `document-intake` requirements before any
   code changed.
 
