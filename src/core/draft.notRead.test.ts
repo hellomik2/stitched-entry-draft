@@ -199,7 +199,7 @@ describe("Requirement 33: A Quantity That Was Not Read Is Not Zero (Property 50)
 
       expect(l003_35?.status).toBe("needsReview");
       expect(l003_35?.reason).toBe(
-        "says 240 PCS, the packing list says 216 PCS. A person decides."
+        "Invoice line 3 says 240 PCS; the packing list says 216 PCS. A person decides."
       );
 
       const checkEntry = check(d, "P3.qty.LH-103");

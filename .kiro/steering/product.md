@@ -36,7 +36,9 @@ control").
   Every draft and every export is marked `DRAFT, NOT FOR FILING`.
 - Never decide entered value, related-party status, origin or preference eligibility,
   AD/CVD, Chapter 99 duties, or currency conversion. Show candidates and the reason; a
-  person decides.
+  person decides. For currency conversion this means the app never chooses, suggests or
+  looks up a rate: a person enters the rate, its date and where it came from, and the app
+  only multiplies, exactly, and rounds once by P4 (document-intake Requirement 63).
 - Never read, store, or display tax identifiers (7501 Blocks 26 and 27, EIN, SSN).
 - Never invent numbers that the official sources do not give. If a rate or rounding
   method is not confirmed, it is a configuration value or a person's input, not a constant

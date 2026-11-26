@@ -15,6 +15,21 @@ import { roundEnteredValue, computeDuty, allocateGrossWeight, totalEnteredValue,
 import { type PartsList, type LineParts, linePartsInfo } from "./partsList";
 import { type CodeTableSource, lookupUsPort, lookupForeignPort, codeTableSourceD, codeTableSourceK } from "./codeTables";
 import { suggestMid } from "./mid";
+import {
+  type ExchangeRateInput,
+  type ExchangeRateSource,
+  EXCHANGE_RATE_FIELD_ID,
+  MIXED_FORMS_REASON,
+  invoiceForeignCurrency,
+  exchangeRateProblem,
+  exchangeRateSource,
+  decimalCommaCents,
+  mixesNumberForms,
+  exchangeLineMismatch,
+  convertedEnteredValue,
+  exchangeRateNote,
+  convertedNote,
+} from "./exchangeRate";
 
 export const DRAFT_NOTICE = "DRAFT, NOT FOR FILING";
 
@@ -75,7 +90,7 @@ export type HtsSource = {
   htsno: string;
 };
 
-export type Source = DocSource | HtsSource | CodeTableSource;
+export type Source = DocSource | HtsSource | CodeTableSource | ExchangeRateSource;
 
 export type DraftField = {
   id: string;
@@ -229,6 +244,7 @@ export function buildDraft(input: {
   invoiceLineCount?: number | null;
   packingListLineCount?: number | null;
   partsList?: PartsList | null;
+  exchangeRate?: ExchangeRateInput | null;
 }): Draft {
   const { bundle, reader, readings, hts } = input;
   const overrides = input.overrides || [];
@@ -242,6 +258,23 @@ export function buildDraft(input: {
     return r;
   });
   const accepted = acceptedReadings(verified);
+
+  // Requirement 63.1: a person's exchange rate, used only for an accepted invoice currency that is not USD and only when
+  // the rate, its date and its source pass; otherwise the draft is exactly as without it
+  const fxCurrency = invoiceForeignCurrency(verified);
+  const fx: ExchangeRateSource | null =
+    fxCurrency !== null && input.exchangeRate && exchangeRateProblem(input.exchangeRate) === null
+      ? exchangeRateSource(fxCurrency, input.exchangeRate)
+      : null;
+  // Requirement 63.4: the invoice money readings of any status, for the check of mixed number forms
+  const fxMixed =
+    fx !== null &&
+    mixesNumberForms(
+      verified
+        .filter((r) => /^invoice\.(lines\.\d+\.(amount|unitPrice)|subtotal|total)$/.test(r.field))
+        .map((r) => r.value)
+        .filter((v): v is string => typeof v === "string" && v !== ""),
+    );
 
   // Rejected readings
   const rejectedReadings = verified
@@ -419,7 +452,7 @@ export function buildDraft(input: {
     const packingSum = (packingByItemNo.get(itemNo) ?? []).reduce((a, b) => a + b, 0);
     if (packingSum !== q) {
       return {
-        reason: `says ${q} PCS, the packing list says ${packingSum} PCS. A person decides.`,
+        reason: `Invoice line ${n} says ${q} PCS; the packing list says ${packingSum} PCS. A person decides.`,
         detail: `invoice qty = ${q}, packing sum = ${packingSum}`,
       };
     }
@@ -1462,6 +1495,21 @@ export function buildDraft(input: {
     })
   );
 
+  // Requirement 63.2: the person's exchange rate is the last header field, only when it is usable
+  if (fx) {
+    headerFields.push(
+      field_helper({
+        id: EXCHANGE_RATE_FIELD_ID,
+        block: "FX",
+        label: `Exchange rate (USD per 1 ${fx.currency})`,
+        value: fx.rate,
+        status: "personEdited",
+        note: exchangeRateNote(fx),
+        sources: [fx],
+      })
+    );
+  }
+
   // Build 7501 lines by grouping invoice lines
   // Key = "${hts_digits or "raw:" + printed}|${origin or "unknown-origin-" + n}"
   // Each group becomes one 7501 line
@@ -1800,6 +1848,7 @@ export function buildDraft(input: {
           arithmeticNote = `${displayValue} ${htsUnit || ""}`.trim();
         } else {
           const parts: string[] = [];
+          const pieceTerms: { qty: number; unit: string }[] = [];
           for (let i = 0; i < invoiceLines.length; i++) {
             const n = invoiceLines[i];
             const qtyReading = accepted.get(`invoice.lines.${n}.quantity`);
@@ -1807,10 +1856,19 @@ export function buildDraft(input: {
               const qtyResult = parseCount(normalizeSpace(qtyReading.value));
               if (qtyResult.ok) {
                 parts.push(String(qtyResult.value));
+                const unitText = normalizeSpace(accepted.get(`invoice.lines.${n}.unit`)?.value ?? "").toUpperCase();
+                pieceTerms.push({ qty: qtyResult.value, unit: unitText });
               }
             }
           }
-          arithmeticNote = `${parts.join(" + ")} ${htsUnit || ""}`.trim();
+          // Requirement 64.1: several invoice lines in piece units give an equation that holds; other units keep this note
+          const pieceUnits = ["PCS", "PC", "EA", "PIECES", "NO."];
+          if (pieceTerms.length === invoiceLines.length && pieceTerms.every((t) => pieceUnits.includes(t.unit))) {
+            const pieces = pieceTerms.reduce((s, t) => s + t.qty, 0);
+            arithmeticNote = `${pieceTerms.map((t) => `${t.qty} ${t.unit}`).join(" + ")} = ${pieces} PCS${htsUnit ? ` = ${displayValue} ${htsUnit}` : ""}`;
+          } else {
+            arithmeticNote = `${parts.join(" + ")} ${htsUnit || ""}`.trim();
+          }
         }
 
         return field_helper({
@@ -2188,6 +2246,24 @@ export function buildDraft(input: {
         }
       }
 
+      // Requirement 63.3: with a usable rate, the first line of the group with no P1 check (its unit price or its amount is
+      // printed with a decimal comma) whose quantity times unit price is not its amount
+      let fxLineMismatch: string | null = null;
+      if (fx) {
+        for (const n of group.invoiceLines) {
+          if (checks.some((c) => c.id === `P1.invoice.line.${n}`)) continue;
+          const detail = exchangeLineMismatch(
+            invoiceLines.get(n)?.quantity ?? null,
+            accepted.get(`invoice.lines.${n}.unitPrice`)?.value,
+            accepted.get(`invoice.lines.${n}.amount`)?.value,
+          );
+          if (detail !== null) {
+            fxLineMismatch = detail;
+            break;
+          }
+        }
+      }
+
       // Check currency
       const currencyReading = accepted.get("invoice.currency");
       let isCurrencyOk = true;
@@ -2209,7 +2285,7 @@ export function buildDraft(input: {
             reason: "No invoice currency was read. A person checks that the amounts are in USD and enters the entered value.",
           })
         );
-      } else if (!isCurrencyOk) {
+      } else if (!isCurrencyOk && !fx) {
         lineFields.push(
           field_helper({
             id,
@@ -2228,7 +2304,43 @@ export function buildDraft(input: {
             line: lineNum,
             label: "Entered value (USD)",
             status: "needsReview",
-            reason: `P1 mismatch: ${p1MismatchReason} A person decides.`,
+            reason: `P1 mismatch: ${p1MismatchReason}. A person decides.`,
+            sources: group.invoiceLines
+              .map((n) => {
+                const r = accepted.get(`invoice.lines.${n}.amount`);
+                return r ? docSource(r) : null;
+              })
+              .filter((s): s is DocSource => s !== null),
+          })
+        );
+      } else if (fx && fxMixed) {
+        // Requirement 63.4: an invoice that prints its amounts in two forms is not converted
+        lineFields.push(
+          field_helper({
+            id,
+            block: "36A",
+            line: lineNum,
+            label: "Entered value (USD)",
+            status: "needsReview",
+            reason: MIXED_FORMS_REASON,
+            sources: group.invoiceLines
+              .map((n) => {
+                const r = accepted.get(`invoice.lines.${n}.amount`);
+                return r ? docSource(r) : null;
+              })
+              .filter((s): s is DocSource => s !== null),
+          })
+        );
+      } else if (fx && fxLineMismatch !== null) {
+        // Requirement 63.3: a line printed with a decimal comma has no P1 check, so it is checked the same way here
+        lineFields.push(
+          field_helper({
+            id,
+            block: "36A",
+            line: lineNum,
+            label: "Entered value (USD)",
+            status: "needsReview",
+            reason: `P1 mismatch: ${fxLineMismatch}. A person decides.`,
             sources: group.invoiceLines
               .map((n) => {
                 const r = accepted.get(`invoice.lines.${n}.amount`);
@@ -2240,7 +2352,13 @@ export function buildDraft(input: {
       } else {
         // Sum amounts in cents, round to whole dollars
         // Check for missing amounts first (Requirement 27.2)
-        const missing = group.invoiceLines.filter((n, i) => group.amountsCents[i] === null);
+        // Requirement 63.4: with a usable rate, an amount today's reading does not take may be read with a decimal comma
+        const amountCentsOf = group.invoiceLines.map((n, i) => {
+          if (group.amountsCents[i] !== null) return group.amountsCents[i];
+          if (!fx) return null;
+          return decimalCommaCents(accepted.get(`invoice.lines.${n}.amount`)?.value ?? "");
+        });
+        const missing = group.invoiceLines.filter((n, i) => amountCentsOf[i] === null);
 
         if (missing.length > 0) {
           const amountSources: DocSource[] = [];
@@ -2267,7 +2385,7 @@ export function buildDraft(input: {
 
           for (let i = 0; i < group.invoiceLines.length; i++) {
             const n = group.invoiceLines[i];
-            const amountCents = group.amountsCents[i];
+            const amountCents = amountCentsOf[i];
 
             if (amountCents !== null) {
               totalCents += amountCents;
@@ -2277,7 +2395,13 @@ export function buildDraft(input: {
             if (r) amountSources.push(docSource(r));
           }
 
-          const roundedValue = roundEnteredValue(totalCents);
+          // Requirement 63.3: with a usable rate, the exact product of the amounts and the rate, then P4 once
+          const converted = fx ? convertedEnteredValue(totalCents, fx.rate) : null;
+          const roundedValue = converted
+            ? converted.ok
+              ? { ok: true as const, value: converted.dollars }
+              : { ok: false as const, reason: converted.reason }
+            : roundEnteredValue(totalCents);
           if (!roundedValue.ok) {
             lineFields.push(
               field_helper({
@@ -2300,10 +2424,25 @@ export function buildDraft(input: {
                 value: String(roundedValue.value),
                 status: "computed",
                 rule: "P4",
-                note: "Nothing was deducted. A person confirms the entered value.",
-                sources: fromImagePage(currencyReading) 
-                  ? [...amountSources, docSource(currencyReading)]
-                  : amountSources,
+                note:
+                  fx && converted && converted.ok
+                    ? convertedNote(
+                        group.invoiceLines.map((_, i) => amountCentsOf[i] as number),
+                        fx.currency,
+                        fx.rate,
+                        converted.exactUsd,
+                        group.invoiceLines
+                          .map((n, i) => ({ line: n, printed: normalizeSpace(accepted.get(`invoice.lines.${n}.amount`)?.value ?? ""), cents: amountCentsOf[i] as number, comma: group.amountsCents[i] === null }))
+                          .filter((x) => x.comma)
+                          .map(({ line, printed, cents }) => ({ line, printed, cents })),
+                      )
+                    : "Nothing was deducted. A person confirms the entered value.",
+                sources: fx
+                  ? [...amountSources, docSource(currencyReading), fx]
+                  : fromImagePage(currencyReading)
+                    ? [...amountSources, docSource(currencyReading)]
+                    : amountSources,
+                inputs: fx ? [EXCHANGE_RATE_FIELD_ID] : [],
               })
             );
           }
@@ -3473,6 +3612,8 @@ export function buildDraft(input: {
   for (const override of overrides) {
     const field = allFieldsList.find((f) => f.id === override.fieldId);
     if (!field) continue;
+    // Requirement 63.2: the rate changes only through the exchange rate input, never through a person value
+    if (field.id === EXCHANGE_RATE_FIELD_ID) continue;
 
     // Parse value based on field kind
     let parseResult: { ok: boolean; value?: string | number; reason?: string } | null = null;

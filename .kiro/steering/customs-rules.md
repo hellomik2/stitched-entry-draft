@@ -32,6 +32,11 @@ omitted."
   "less than 50 cents" sentence]
 - Result: a non-negative whole-dollar integer.
 - Properties: `|rounded - exact| <= 0.50`; values under 0.50 give 0; result is an integer.
+- Foreign currency (19 CFR 159.31, 159.32 with 152.1(c), 159.34, 159.35) [confirmed source,
+  a person's rate]: the app converts only with a rate a person enters (value, date, source);
+  it never chooses, suggests or looks up one. The exact product of the amount and the rate
+  is rounded once by P4. 159 Subpart C and the 7501 instructions give no rounding for the
+  conversion step, so there is none before P4.
 
 ## P5. Total entered value, Block 39 (7501 p.20) [confirmed]
 

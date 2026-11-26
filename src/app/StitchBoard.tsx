@@ -11,6 +11,7 @@ import type {
   DocSource,
   HtsTable,
   Override,
+  ExchangeRateInput,
 } from '../core'
 import {
   extractDocumentText,
@@ -24,6 +25,11 @@ import {
   LOW_CONFIDENCE_REVIEW_REASON,
   CONFIRMED_NOTE,
   isImageReviewReason,
+  invoiceForeignCurrency,
+  exchangeRateProblem,
+  exchangeRateSourceText,
+  EXCHANGE_RATE_FIELD_ID,
+  EXCHANGE_RATE_HELP,
 } from '../core'
 import UploadPanel, { type UploadResult } from './intake/UploadPanel'
 import { APP_NAME, BOARD_TITLE } from './appTitle'
@@ -135,6 +141,8 @@ export default function StitchBoard({
   const [svgDimensions, setSvgDimensions] = useState({ width: 0, height: 0 })
   const [threads, setThreads] = useState<Array<{ kind: 'doc' | 'calc'; d: string }>>([])
   const [overrides, setOverrides] = useState<Override[]>([])
+  // Requirement 63.5: the person's exchange rate; the app never fills it
+  const [exchangeRate, setExchangeRate] = useState<ExchangeRateInput | null>(null)
   const [csvUrl, setCsvUrl] = useState<string | null>(null)
   const readingAnswer = useMemo(() => {
     try {
@@ -204,6 +212,7 @@ export default function StitchBoard({
         readings: verified,
         hts,
         overrides,
+        exchangeRate,
         invoiceLineCount: readingAnswer.invoiceLineCount ?? null,
         packingListLineCount: readingAnswer.packingListLineCount ?? null,
         partsList: upload?.partsList?.list ?? null,
@@ -212,7 +221,7 @@ export default function StitchBoard({
     } catch (e) {
       throw new Error(`Failed to build draft: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [documents, readingAnswer, activeBundle.bundle, hts, overrides])
+  }, [documents, readingAnswer, activeBundle.bundle, hts, overrides, exchangeRate])
 
   // Load all PDF documents (sample mode only)
   useEffect(() => {
@@ -319,6 +328,7 @@ export default function StitchBoard({
         setActivePage(1)
         setSelectedField(null)
         setOverrides([])
+        setExchangeRate(null)
         setLoadState('ready')
       } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
@@ -1162,7 +1172,7 @@ export default function StitchBoard({
               <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '0.75rem' }}>
                   {draft.header
-                    .filter((f) => f.status !== 'personInput')
+                    .filter((f) => f.status !== 'personInput' && f.id !== EXCHANGE_RATE_FIELD_ID)
                     .map((field) => (
                       <div key={field.id} className="field-card"><div className="field-card-label">{field.block}. {field.label}</div><DraftFieldButton
                         field={field}
@@ -1192,6 +1202,21 @@ export default function StitchBoard({
                   </details>
                 )}
               </div>
+
+              {/* Requirement 63.5: the person's exchange rate, right above the line items */}
+              {invoiceForeignCurrency(verified) !== null && (
+                <ExchangeRateBox
+                  currency={invoiceForeignCurrency(verified) as string}
+                  field={draft.header.find((f) => f.id === EXCHANGE_RATE_FIELD_ID)}
+                  selected={selectedField === EXCHANGE_RATE_FIELD_ID}
+                  onSelect={() => setSelectedField(EXCHANGE_RATE_FIELD_ID)}
+                  onApply={(x) => setExchangeRate(x)}
+                  onClear={() => {
+                    setExchangeRate(null)
+                    if (selectedField === EXCHANGE_RATE_FIELD_ID) setSelectedField(null)
+                  }}
+                />
+              )}
 
               {/* 3. Lines Table */}
               <div style={{ marginBottom: '1.5rem' }}>
@@ -1356,6 +1381,10 @@ export default function StitchBoard({
           setOverrides((prev) => [...prev.filter((o) => o.fieldId !== fieldId), { fieldId, value }])
         }}
         onUndo={(fieldId) => {
+          if (fieldId === EXCHANGE_RATE_FIELD_ID) {
+            setExchangeRate(null)
+            return
+          }
           setOverrides((prev) => prev.filter((o) => o.fieldId !== fieldId))
         }}
         onSelect={setSelectedField}
@@ -1422,6 +1451,7 @@ function ThreadSwatch({ color }: { color: string }) {
  */
 function fieldTitle(field: DraftField | undefined, fallback: string): string {
   if (!field) return fallback
+  if (field.id === EXCHANGE_RATE_FIELD_ID) return field.label
   if (field.line) return `Line ${field.line} · ${field.block} ${field.label}`
   if (field.id.startsWith('FEE.')) return `Part of block ${field.block} · ${field.label}`
   return `Block ${field.block} · ${field.label}`
@@ -1482,6 +1512,74 @@ function scrollIntoPane(pane: HTMLElement, el: HTMLElement) {
   } else if (r.bottom > bottom) {
     pane.scrollTop += Math.min(r.bottom - bottom, r.top - top)
   }
+}
+
+/**
+ * ExchangeRateBox (Requirement 63.5): a person enters the exchange rate, its date and where it came from.
+ * The app never fills it: no suggested, sample, remembered or looked-up rate.
+ */
+function ExchangeRateBox({
+  currency,
+  field,
+  selected,
+  onSelect,
+  onApply,
+  onClear,
+}: {
+  currency: string
+  field: DraftField | undefined
+  selected: boolean
+  onSelect: () => void
+  onApply: (x: ExchangeRateInput) => void
+  onClear: () => void
+}) {
+  const [problem, setProblem] = useState<string | null>(null)
+  const label = `Exchange rate (USD per 1 ${currency})`
+  const fxSource = field?.sources.find((s) => s.kind === 'exchangeRate')
+  return (
+    <div data-testid="exchange-rate" className="field-card" style={{ marginBottom: '1.5rem' }}>
+      <div className="field-card-label">{label}</div>
+      <div data-testid="exchange-rate-help" style={{ fontSize: 'var(--fs-dense)', color: 'var(--muted)', margin: '0.25rem 0 0.5rem', lineHeight: 1.4 }}>
+        {EXCHANGE_RATE_HELP}
+      </div>
+      {field && fxSource && fxSource.kind === 'exchangeRate' ? (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: '0.75rem', rowGap: '0.25rem' }}>
+          <DraftFieldButton field={field} selected={selected} onSelect={onSelect} />
+          <span data-testid="exchange-rate-applied" style={{ fontSize: 'var(--fs-small)' }}>
+            rate date {fxSource.date}, source "{fxSource.source}"
+          </span>
+          <button type="button" data-testid="exchange-rate-clear" className="btn btn-small" onClick={onClear}>
+            Clear rate
+          </button>
+        </div>
+      ) : (
+        <form
+          data-testid="exchange-rate-form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            const data = new FormData(e.currentTarget)
+            const x = { rate: String(data.get('rate') ?? ''), date: String(data.get('date') ?? ''), source: String(data.get('source') ?? '') }
+            const p = exchangeRateProblem(x)
+            setProblem(p)
+            if (p === null) onApply(x)
+          }}
+          style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.5rem', margin: 0 }}
+        >
+          <input name="rate" data-testid="exchange-rate-rate" aria-label={label} placeholder={`USD per 1 ${currency}`} className="text-input" autoComplete="off" style={{ width: '9rem' }} />
+          <input name="date" data-testid="exchange-rate-date" aria-label="Rate date" placeholder="Rate date YYYY-MM-DD" className="text-input" autoComplete="off" style={{ width: '11rem' }} />
+          <input name="source" data-testid="exchange-rate-source" aria-label="Where the rate came from" placeholder="Where the rate came from" className="text-input" autoComplete="off" style={{ flex: '1 1 14rem' }} />
+          <button type="submit" data-testid="exchange-rate-apply" className="btn btn-small">
+            Use this rate
+          </button>
+          {problem && (
+            <div data-testid="exchange-rate-problem" style={{ flexBasis: '100%', color: '#b91c1c', fontSize: 'var(--fs-small)' }}>
+              {problem}
+            </div>
+          )}
+        </form>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -1737,6 +1835,8 @@ function SourceStrip({
                               )
                             )}
                           </>
+                        ) : source.kind === 'exchangeRate' ? (
+                          exchangeRateSourceText(source)
                         ) : source.kind === 'codeTable' ? (
                           `${source.table} (${source.edition}): ${source.code} ${source.name}${source.country ? `, ${source.country}` : ''}`
                         ) : (

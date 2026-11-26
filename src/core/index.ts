@@ -13,6 +13,7 @@ export * from "./budget";
 export * from "./partsList";
 export * from "./codeTables";
 export * from "./mid";
+export * from "./exchangeRate";
 
 import type { DocumentText } from "./pdfText";
 import type { DocumentReader } from "./reading";

@@ -1,4 +1,5 @@
 import { Draft, DraftField, Source, DocSource, HtsSource } from "./draft";
+import { exchangeRateSourceText, type ExchangeRateSource } from "./exchangeRate";
 
 export const CSV_COLUMNS = [
   "field_id",
@@ -27,6 +28,11 @@ export const CSV_COLUMNS = [
  * CodeTableSource: `${table} ${edition} ${code} "${name}"` with `, ${country}` inside the quotes when present.
  */
 export function formatSource(s: Source): string {
+  if (s.kind === "exchangeRate") {
+    // Requirement 63.6: a quote inside the source is doubled, as in a document quote
+    const fx = s as ExchangeRateSource;
+    return exchangeRateSourceText({ ...fx, source: fx.source.replace(/"/g, '""') });
+  }
   if (s.kind === "codeTable") {
     const cts = s as any;
     const nameWithCountry = cts.country ? `${cts.name}, ${cts.country}` : cts.name;
