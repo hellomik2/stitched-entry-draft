@@ -33,7 +33,9 @@ The page opens on an invented sample shipment (every page is marked DEMO / FICTI
    box appears above the line items. Enter the rate, its date and where it came from; Column 36A,
    the duties and the totals are then computed from it, and the rate shows as a value entered by a
    person. Customs accepts only a proclaimed or certified rate (19 CFR 159.31), so the app never
-   chooses, suggests or looks up a rate.
+   chooses, suggests or looks up a rate. To see it, upload the invented euro bundle
+   `samples/upload-test/files/duskhaven-*` (invoice, packing list, bill of lading); reading it uses
+   one of the day's real AI reads.
 
 **AI reading limits on the public site.** Each read is one paid AI call, so the reader runs inside
 fixed caps: 3 reads per visitor per day, 30 per day for the whole site, 500 in total, plus a cost
