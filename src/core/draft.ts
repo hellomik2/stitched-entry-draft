@@ -3541,7 +3541,26 @@ export function buildDraft(input: {
     const reasons: string[] = [];
     const p2 = checks.filter((c) => c.rule === "P2");
     if (!p2.some((c) => c.id === "P2.invoice.subtotal")) {
-      reasons.push("No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice.");
+      // Requirement 65.1 & 65.2: check if subtotal was read but P2 did not add it up
+      const subtotalReading = accepted.get("invoice.subtotal");
+      if (subtotalReading && subtotalReading.value) {
+        const subtotalNormalized = normalizeSpace(subtotalReading.value);
+        // Requirement 65.1: one leading and one trailing three-capital-letter code, "€" or "$" removed (as in
+        // mixesNumberForms), then one of the two decimal comma forms of Requirement 63.4
+        const subtotalNumber = subtotalNormalized.replace(/^(?:[A-Z]{3}|€|\$)\s*/, "").replace(/\s*(?:[A-Z]{3}|€|\$)$/, "");
+        const isDecimalCommaForm = decimalCommaCents(subtotalNumber) !== null;
+        
+        if (isDecimalCommaForm) {
+          // Requirement 65.1: decimal comma form
+          reasons.push(`The invoice subtotal "${subtotalNormalized}" is printed with a decimal comma, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice.`);
+        } else {
+          // Requirement 65.2: not a parseable form
+          reasons.push(`The invoice subtotal "${subtotalNormalized}" is not a number the app reads, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice.`);
+        }
+      } else {
+        // Requirement 65.3: no subtotal was read or it was rejected or empty
+        reasons.push("No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice.");
+      }
     }
     const failed = p2.filter((c) => !c.ok);
     if (failed.length > 0) {
