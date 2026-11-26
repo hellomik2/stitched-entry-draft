@@ -1027,6 +1027,16 @@ export default function StitchBoard(...) {
 
 **Requirement 53 (The Page Comes First, and the Lists of Readings Stay Below It):** `StitchBoard.tsx`: the two lists move into one block of at most 30% of the documents pane with its own scroll bar.
 
+## Fourth Real Read Fixes (2026-11-26)
+
+**Requirement 58 (A Value on a Transcript Line With No Usable Place Waits for a Person):** `reading.ts`: where the box of a reading on an image page would come from an item without a box, the reading is "uncertain" with `box: null`, `itemIds: []`, `lineWithoutBox: true`, `lineText` and `LINE_WITHOUT_BOX_MESSAGE`; `VerifiedReading` (accepted and uncertain) and `DocSource` get the optional flag `lineWithoutBox`. `draft.ts`: `buildDraft` turns such a reading with confidence other than "low" into an accepted reading as it does for `notInTranscript`; the image rule picks the two "line without box" reasons when a source has the flag and none has `notInTranscript`; `isImageReviewReason` and the two confirm paths know the two new reasons. `csv.ts` adds " (transcript line with no place)"; `StitchBoard.tsx` lists such readings with their transcript line and says so in the source strip.
+
+**Requirement 59 (A Number Written Without Its Thousands Commas Is Inside Its Quote):** `reading.ts`: one helper finds, for the number fields only, the first printed number with thousands commas of the quote that is the value without its commas; the value check after the quote search, the check of 50.1 and the check of 50.8 use it when the value itself is not in the quote, and the box comes from the place of the printed number.
+
+**Requirement 60 (An Address Printed Over Several Lines Under Its Quote Is Inside Its Quote):** `reading.ts`: for the three address fields, when the value is not in the quote, the item where the quote starts and the items under it (the geometry of 35.3 on a text page, the next transcript lines on an image page) joined with ", " may make the value; the box is their union. The code of 35.3 and 35.4 is not changed.
+
+**Test baseline:** `src/core/reading.before58.ts` is a byte copy of `src/core/reading.ts` at commit d4bfff6. Only the test of Property 81 imports it.
+
 ---
 
 ## Correctness Properties
@@ -1318,8 +1328,8 @@ For the sample bundle with text pages and any set of readings given `confidence:
 **Validates: Requirements 36.1, 36.2, 36.3**
 
 ### Property 54: A Bad Box Spoils Only Its Line
-For any image page transcript and any set of its lines given a bad "b" (a wrong count, a number that is not a whole number, a number out of 0 to 1000, or a box past the page), the Claude reader returns the answer; every reading whose quote lies only on good lines has the same status and box as with all lines good; every reading whose box would come from a bad line is rejected with "no_source_box".
-**Validates: Requirements 37.1, 37.2, 37.3**
+For any image page transcript and any set of its lines given a bad "b" (a wrong count, a number that is not a whole number, a number out of 0 to 1000, or a box past the page), the Claude reader returns the answer; every reading whose quote lies only on good lines has the same status and box as with all lines good; every reading whose box would come from a bad line is "uncertain" with no box and `lineWithoutBox: true` (Requirement 58.1).
+**Validates: Requirements 37.1, 37.2, 58.1, 58.2**
 
 ### Property 55: What Was Not Read Is Waited On
 For the sample bundle with text pages and any set of invoice lines whose origin readings are rejected, B10 has a value only when every line's 10 has one or the line 10 values hold two or more different codes, and after person values of "PT" for every line 10 without a value, B10 has the value of today's rule for those codes; for any line and any refused 33A person value ("9999.99.9999" or "12345"), that line's 35, 37A and 38 have no value unless they are "personEdited".
@@ -1408,6 +1418,26 @@ For any reported counts (any safe integers up to 2^53 - 1, fractions, negative n
 ### Property 76: The Chapter 99 Reason Says "See" Once
 For any one to three footnotes made of optional spaces or an optional "See " (any case), a heading 99NN.NN.NN, optional trailing periods and optional spaces, `chapter99Reason` starts with "See ", has no "See See" (any case) and no "..", names every heading in order, and ends with ". A person enters the additional duty (0.00 if none)."
 **Validates: Requirements 57.1, 57.2**
+
+### Property 77: A Value on a Transcript Line With No Usable Place Waits, Without a Box
+For any image page transcript, any set of its lines without a box, and readings that quote a whole line and take a value inside it: every reading whose box would come from a line without a box is "uncertain" with `box: null`, `itemIds: []`, `lineWithoutBox: true`, `lineText` the line text and `LINE_WITHOUT_BOX_MESSAGE`, whatever its confidence, and is never "accepted" and never rejected with "no_source_box"; every reading on a line with a box is accepted with that line's box, or "uncertain" with it when its confidence is "low".
+**Validates: Requirements 58.1, 58.2**
+
+### Property 78: No Draft Value From a Line With No Usable Place Is Final Without a Person
+For the image part of the recorded read of bundle A and any subset of its 26 high-confidence readings with `lineWithoutBox` (the others of them accepted image readings with a box): every draft field with a document source that has `lineWithoutBox: true` is "needsReview", every such source has `box: null`, and every field has the same value as in the draft where all those readings are accepted image readings with a box.
+**Validates: Requirements 58.3, 58.4**
+
+### Property 79: A Number Without Its Thousands Commas Matches Only Its Own Digits
+For any number field, any printed number with thousands commas p and any quote of a label, p and a unit that is on the page: the value p without its commas is inside its quote (accepted on a text page with the box of p's item); every value that differs from it in one character (a digit changed, added or removed, the period added or removed) and is not inside the quote by today's checks is rejected with "value_not_in_quote"; the same value and quote for a field that is not a number field are rejected with "value_not_in_quote".
+**Validates: Requirements 59.1, 59.2, 59.4**
+
+### Property 80: An Address Over Lines Is Kept Only When Every Part Is One of Its Lines
+For any text page with an item S, items stacked under it in its column and items of another column beside them, and for any image transcript with S and lines after it: the value made of S and the next k − 1 lines (k from 2 to 4) joined with ", ", with the quote S's text, is inside its quote with the union of their boxes; the value with one part replaced by the text of another item of the page (the other column, a line above S, a line past the k lines) or by a changed text is rejected with "value_not_in_quote"; the same value and quote for a field that is not an address field are rejected with "value_not_in_quote".
+**Validates: Requirements 60.1, 60.2**
+
+### Property 81: The New Rules Keep Only What the Old Check Rejected
+For any text page or image transcript (with any lines without a box) and any readings, `verifyReadings` gives for each reading what the check before these changes gives (`verifyReadings` of `src/core/reading.before58.ts`), except a reading it rejected with "no_source_box" and the message of a line with no usable place, which is now "uncertain" with `lineWithoutBox: true`, and a reading of a number field or an address field it rejected with "value_not_in_quote", which may now be accepted or "uncertain". On a text page no reading gets `lineWithoutBox`, and every other reading has the same status, reason, message, box, item ids and cell.
+**Validates: Requirements 58.2, 59.4, 60.3**
 
 ---
 
