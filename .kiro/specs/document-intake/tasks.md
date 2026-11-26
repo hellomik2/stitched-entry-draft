@@ -474,12 +474,12 @@
 - [x] 83. (maintainer) Verifier items for Requirements 63 and 64; the sample CSV fingerprints; the recorded reads replayed with and without a rate; the board with the recorded read of bundle B and a rate
   - _Requirements: 63, 64_
 
-- [ ] 84. A subtotal that was read but not added up says so
-  - [ ] 84.1 Tests that fail on the current code: the examples of 65.1 and 65.2, Property 92, the older test that reads this reason
-  - [ ] 84.2 `src/core/draft.ts`
+- [x] 84. A subtotal that was read but not added up says so
+  - [x] 84.1 Tests that fail on the current code: the examples of 65.1 and 65.2, Property 92, the older test that reads this reason
+  - [x] 84.2 `src/core/draft.ts`
   - _Requirements: 65_
 
-- [ ] 85. (maintainer) Verifier item for Requirement 65; the sample CSV fingerprints; the recorded reads replayed
+- [x] 85. (maintainer) Verifier item for Requirement 65; the sample CSV fingerprints; the recorded reads replayed
   - _Requirements: 65_
 
 ## Summary
