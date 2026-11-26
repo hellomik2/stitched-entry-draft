@@ -9,7 +9,7 @@ import { transcriptToPageText } from "./transcript";
 import type { DocumentText, PageText } from "./pdfText";
 import { loadBundleFromDisk } from "../node/index";
 
-// Feature: document-intake, Property 81 (task 76.1): the check of Requirements 58 to 60 gives what the check of commit d4bfff6
+// Feature: document-intake, Property 81 (task 76.1): the check of Requirements 58 to 60 gives what the check of commit 484b7b5
 // gives (src/core/reading.before58.ts, a byte copy), except the readings the new rules keep: a value on a transcript line with
 // no usable place (58.1), and a number field or an address field that the old check rejected with "value_not_in_quote" (59, 60).
 
@@ -79,7 +79,7 @@ function answerOf(doc: string, kind: "invoice", rs: { field: string; value: stri
 function same(oldR: VerifiedReading, newR: VerifiedReading, image: boolean) {
   if (!image) expect("lineWithoutBox" in newR).toBe(false);
   // Requirement 61: a number field reading may now be rejected because its value is only inside longer printed numbers, also one
-  // the old check rejected with "no_source_box" for a line with no usable place (Property 82 checks this exactly against b41d1cc).
+  // the old check rejected with "no_source_box" for a line with no usable place (Property 82 checks this exactly against 698d601).
   if (NUMBER.test(oldR.field) && newR.status === "rejected" && newR.reason === "value_not_in_quote" && !(oldR.status === "rejected" && oldR.reason === "value_not_in_quote")) return;
   if (image && oldR.status === "rejected" && oldR.reason === "no_source_box" && oldR.message === OLD_LINE_MESSAGE) {
     const { reason: _r, message: _m, status: _s, ...rest } = oldR;

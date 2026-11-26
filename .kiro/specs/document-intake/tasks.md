@@ -441,14 +441,14 @@
   - _Requirements: 60_
 
 - [x] 76. The new rules keep only what the old check rejected
-  - [x] 76.1 `src/core/reading.before58.ts` (a byte copy of `src/core/reading.ts` at d4bfff6) and the test of Property 81
+  - [x] 76.1 `src/core/reading.before58.ts` (a byte copy of `src/core/reading.ts` at 484b7b5) and the test of Property 81
   - _Requirements: 58.2, 59.4, 60.3_
 
 - [x] 77. (maintainer) Verifier items for Requirements 58 to 60; the recorded reads of bundles A, B and C replayed before and after; the board with the recorded read of bundle A
   - _Requirements: 58, 59, 60_
 
 - [x] 78. A number inside a longer printed number is not inside its quote
-  - [x] 78.1 Tests that fail on the current code: the examples of 61.5, Property 82 with `src/core/reading.before61.ts` (a byte copy of `src/core/reading.ts` at b41d1cc); the test of Property 81 allows the change of Requirement 61
+  - [x] 78.1 Tests that fail on the current code: the examples of 61.5, Property 82 with `src/core/reading.before61.ts` (a byte copy of `src/core/reading.ts` at 698d601); the test of Property 81 allows the change of Requirement 61
   - [x] 78.2 `src/core/reading.ts`
   - _Requirements: 61_
 

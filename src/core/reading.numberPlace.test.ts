@@ -10,7 +10,7 @@ import type { DocumentText, PageText } from "./pdfText";
 import { loadBundleFromDisk } from "../node/index";
 
 // Feature: document-intake, Requirement 61 and Property 82 (task 78.1): for a number field, a value is inside its quote only at a
-// place that is not inside a longer printed number. src/core/reading.before61.ts is a byte copy of src/core/reading.ts at b41d1cc.
+// place that is not inside a longer printed number. src/core/reading.before61.ts is a byte copy of src/core/reading.ts at 698d601.
 
 const NUMBER = /^(invoice\.lines\.\d+\.(quantity|unitPrice|amount)|invoice\.(subtotal|total)|packingList\.lines\.\d+\.(cartons|quantity|netKg|grossKg)|packingList\.total(Cartons|Quantity|NetKg|GrossKg)|billOfLading\.grossKg)$/;
 

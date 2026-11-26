@@ -1035,7 +1035,7 @@ export default function StitchBoard(...) {
 
 **Requirement 60 (An Address Printed Over Several Lines Under Its Quote Is Inside Its Quote):** `reading.ts`: for the three address fields, when the value is not in the quote, the item where the quote starts and the items under it (the geometry of 35.3 on a text page, the next transcript lines on an image page) joined with ", " may make the value; the box is their union. The code of 35.3 and 35.4 is not changed.
 
-**Test baseline:** `src/core/reading.before58.ts` is a byte copy of `src/core/reading.ts` at commit d4bfff6. Only the test of Property 81 imports it.
+**Test baseline:** `src/core/reading.before58.ts` is a byte copy of `src/core/reading.ts` at commit 484b7b5. Only the test of Property 81 imports it.
 
 ## Number Places and Log Lines (2026-11-26)
 
@@ -1043,7 +1043,7 @@ export default function StitchBoard(...) {
 
 **Requirement 62 (The Lines for a Record or a Top-Up Not Written Name the Record Key and the Missing Amount):** `usageStore.ts` gets `newUsageRecordKey` and the optional key argument of `appendRecord`; `usageStoreBlobs.ts` writes under the given key; `intakeService.ts` makes the key in `writeRecord`, passes it and puts it in the record line, and `topUpCost` puts the missing amount in its line.
 
-**Test baseline:** `src/core/reading.before61.ts` is a byte copy of `src/core/reading.ts` at commit b41d1cc. Only the test of Property 82 imports it.
+**Test baseline:** `src/core/reading.before61.ts` is a byte copy of `src/core/reading.ts` at commit 698d601. Only the test of Property 82 imports it.
 
 ## Exchange Rate and Screen Texts (2026-11-26)
 
