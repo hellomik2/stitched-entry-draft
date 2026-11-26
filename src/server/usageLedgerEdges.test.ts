@@ -248,7 +248,7 @@ describe("Feature: document-intake, Property 74: The Store Writes After the Read
     expect(got.res.status).toBe(200);
     expect(afterReaderMs).toBeLessThan(60 + 500);
     expect(recordLines(got.logs)).toHaveLength(1);
-    expect(got.logs.filter((l) => l === TOPUP_LINE)).toHaveLength(1);
+    expect(got.logs.filter((l) => l.startsWith(TOPUP_LINE))).toHaveLength(1);
     // the record went first; no time was left for the top-up, so it never wrote the state
     expect(s.events.slice(0, 3)).toEqual(["readState", "writeState", "appendRecord"]);
     expect(s.events.filter((e) => e === "writeState")).toHaveLength(1);
@@ -262,7 +262,7 @@ describe("Feature: document-intake, Property 74: The Store Writes After the Read
       expect(got.res.status).toBe(outcome === "valid" ? 200 : 502);
       expect(afterReaderMs).toBeLessThan(60 + 500);
       expect(recordLines(got.logs)).toHaveLength(1);
-      expect(got.logs).not.toContain(TOPUP_LINE);
+      expect(got.logs.filter((l) => l.startsWith(TOPUP_LINE))).toHaveLength(0);
     }
   });
 
@@ -289,8 +289,8 @@ describe("Feature: document-intake, Property 74: The Store Writes After the Read
         if (lines === 0) expect(s.inner.records).toHaveLength(1);
         const firstTopUpRead = s.events.indexOf("readState", 2);
         if (firstTopUpRead !== -1) expect(s.events.indexOf("appendRecord")).toBeLessThan(firstTopUpRead);
-        if (big && !got.logs.includes(TOPUP_LINE)) expect(s.inner.state().reservedCostNanoUsd).toBe(estimateCostNanoUsd(BIG.inputTokens, BIG.outputTokens));
-        if (!big) expect(got.logs).not.toContain(TOPUP_LINE);
+        if (big && !got.logs.some((l) => l.startsWith(TOPUP_LINE))) expect(s.inner.state().reservedCostNanoUsd).toBe(estimateCostNanoUsd(BIG.inputTokens, BIG.outputTokens));
+        if (!big) expect(got.logs.filter((l) => l.startsWith(TOPUP_LINE))).toHaveLength(0);
       }),
       { numRuns: 20 },
     );

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import * as path from "node:path";
 import type { UsageState, Caps } from "../core/budget";
@@ -14,7 +15,12 @@ export class UsageStateConflictError extends Error {
 export interface UsageStore {
   readState(): Promise<UsageState>;
   writeState(s: UsageState): Promise<void>;
-  appendRecord(r: UsageRecord): Promise<void>;
+  appendRecord(r: UsageRecord, key?: string): Promise<void>; // Requirement 62.1: the Blobs store writes under key when it is given
+}
+
+// Requirements 54.1 and 62.1: the key of a usage record, new for every call.
+export function newUsageRecordKey(timestamp: string): string {
+  return `usage/${timestamp.replace(/[^0-9]/g, "")}-${randomUUID()}`;
 }
 
 export function parseUsageState(value: unknown): UsageState {

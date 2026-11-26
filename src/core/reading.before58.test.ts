@@ -78,6 +78,9 @@ function answerOf(doc: string, kind: "invoice", rs: { field: string; value: stri
 /** Compare one reading of the new check with the old one. */
 function same(oldR: VerifiedReading, newR: VerifiedReading, image: boolean) {
   if (!image) expect("lineWithoutBox" in newR).toBe(false);
+  // Requirement 61: a number field reading may now be rejected because its value is only inside longer printed numbers, also one
+  // the old check rejected with "no_source_box" for a line with no usable place (Property 82 checks this exactly against b41d1cc).
+  if (NUMBER.test(oldR.field) && newR.status === "rejected" && newR.reason === "value_not_in_quote" && !(oldR.status === "rejected" && oldR.reason === "value_not_in_quote")) return;
   if (image && oldR.status === "rejected" && oldR.reason === "no_source_box" && oldR.message === OLD_LINE_MESSAGE) {
     const { reason: _r, message: _m, status: _s, ...rest } = oldR;
     expect(newR).toMatchObject({ ...rest, status: "uncertain", box: null, itemIds: [], origin: "imageTranscript", lineWithoutBox: true, message: LINE_WITHOUT_BOX_MESSAGE });

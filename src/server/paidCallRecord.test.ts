@@ -19,7 +19,7 @@ const setup = (total: number): ReaderSetup => ({ mode: "claude", reason: null, c
 const worst = estimateReaderCall(body).worstCaseCostNanoUsd;
 const BIG = { inputTokens: 200_000, outputTokens: 16_000 };
 const actual = estimateCostNanoUsd(BIG.inputTokens, BIG.outputTokens);
-const RECORD_KEYS = ["estimatedCostNanoUsd", "inputTokens", "model", "outcome", "outputTokens", "timestamp"];
+const RECORD_KEYS = ["estimatedCostNanoUsd", "inputTokens", "key", "model", "outcome", "outputTokens", "timestamp"];
 const EDGE = { siteID: "site", token: "tok", edgeURL: "http://edge.invalid", uncachedEdgeURL: "http://uncached.invalid" };
 const isCount = (v: unknown): v is number => typeof v === "number" && Number.isSafeInteger(v) && v >= 0;
 
@@ -209,7 +209,7 @@ async function topUpRun(k: number, extra: Knobs = {}) {
 }
 function expectTopUp(k: number, run: Awaited<ReturnType<typeof topUpRun>>) {
   expect(run.res.status).toBe(200);
-  const notWritten = run.logs.filter((l) => l === "usage cost top-up not written").length;
+  const notWritten = run.logs.filter((l) => l.startsWith("usage cost top-up not written: ")).length;
   if (k <= 5) {
     expect([run.f.ledger().reservedCostNanoUsd, run.s.waits.length, run.f.counts.capsWrites, notWritten]).toEqual([actual, k, 1 + (k + 1), 0]);
   } else {
@@ -230,7 +230,7 @@ describe("Feature: document-intake, Property 58: The Ledger Keeps the Actual Cos
   it("42.1 a store error that is not a changed state ends the top-up after one try", async () => {
     const run = await topUpRun(0, { topUpStoreError: true });
     expect(run.res.status).toBe(200);
-    expect([run.f.counts.capsWrites, run.s.waits.length, run.logs.filter((l) => l === "usage cost top-up not written").length]).toEqual([2, 0, 1]);
+    expect([run.f.counts.capsWrites, run.s.waits.length, run.logs.filter((l) => l.startsWith("usage cost top-up not written: ")).length]).toEqual([2, 0, 1]);
   });
 
   it("Property 58: for any k from 0 to 8 changed states, the ledger ends at the actual cost (k <= 5) or at the reservation with one log line", async () => {

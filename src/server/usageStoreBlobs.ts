@@ -1,9 +1,8 @@
-import { randomUUID } from "node:crypto";
 import type { UsageState } from "../core/budget";
 import { emptyUsageState } from "../core/budget";
 import type { UsageRecord } from "./readerTypes";
 import type { UsageStore } from "./usageStore";
-import { parseUsageState, UsageStateConflictError } from "./usageStore";
+import { newUsageRecordKey, parseUsageState, UsageStateConflictError } from "./usageStore";
 
 export type BlobsLike = {
   getWithMetadata(key: string): Promise<{ data: unknown; etag?: string } | null>;
@@ -101,15 +100,15 @@ export function createBlobsUsageStore(options: { blobs?: BlobsLike; storeName?: 
       lastRead = { exists: true, etag: r.etag };
     },
 
-    async appendRecord(r: UsageRecord): Promise<void> {
+    async appendRecord(r: UsageRecord, key?: string): Promise<void> {
       const blobs = await getBlobs();
-      const key = `usage/${r.timestamp.replace(/[^0-9]/g, "")}-${randomUUID()}`;
+      const recordKey = key ?? newUsageRecordKey(r.timestamp);
       // Requirement 54.1: no condition. The key is new for every call, so a PUT that the library sends again after a 5xx or a
       // lost connection lands on the same record. For a PUT without a condition the library resolves only for status 200 and
       // throws for every other status after its retries.
       let result: { modified: boolean; etag?: string };
       try {
-        result = await blobs.setJSON(key, r);
+        result = await blobs.setJSON(recordKey, r);
       } catch {
         throw new Error("usage record write was not confirmed by the store; not written");
       }

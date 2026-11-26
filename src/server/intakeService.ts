@@ -7,7 +7,7 @@ import type { ReaderSetup } from "./readerEnv";
 import type { UsageRecord, IntakeReader } from "./readerTypes";
 import { ReaderError } from "./readerTypes";
 import type { UsageStore } from "./usageStore";
-import { UsageStateConflictError } from "./usageStore";
+import { newUsageRecordKey, UsageStateConflictError } from "./usageStore";
 
 export type ServiceResponse = { status: number; json: Record<string, unknown> };
 
@@ -76,16 +76,17 @@ async function beforeDeadline<T>(deadline: number, run: () => Promise<T>): Promi
 // Requirement 41.2: a record the store did not confirm is logged with its counts (no file hashes, no error text, no document text).
 // After the reader the write ends by the deadline of Requirement 55.2.
 async function writeRecord(store: UsageStore, record: UsageRecord, log?: (message: string) => void, deadline?: number): Promise<void> {
+  const key = newUsageRecordKey(record.timestamp); // Requirement 62.2: made before the write, so the line can name it
   try {
     if (deadline === undefined) {
-      await store.appendRecord(record);
+      await store.appendRecord(record, key);
     } else {
-      await beforeDeadline(deadline, () => store.appendRecord(record));
+      await beforeDeadline(deadline, () => store.appendRecord(record, key));
     }
   } catch {
     log?.(
       "usage record not written: " +
-        JSON.stringify({ timestamp: record.timestamp, model: record.model, outcome: record.outcome, inputTokens: record.inputTokens, outputTokens: record.outputTokens, estimatedCostNanoUsd: record.estimatedCostNanoUsd }),
+        JSON.stringify({ key, timestamp: record.timestamp, model: record.model, outcome: record.outcome, inputTokens: record.inputTokens, outputTokens: record.outputTokens, estimatedCostNanoUsd: record.estimatedCostNanoUsd }),
     );
   }
 }
@@ -127,7 +128,7 @@ async function topUpCost(
   try {
     actual = estimateCostNanoUsd(usage.inputTokens, usage.outputTokens);
   } catch {
-    log?.("usage cost top-up not written");
+    log?.("usage cost top-up not written: " + JSON.stringify({ missingNanoUsd: null })); // Requirement 62.3
     return;
   }
 
@@ -151,7 +152,7 @@ async function topUpCost(
       }
     }
   }
-  log?.("usage cost top-up not written");
+  log?.("usage cost top-up not written: " + JSON.stringify({ missingNanoUsd: extra })); // Requirement 62.3
 }
 
 export async function handleReadRequest(deps: ReadDeps): Promise<ServiceResponse> {

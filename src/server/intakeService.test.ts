@@ -1522,7 +1522,7 @@ describe("Per-call size and cost line (Requirement 17)", () => {
       expect(result.status).toBe(200);
 
       // Expect exactly 1 log message about top-up not written
-      expect(logMessages.filter((m) => m === "usage cost top-up not written").length).toBe(1);
+      expect(logMessages.filter((m) => m.startsWith("usage cost top-up not written: ")).length).toBe(1);
 
       // Expect 2 writeState calls: 1 reserve + 1 top-up try
       expect(writeStateCallCount).toBe(2);
@@ -1604,7 +1604,7 @@ describe("Per-call size and cost line (Requirement 17)", () => {
       // Reserve succeeds, reader is called, top-up fails once
       expect(result.status).toBe(200);
       expect(result.json.ok).toBe(true);
-      expect(logMessages).toContain("usage cost top-up not written");
+      expect(logMessages.some((m) => m.startsWith("usage cost top-up not written: "))).toBe(true);
 
       // writeState was called 2 times: 1 reserve + 1 top-up try
       expect(faultyStore.events.filter((e) => e === "writeState").length).toBe(2);

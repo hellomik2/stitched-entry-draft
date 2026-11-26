@@ -305,6 +305,23 @@ function printedNumberWithCommas(fieldName: string, v: string, q: string): { sta
   return null;
 }
 
+// Requirement 61: for a number field, the first place of the value in a text that is not inside a longer printed number
+// (a digit right before or after it, or a comma or a period with a digit on its far side); -1 when there is none.
+// Every other field: the first place, as before.
+function valuePlace(fieldName: string, text: string, v: string): number {
+  if (!NUMBER_FIELD.test(fieldName) || v === "") return text.indexOf(v);
+  const digit = (c: string | undefined) => c !== undefined && /\d/.test(c);
+  for (let i = text.indexOf(v); i !== -1; i = text.indexOf(v, i + 1)) {
+    const before = text[i - 1];
+    const after = text[i + v.length];
+    const inside =
+      digit(before) || ((before === "," || before === ".") && digit(text[i - 2])) ||
+      digit(after) || ((after === "," || after === ".") && digit(text[i + v.length + 1]));
+    if (!inside) return i;
+  }
+  return -1;
+}
+
 // Address field pattern
 const ADDRESS_FIELD = /^invoice\.(seller|buyer|shipTo)\.address$/;
 
@@ -613,7 +630,7 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
             }
           }
 
-          if (q.indexOf(v) !== -1 || dateValueMatchesQuote(field.field, v, q) || printedNumberWithCommas(field.field, v, q) !== null) {
+          if (valuePlace(field.field, q, v) !== -1 || dateValueMatchesQuote(field.field, v, q) || printedNumberWithCommas(field.field, v, q) !== null) {
             return {
               ...field,
               status: "uncertain" as const,
@@ -785,7 +802,7 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
     // If runItems is set (from stacked runs), check value inside runItems
     if (runItems !== null) {
       const runTextSingleSpace = runItems.map(i => i.str).join(" ");
-      valueIndexInQuote = runTextSingleSpace.indexOf(v);
+      valueIndexInQuote = valuePlace(field.field, runTextSingleSpace, v);
       if (valueIndexInQuote !== -1) {
         valueFoundInQuote = true;
       } else {
@@ -801,14 +818,14 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
             return " " + item.str;
           })
           .join("");
-        valueIndexInQuote = runTextCommaSpace.indexOf(v);
+        valueIndexInQuote = valuePlace(field.field, runTextCommaSpace, v);
         if (valueIndexInQuote !== -1) {
           valueFoundInQuote = true;
         }
       }
     } else {
       // Normal path: check value in the quote string
-      valueIndexInQuote = q.indexOf(v);
+      valueIndexInQuote = valuePlace(field.field, q, v);
       valueFoundInQuote = valueIndexInQuote !== -1;
 
       // If value not found directly, check multi-row case (Requirement 35.4)
@@ -848,7 +865,7 @@ export function verifyReadings(answer: ReadingAnswer, documents: DocumentText[])
                 return " " + item.str;
               })
               .join("");
-            if (quoteWithCommas.indexOf(v) !== -1) {
+            if (valuePlace(field.field, quoteWithCommas, v) !== -1) {
               valueFoundInQuote = true;
             }
           }
