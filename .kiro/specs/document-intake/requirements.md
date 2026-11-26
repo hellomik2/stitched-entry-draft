@@ -337,7 +337,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 #### Acceptance Criteria
 
 1. THE draft SHALL add a totals field "CHK.INVOICE" (block "P2", label "Invoice lines against the invoice", status "needsReview", value null) when any of the following holds, with the reason of every case that holds joined by a space:
-   - no `P2.invoice.subtotal` check ran (no accepted, parseable invoice subtotal): "No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."
+   - no `P2.invoice.subtotal` check ran (no accepted, parseable invoice subtotal): "No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice." When a subtotal reading is accepted but not added up, Requirement 65.1 gives this reason instead.
    - a P2 check failed: "The invoice line amounts do not match the invoice totals (<detail of each failed P2 check, joined by "; ">). A line may be missing; compare the 7501 lines with the invoice."
    - the reader gave an invoice line count N that differs from the number M of invoice lines with at least one reading: "The invoice shows N item lines, but the draft has readings for M."
    - N is above 8: "The invoice shows N item lines; this draft reads only the first 8."
@@ -1034,6 +1034,23 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 65 (MUST): A Subtotal That Was Read but Not Added Up Says So
+
+**User Story:** As an entry writer, I want CHK.INVOICE to tell me when the invoice subtotal was read but the app could not add the invoice lines up against it, so that I do not look for a subtotal the reader did find.
+
+**Background:** In the recorded read of bundle B the reader read the subtotal "EUR 9.299,00" and the draft accepted it, but P2 does not read a decimal comma, so no `P2.invoice.subtotal` check ran and CHK.INVOICE said "No invoice subtotal was read". The subtotal was read; it was not added up.
+
+#### Acceptance Criteria
+
+1. WHEN no `P2.invoice.subtotal` check ran and the invoice subtotal reading is accepted with a value that is not empty, THE first reason of CHK.INVOICE (Requirement 19.1) SHALL be, with <value> the reading's value with spaces normalized:
+   - when <value>, with one leading and one trailing three-capital-letter code, "€" or "$" removed (as in Requirement 63.4), is one of the two decimal comma forms of Requirement 63.4: "The invoice subtotal "<value>" is printed with a decimal comma, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."
+   - otherwise: "The invoice subtotal "<value>" is not a number the app reads, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."
+   Example: the recorded read of bundle B gives "The invoice subtotal "EUR 9.299,00" is printed with a decimal comma, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."
+2. WHEN no invoice subtotal reading is accepted, or its value is empty, the reason stays "No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."
+3. Only this reason changes. The P2 checks and the status ("needsReview"), value (null), sources, inputs and other reasons of CHK.INVOICE stay. The sample CSVs do not change (their subtotal is added up). Of the recorded reads, only those of bundle B change, in this reason only.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -1102,6 +1119,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 62. (MUST) The Lines for a Record or a Top-Up Not Written Name the Record Key and the Missing Amount
 63. (MUST) A Person's Exchange Rate Converts the Amounts of an Invoice That Is Not in USD
 64. (MUST) Three Screen Texts Read as Sentences and Equations
+65. (MUST) A Subtotal That Was Read but Not Added Up Says So
 
 **NICE (if time is left):**
 

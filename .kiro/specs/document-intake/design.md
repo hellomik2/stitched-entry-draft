@@ -1493,6 +1493,10 @@ For any invoice with a usable rate, any line and any whole-dollar value, a perso
 For any 7501 line of two or more invoice lines in piece units, the note of its computed 35 is "<q1> <u1> + … = <s> PCS" followed by " = <v> <unit>" when it has a unit, with s the sum of the q and v the field's value; the reason of a quantity that is not the packing list sum starts with "Invoice line <n> says "; and the reason of the P1 case of 36A ends with ". A person decides." with no digit right before " A person decides.".
 **Validates: Requirements 64.1, 64.2, 64.3**
 
+### Property 92: A Subtotal That Was Read but Not Added Up Says So
+For any CHK.INVOICE field built when no P2 invoice subtotal check ran but an invoice subtotal reading is accepted with a non-empty value: the first reason of CHK.INVOICE SHALL be, with <value> the reading's value with spaces normalized: when <value> after removing one leading and one trailing three-capital-letter code, "€" or "$", is one of the two decimal comma forms of Requirement 63.4, "The invoice subtotal "<value>" is printed with a decimal comma, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice."; otherwise "The invoice subtotal "<value>" is not a number the app reads, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice." For any CHK.INVOICE where a subtotal reading is not accepted or is empty, the reason stays "No invoice subtotal was read, so the invoice line amounts were not added up against it. Compare the 7501 lines with the invoice." A subtotal reading with any other status (low confidence, rejected for another reason) does not change CHK.INVOICE; every other reason, source, input and status of CHK.INVOICE stay the same.
+**Validates: Requirements 65.1, 65.2, 65.3**
+
 ---
 
 ## Error Handling
