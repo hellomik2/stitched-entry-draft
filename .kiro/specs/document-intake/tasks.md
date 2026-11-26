@@ -447,31 +447,31 @@
 - [x] 77. (maintainer) Verifier items for Requirements 58 to 60; the recorded reads of bundles A, B and C replayed before and after; the board with the recorded read of bundle A
   - _Requirements: 58, 59, 60_
 
-- [ ] 78. A number inside a longer printed number is not inside its quote
-  - [ ] 78.1 Tests that fail on the current code: the examples of 61.5, Property 82 with `src/core/reading.before61.ts` (a byte copy of `src/core/reading.ts` at b41d1cc); the test of Property 81 allows the change of Requirement 61
-  - [ ] 78.2 `src/core/reading.ts`
+- [x] 78. A number inside a longer printed number is not inside its quote
+  - [x] 78.1 Tests that fail on the current code: the examples of 61.5, Property 82 with `src/core/reading.before61.ts` (a byte copy of `src/core/reading.ts` at b41d1cc); the test of Property 81 allows the change of Requirement 61
+  - [x] 78.2 `src/core/reading.ts`
   - _Requirements: 61_
 
-- [ ] 79. The lines for a record or a top-up not written name the record key and the missing amount
-  - [ ] 79.1 Tests that fail on the current code: 62.1 to 62.3 and Property 83; the older tests that read the two lines
-  - [ ] 79.2 `src/server/usageStore.ts`, `usageStoreBlobs.ts`, `intakeService.ts`
+- [x] 79. The lines for a record or a top-up not written name the record key and the missing amount
+  - [x] 79.1 Tests that fail on the current code: 62.1 to 62.3 and Property 83; the older tests that read the two lines
+  - [x] 79.2 `src/server/usageStore.ts`, `usageStoreBlobs.ts`, `intakeService.ts`
   - _Requirements: 62_
 
-- [ ] 80. (maintainer) Verifier items for Requirements 61 and 62; the recorded reads replayed before and after
+- [x] 80. (maintainer) Verifier items for Requirements 61 and 62; the recorded reads replayed before and after
   - _Requirements: 61, 62_
 
-- [ ] 81. A person's exchange rate converts the amounts of an invoice that is not in USD
-  - [ ] 81.1 Tests that fail on the current code: the examples of 63.8, Properties 84 to 90, the CSV text of 63.6
-  - [ ] 81.2 `src/core/exchangeRate.ts`, `src/core/index.ts`, `src/core/draft.ts`, `src/core/csv.ts`
-  - [ ] 81.3 `src/app/StitchBoard.tsx`; the steering notes in `product.md` and `customs-rules.md`
+- [x] 81. A person's exchange rate converts the amounts of an invoice that is not in USD
+  - [x] 81.1 Tests that fail on the current code: the examples of 63.8, Properties 84 to 90, the CSV text of 63.6
+  - [x] 81.2 `src/core/exchangeRate.ts`, `src/core/index.ts`, `src/core/draft.ts`, `src/core/csv.ts`
+  - [x] 81.3 `src/app/StitchBoard.tsx`; the steering notes in `product.md` and `customs-rules.md`
   - _Requirements: 63_
 
-- [ ] 82. Three screen texts read as sentences and equations
-  - [ ] 82.1 Tests that fail on the current code: the examples of 64.1 to 64.3, Property 91; the older tests that read these texts
-  - [ ] 82.2 `src/core/draft.ts`
+- [x] 82. Three screen texts read as sentences and equations
+  - [x] 82.1 Tests that fail on the current code: the examples of 64.1 to 64.3, Property 91; the older tests that read these texts
+  - [x] 82.2 `src/core/draft.ts`
   - _Requirements: 64_
 
-- [ ] 83. (maintainer) Verifier items for Requirements 63 and 64; the sample CSV fingerprints; the recorded reads replayed with and without a rate; the board with the recorded read of bundle B and a rate
+- [x] 83. (maintainer) Verifier items for Requirements 63 and 64; the sample CSV fingerprints; the recorded reads replayed with and without a rate; the board with the recorded read of bundle B and a rate
   - _Requirements: 63, 64_
 
 ## Summary
