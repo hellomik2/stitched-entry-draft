@@ -144,13 +144,13 @@ sections that the steering files and specs cite by page and section.
 One person directed the work with two AI tools, Kiro and Claude Code:
 
 - **Kiro wrote the application files.** Each commit that changes code under `src/`, `scripts/` or
-  `tools/` (62 of the first 128 commits) names the Kiro run that wrote it: 52 in the commit
-  message, 10 in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
+  `tools/` (62 of the first 128 commits) names the Kiro run that wrote it: 55 in the commit
+  message, 7 only in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
   and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 124 of
   the 128 journal rows). Kiro's spec mode also wrote the spec files.
 - **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
-  steering files it wrote 14 requirements, a design with 55 correctness properties and an 82-step
-  task list, then the project skeleton and the first rule modules with their tests); the first
+  steering files it wrote 14 requirements, a design with 54 correctness properties and a task list
+  of 16 tasks with 34 sub-tasks, then the project skeleton and the first rule modules with their tests); the first
   draft of the second spec, `document-intake`, which we corrected in a 13-point review; and the
   prompt of the demo-data hook, revised twice on our instructions. Where a request gave only the
   spec, Kiro also chose the implementation; for the port code tables, the tests caught seven
