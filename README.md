@@ -1,30 +1,184 @@
-# Entry Draft Helper (working title)
+# Stitched Entry Draft
 
-A draft-preparation helper for small U.S. customs brokerage offices.
+A line-by-line **draft of CBP Form 7501** (Entry Summary), stitched from the shipping documents a
+small U.S. customs brokerage receives: a commercial invoice, a packing list and a bill of lading,
+as a text PDF, a scan, a phone photo or an Excel sheet.
 
-It reads mismatched commercial invoices and packing lists and prepares a
-line-by-line **draft** of CBP Form 7501 (Entry Summary):
+Every value on the draft is tied to the words it came from. Totals and fees come from small rules
+checked by property-based tests. Anything uncertain is left blank and handed to the Entry Writer
+with a reason. It never chooses a tariff classification or an exchange rate.
 
-- every value on the draft links back to the place in the source document it came from;
-- computed fields (rounding, totals, fees, check digits) are produced by small pure
-  rules that are verified with property-based tests;
-- fields that are uncertain or that need a professional decision are left blank and
-  flagged for the Entry Writer instead of being guessed;
-- it never chooses an HTS classification. It only checks that the number printed on
-  the invoice exists in the public Harmonized Tariff Schedule.
+**Live demo:** https://stitched-entry-draft.netlify.app (no sign-up, no login)
 
-The output is a draft for review by a licensed customs broker. It is not filed with CBP.
+> This is a draft for review by a licensed customs broker. Every screen and CSV is marked
+> "DRAFT, NOT FOR FILING". It does not connect to CBP systems.
 
-## Status
+## Try it in two minutes
 
-Early development. The project was started in November 2026.
+The page opens on an invented sample shipment (every page is marked DEMO / FICTITIOUS).
 
-## Development
+1. **Click any value** on the right. A stitched thread runs to the exact words on the document page
+   on the left. A computed value gets gold threads to the values it was computed from.
+2. **Read the Needs review list.** Each item says why it waits: a mismatch between documents, a
+   reading whose quote is not on the page, a tariff number that is not in the schedule, a
+   Chapter 99 footnote, a value read from an image.
+3. **Fill a gap.** Type the entered value of line 004 and watch the duty, the totals and the review
+   list update. "Use test answers for this demo" fills every gap with test answers;
+   "Clear person answers" removes them.
+4. **Download CSV**: one row per field with its status, rule, sources and inputs.
+5. **Upload documents** (optional, uses the AI reader). Pick up to three files and their kinds,
+   then "Read documents". Invented files to try are in
+   [`samples/upload-test/files/`](samples/upload-test/files/).
+6. **Exchange rate** (an uploaded invoice in another currency). An "Exchange rate (USD per 1 …)"
+   box appears above the line items. Enter the rate, its date and where it came from; Column 36A,
+   the duties and the totals are then computed from it, and the rate shows as a value entered by a
+   person. Customs accepts only a proclaimed or certified rate (19 CFR 159.31), so the app never
+   chooses, suggests or looks up a rate.
 
-- TypeScript, Next.js, Vitest, fast-check.
-- Built with Kiro (specs, steering, property-based tests). Kiro project files live in `/.kiro`.
-- Development notes: `docs/kiro-journal.md`.
+**AI reading limits on the public site.** Each read is one paid AI call, so the reader runs inside
+fixed caps: 3 reads per visitor per day, 30 per day for the whole site, 500 in total, plus a cost
+cap and a per-call cost limit. The upload panel shows how many reads are left today. When a cap is
+reached, the reader turns off and the sample keeps working. Uploaded files are not stored (the
+usage log keeps only their SHA-256 fingerprints, token counts and cost), but their page text and
+page images are sent to the AI model, so **do not upload real or confidential documents**. The
+per-visitor count keeps only a salted, per-day hash of the connecting address.
+
+## How it works
+
+```
+documents ──► page text and page images (in the browser: pdf.js, Excel cells, photos)
+          ──► AI reader (one server file, structured JSON, no retries)   ← only for uploads
+          ──► quote check: the quote must appear exactly once on the cited page,
+              and the value must sit inside the quote; otherwise the reading is rejected
+          ──► buildDraft (src/core): cross-document checks, 7501 lines, totals
+          ──► rules (src/rules): pure functions, integer cents, property-based tests
+          ──► board (threads to sources) and CSV
+```
+
+- **Tariff numbers are checked, never chosen.** The HTS number printed on the invoice is looked up
+  in a subset of the 2026 HTS Revision 23 that ships with the app.
+- **Values read from images always wait for a person** ("Confirm this value"), because there is no
+  text layer to check the quote against.
+- The same `buildDraft` and `draftToCsv` run in the browser and on the command line, so the CSV
+  from the screen and the CSV from `npm run draft` are the same file.
+
+## How we used Kiro (a tour of `/.kiro`)
+
+Kiro wrote the application files; [How this code was made](#how-this-code-was-made) says who did
+what. The log of every Kiro run (what we asked, what changed, credits, what went well and what did
+not) is in [`docs/kiro-journal.md`](docs/kiro-journal.md).
+
+| Where | What it is |
+|---|---|
+| [`.kiro/specs/entry-math/`](.kiro/specs/entry-math/) | Spec for the 7501 math: requirements, design with correctness properties, tasks. |
+| [`.kiro/specs/document-intake/`](.kiro/specs/document-intake/) | Spec for the upload path and the AI reader boundary, grown requirement by requirement after each real read and each outside review. |
+| [`.kiro/steering/`](.kiro/steering/) | Product, tech, structure and pipeline rules (always included), CBP Form 7501 rules with page numbers (for `src/rules/**`), demo data rules (for `samples/**`). |
+| [`.kiro/hooks/demo-data-check.json`](.kiro/hooks/demo-data-check.json) | Agent hook on file save under `samples/`: checks that names are invented, pages are marked DEMO / FICTITIOUS, mail uses example.com, phones use 555-01xx, and HTS numbers exist. |
+| [`.kiro/agents/`](.kiro/agents/) | Two custom agents for the Kiro CLI, `app-builder` and `rules-builder`, with file tools only and write paths limited per agent. |
+| [`.kiro/settings/mcp.json`](.kiro/settings/mcp.json) | The `hts-lookup` MCP server ([`tools/hts-mcp/server.ts`](tools/hts-mcp/server.ts)) that answers tariff lookups from the shipped HTS subset. |
+| `*.property.test.ts` and other tests | Property-based tests with fast-check. Each property names the requirement it validates. |
+
+Counted on 2026-11-26: 2 specs with 78 requirements and 141 correctness properties in their
+designs, 6 steering files, 1 hook, 2 custom agents, 1 MCP server, 71 test files with 156
+`fc.assert` properties.
+
+## Run it yourself
+
+Requirements: Node.js 20 or newer, npm.
+
+```bash
+npm ci
+npm run dev          # http://localhost:3000, the sample works without any key
+npm test             # unit and property-based tests (no network, no AI)
+npm run typecheck
+npm run draft -- lantern-hollow out   # the same draft and CSV from the command line (bundle name under samples/)
+```
+
+The AI reader is off unless you turn it on. Server-side settings (for example in `.env.local`,
+which git ignores):
+
+| Variable | Meaning |
+|---|---|
+| `DOCUMENT_INTAKE_MODE=fake` | Recorded answers for the files in `samples/upload-test/files/`, no AI call. The screen says "Test mode: recorded answers, no AI call." |
+| `DOCUMENT_INTAKE_ANTHROPIC_KEY` | Your Anthropic API key. The reader uses only this variable. |
+| `DOCUMENT_INTAKE_STORE=file` | Where usage caps are counted (`file` writes to `logs/`; the public site uses `netlify-blobs`). The reader stays off without a store. |
+| `DOCUMENT_INTAKE_VISITOR_SALT` | Salt for the per-visitor count. |
+| `DOCUMENT_INTAKE_TOTAL_CAP`, `DOCUMENT_INTAKE_DAILY_CAP`, `DOCUMENT_INTAKE_VISITOR_DAILY_CAP`, `DOCUMENT_INTAKE_COST_CAP_KRW` | Override the caps in [`src/core/intakeConfig.ts`](src/core/intakeConfig.ts). |
+| `DOCUMENT_INTAKE_KILL_SWITCH` | Any value turns the reader off. |
+
+## Project layout
+
+```
+.kiro/        specs, steering, hooks, custom agents, MCP settings
+src/rules/    pure 7501 rules (rounding, totals, duty, MPF, HMF, weights) and their property tests
+src/core/     reading check, HTS lookup, parsers, buildDraft, exchange rate, CSV, PDF and sheet text
+src/server/   the AI reader, usage caps and the cost ledger
+src/app/      Next.js board, upload panel, /api/read and /api/reader-status
+data/         HTS 2026 Rev. 23 subset, CBP port code tables, country codes
+samples/      invented documents, recorded reader answers, sample layout
+tools/        hts-lookup MCP server
+docs/         Kiro journal
+```
+
+## Known limits
+
+- It does not choose HTS numbers. Numbers outside the shipped subset go to Needs review.
+- The HTS table is a 33-row subset for the sample documents, not the full schedule.
+- Up to 3 documents, 4 PDF pages and 6 image pages per upload, and up to 8 invoice lines.
+- Exchange rate: one currency per invoice and one rate for all its lines. Amounts with a decimal
+  comma are read only as `1.234,56` or `234,56`; other number forms wait for a person. The rate is
+  not saved and must be entered again after a new upload.
+- Two rule groups of the `entry-math` spec are not built: the entry number check digit (Block 1)
+  and the date rules.
+- We have not measured time saved with working entry writers.
+
+## How this code was made
+
+This repository was written from scratch for the Kiroween 2026 hackathon. The first commit is
+dated 2026-11-17, after the submission period opened on 2026-10-30. It is separate from, and shares
+no code with, any earlier product of the author's company. Frameworks and libraries are listed in
+[`package.json`](package.json).
+
+One person directed the work with two AI tools, Kiro and Claude Code:
+
+- **Kiro wrote the application files.** Each commit that changes code under `src/`, `scripts/` or
+  `tools/` (62 of the first 128 commits) names the Kiro run that wrote it: 52 in the commit
+  message, 10 in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
+  and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 124 of
+  the 128 journal rows). Kiro's spec mode also wrote the spec files.
+- **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
+  steering files it wrote 14 requirements, a design with 55 correctness properties and an 82-step
+  task list, then the project skeleton and the first rule modules with their tests); the first
+  draft of the second spec, `document-intake`, which we corrected in a 13-point review; and the
+  prompt of the demo-data hook, revised twice on our instructions. Where a request gave only the
+  spec, Kiro also chose the implementation; for the port code tables, the tests caught seven
+  places where its first version went wrong.
+- **What Claude Code did.** It planned the other changes and wrote the requests that Kiro carried
+  out. The first requests named the files, functions, algorithms and expected values, after the
+  approach had been tried in a throwaway prototype that is not in this repository. Later requests
+  gave new files in full and edits as line numbers with the current and the new text, and later
+  requirements came as text in those requests, which Kiro's spec mode added to the spec. Some
+  tests were written by Kiro from the spec; others were written by Claude Code and placed by Kiro
+  word for word. Claude Code ran the tests, type checks, builds and screen checks that decided
+  whether a task was done, and made every commit, which is why each commit carries a
+  `Co-Authored-By: Claude` line.
+- **Written outside Kiro:** the first five steering files, the two custom agent files, the sample
+  documents and the data files (the custom agents cannot write to `samples/` or `data/`), and
+  `docs/kiro-journal.md` (22 commits change only the journal). Reviews by Claude and by a second
+  AI coding tool (agy) found problems that became new `document-intake` requirements before any
+  code changed.
+
+## Data and notices
+
+- U.S. Harmonized Tariff Schedule, 2026 Revision 23 (USITC), a subset in `data/hts/`: U.S.
+  government work.
+- CBP port code tables (Schedule D and Schedule K) in `data/codes/`: U.S. government work published
+  by U.S. Customs and Border Protection.
+- Country names in `data/codes/iso-3166-1.json` come from Unicode CLDR 48.0. See
+  [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+- Every company, person, address and number in `samples/` and `public/samples/` is invented.
 
 ## License
 
-To be decided before publishing.
+[MIT](LICENSE) for the code in this repository. Third-party data keeps its own terms, listed in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
