@@ -447,6 +447,19 @@
 - [x] 77. (maintainer) Verifier items for Requirements 58 to 60; the recorded reads of bundles A, B and C replayed before and after; the board with the recorded read of bundle A
   - _Requirements: 58, 59, 60_
 
+- [ ] 78. A number inside a longer printed number is not inside its quote
+  - [ ] 78.1 Tests that fail on the current code: the examples of 61.5, Property 82 with `src/core/reading.before61.ts` (a byte copy of `src/core/reading.ts` at b41d1cc); the test of Property 81 allows the change of Requirement 61
+  - [ ] 78.2 `src/core/reading.ts`
+  - _Requirements: 61_
+
+- [ ] 79. The lines for a record or a top-up not written name the record key and the missing amount
+  - [ ] 79.1 Tests that fail on the current code: 62.1 to 62.3 and Property 83; the older tests that read the two lines
+  - [ ] 79.2 `src/server/usageStore.ts`, `usageStoreBlobs.ts`, `intakeService.ts`
+  - _Requirements: 62_
+
+- [ ] 80. (maintainer) Verifier items for Requirements 61 and 62; the recorded reads replayed before and after
+  - _Requirements: 61, 62_
+
 ## Summary
 
 **Top-Level Task Titles:**
@@ -527,5 +540,8 @@
 75. An address printed over several lines under its quote is inside its quote
 76. The new rules keep only what the old check rejected
 77. (maintainer) Verifier items for Requirements 58 to 60, replays and the board with the recorded read of bundle A
+78. A number inside a longer printed number is not inside its quote
+79. The lines for a record or a top-up not written name the record key and the missing amount
+80. (maintainer) Verifier items for Requirements 61 and 62, replays
 
-**Total Sub-Tasks:** 221
+**Total Sub-Tasks:** 225

@@ -1037,6 +1037,14 @@ export default function StitchBoard(...) {
 
 **Test baseline:** `src/core/reading.before58.ts` is a byte copy of `src/core/reading.ts` at commit d4bfff6. Only the test of Property 81 imports it.
 
+## Number Places and Log Lines (2026-11-26)
+
+**Requirement 61 (A Number Inside a Longer Printed Number Is Not Inside Its Quote):** `reading.ts`: one helper gives, for the number fields only, the first place of the value in a text that is not inside a longer printed number; the value searches of the normal path, of 35.3 and 35.4, and of the test of 50.1 use it in place of `indexOf`. The check of 50.8 and the helper of 59 are not changed.
+
+**Requirement 62 (The Lines for a Record or a Top-Up Not Written Name the Record Key and the Missing Amount):** `usageStore.ts` gets `newUsageRecordKey` and the optional key argument of `appendRecord`; `usageStoreBlobs.ts` writes under the given key; `intakeService.ts` makes the key in `writeRecord`, passes it and puts it in the record line, and `topUpCost` puts the missing amount in its line.
+
+**Test baseline:** `src/core/reading.before61.ts` is a byte copy of `src/core/reading.ts` at commit b41d1cc. Only the test of Property 82 imports it.
+
 ---
 
 ## Correctness Properties
@@ -1436,8 +1444,16 @@ For any text page with an item S, items stacked under it in its column and items
 **Validates: Requirements 60.1, 60.2**
 
 ### Property 81: The New Rules Keep Only What the Old Check Rejected
-For any text page or image transcript (with any lines without a box) and any readings, `verifyReadings` gives for each reading what the check before these changes gives (`verifyReadings` of `src/core/reading.before58.ts`), except a reading it rejected with "no_source_box" and the message of a line with no usable place, which is now "uncertain" with `lineWithoutBox: true`, and a reading of a number field or an address field it rejected with "value_not_in_quote", which may now be accepted, "uncertain", or rejected with "quote_not_found" (Requirement 59.3: on an image page the check of 50.8 uses the printed number in place of the value). On a text page no reading gets `lineWithoutBox`, and every other reading has the same status, reason, message, box, item ids and cell.
+For any text page or image transcript (with any lines without a box) and any readings, `verifyReadings` gives for each reading what the check before these changes gives (`verifyReadings` of `src/core/reading.before58.ts`), except a reading it rejected with "no_source_box" and the message of a line with no usable place, which is now "uncertain" with `lineWithoutBox: true`, and a reading of a number field or an address field it rejected with "value_not_in_quote", which may now be accepted, "uncertain", or rejected with "quote_not_found" (Requirement 59.3: on an image page the check of 50.8 uses the printed number in place of the value). Since Requirement 61, a number field reading whose value is in the searched text only inside longer printed numbers may also be rejected with "value_not_in_quote". On a text page no reading gets `lineWithoutBox`, and every other reading has the same status, reason, message, box, item ids and cell.
 **Validates: Requirements 58.2, 59.4, 60.3**
+
+### Property 82: A Number Is Inside Its Quote Only Where It Is Not Part of a Longer Number
+For any text page or image transcript and any readings, `verifyReadings` gives for each reading what `verifyReadings` of `src/core/reading.before61.ts` gives, except a number field reading that was accepted or "uncertain" and whose value is, in its quote, only inside longer printed numbers: it is now rejected with "value_not_in_quote". For any number field, any number d and any longer printed number made by putting digits, a comma and three digits, or a period and digits before or after d, a quote that has d only inside that longer number gives "value_not_in_quote", and the same quote with d also standing alone gives the box of the standing d.
+**Validates: Requirements 61.1, 61.2, 61.3, 61.4**
+
+### Property 83: A Line Not Written Names Only the Key, the Counts and the Missing Amount
+For any request in claude mode with any file hashes and page texts, any provider key in the environment, any reader usage the call can have, and any store whose record write or top-up fails or runs out of time: every "usage record not written" line is that prefix and the JSON of exactly `key`, `timestamp`, `model`, `outcome`, `inputTokens`, `outputTokens` and `estimatedCostNanoUsd`, its `key` is the key the store was asked to write and has the form of `newUsageRecordKey`; every "usage cost top-up not written" line is that prefix and the JSON of exactly `missingNanoUsd`, which is the actual cost minus the reserved cost; no line contains a file hash, a page text, the provider key or an error message; and the status and body of the answer are those of the same request with a working store.
+**Validates: Requirements 62.1, 62.2, 62.3, 62.4**
 
 ---
 

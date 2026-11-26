@@ -638,7 +638,7 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 #### Acceptance Criteria
 
 1. `createBlobsUsageStore().appendRecord` SHALL write the record and judge the write as Requirement 54.1 says; WHEN the record is not saved it SHALL throw "usage record write was not confirmed by the store; not written".
-2. WHEN `appendRecord` throws in claude mode (success, error and cap-exceeded records), THE server SHALL log one line: `usage record not written: ` followed by the JSON of `{ timestamp, model, outcome, inputTokens, outputTokens, estimatedCostNanoUsd }` of that record (no file hashes, no error message, no document text). The status and body of the answer are the same as with a working store. The record is not written again (the library has already retried 429 and 5xx).
+2. WHEN `appendRecord` throws in claude mode (success, error and cap-exceeded records), THE server SHALL log one line: `usage record not written: ` followed by the JSON of `{ timestamp, model, outcome, inputTokens, outputTokens, estimatedCostNanoUsd }` of that record (no file hashes, no error message, no document text). The status and body of the answer are the same as with a working store. The record is not written again (the library has already retried 429 and 5xx). (Requirement 62.2 adds the record key to this line.)
 3. WHEN the reader reports `inputTokens` or `outputTokens` that is not a non-negative safe integer, or a usage the call cannot have (Requirement 56.1), THE server SHALL NOT throw: the record has `inputTokens: null`, `outputTokens: null` and `estimatedCostNanoUsd` = the worst case reserved for the call (`estimateReaderCall(input).worstCaseCostNanoUsd`), the ledger gets no top-up, and the answer is the one for that outcome (200 with the output for a valid answer, 502 for an invalid answer or a reader error).
 
 ---
@@ -969,6 +969,37 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 
 ---
 
+### Requirement 61 (MUST): A Number Inside a Longer Printed Number Is Not Inside Its Quote
+
+**User Story:** As an entry writer, I want a number that the AI reader cut short ("980" from "4,980") to be rejected, so that a wrong number never stands in the draft with the box of the longer number.
+
+**Background:** `verifyReadings` counted a value as inside its quote when the value's text was anywhere in the quote. For a number field, "980" was inside "4,980", "200" inside "1,200" and "160,00" inside "2.160,00", so a reading that dropped the first digits was accepted with the box of the longer number (open limit of implementation session 28). In the six recorded real reads (the third and fourth reads of bundles A, B and C) and the sample bundle, the rule below changes no reading (counted 2026-11-26 from the recorded answers, no AI call).
+
+#### Acceptance Criteria
+
+1. FOR a reading of a number field of Requirement 59.1, a place of its value (spaces normalized) in a text is inside a longer printed number WHEN the character right before it is a digit, or is a comma or a period with a digit right before that, or WHEN the character right after it is a digit, or is a comma or a period with a digit right after that.
+2. WHERE `verifyReadings` looks for the value as text (in the quote after the quote search, in the joined text of a stacked run of Requirement 35.3, in the quote over several rows of 35.4, and on an image page in the test of 50.1 that the value is inside its own quote), THE value SHALL count as found there only at a place that is not inside a longer printed number, and the first such place is the value's place (its box and items as today). WHEN every place is inside a longer printed number, the value is not found by that search; the other checks of today (dates of 35.1, printed numbers with thousands commas of 59) still run, and when none finds it the reading is rejected with "value_not_in_quote" as today.
+3. A comma or a period that has no digit on its far side (the end of a sentence "Total 77.", a list "77, 80") does not make a place inside a longer number. The check of 50.8 is not changed. Fields that are not number fields of 59.1 (item, invoice, packing list, bill of lading and container numbers, HTS numbers, `billOfLading.packages`, dates and every text field) are checked as today: "MCA-101" inside "MCA-1012" is judged as before.
+4. Every reading that is not a number field reading found only inside longer printed numbers gets the same status, reason, message, box, item ids, line text and cell as before this requirement.
+5. Examples on a text page: "980" with the quote "TOTAL 77 4,980": rejected with "value_not_in_quote". "980" with the quote "980 PCS 4,980": accepted with the box of the first "980". "200" with the quote "1,200": rejected. "1200" with the quote "1,200": accepted by 59.2 as today. "160,00" with the quote "2.160,00": rejected. "77" with the quote "Total 77.": accepted. "468" with the quote "468.0 KGS": rejected (fewer digits than printed). The recorded reads of bundles A, B and C and the sample bundle give the same readings, drafts and CSVs as before.
+
+---
+
+### Requirement 62 (MUST): The Lines for a Record or a Top-Up Not Written Name the Record Key and the Missing Amount
+
+**User Story:** As an operator, I want the log line of a record that was not written to name its record key, and the line of a top-up that was not written to name the amount, so that I can drop a line whose record did arrive and add the missing amount to the ledger count.
+
+**Background:** agy cross-check 4 (R22, R20): a record write that runs out of time may still be saved later, and the line "usage record not written" did not say which record key it was, so a count of records plus lines could not drop it. The line "usage cost top-up not written" did not say how much the cap ledger is short.
+
+#### Acceptance Criteria
+
+1. `src/server/usageStore.ts` SHALL export `newUsageRecordKey(timestamp: string): string`, which gives `usage/<the digits of the timestamp>-<a random UUID>` (the key of Requirement 54.1). `UsageStore.appendRecord` SHALL take an optional second argument `key?: string`. `createBlobsUsageStore().appendRecord(r, key)` SHALL write the record under `key` when it is given and under `newUsageRecordKey(r.timestamp)` when it is not; everything else of 54.1 stays. The file and memory stores ignore the key.
+2. IN claude mode THE server SHALL make the key of each record with `newUsageRecordKey(record.timestamp)` before it writes the record, pass it to `appendRecord`, and WHEN the record is not saved (Requirements 41.2 and 55.2) log `usage record not written: ` followed by the JSON of `{ key, timestamp, model, outcome, inputTokens, outputTokens, estimatedCostNanoUsd }`, with `key` the key it passed.
+3. WHEN the top-up of Requirement 24.3 is not written (the tries of Requirement 42 fail or the time of 55.2 runs out), THE server SHALL log `usage cost top-up not written: ` followed by the JSON of `{ missingNanoUsd }`, the actual cost minus the reserved cost that was not added to the ledger. WHEN the actual cost could not be computed, the line is `usage cost top-up not written: {"missingNanoUsd":null}`.
+4. Only the two lines and the key passed to `appendRecord` change. The order (the record first, then the top-up), the deadline of 55.2, the tries and waits of 42, the caps, the reservation, the costs, the record itself, the ledger, the answer to the person, the prompt and the reader stay as they are. The lines carry no file hash, no document text, no error message, no provider key and no environment value.
+
+---
+
 ## Requirements Summary (MUST/NICE Tags)
 
 **MUST (needed for demo by 2026-11-29):**
@@ -1033,6 +1064,8 @@ This feature adds the missing front door to the 7501 draft helper: a person uplo
 58. (MUST) A Value on a Transcript Line With No Usable Place Waits for a Person
 59. (MUST) A Number Written Without Its Thousands Commas Is Inside Its Quote
 60. (MUST) An Address Printed Over Several Lines Under Its Quote Is Inside Its Quote
+61. (MUST) A Number Inside a Longer Printed Number Is Not Inside Its Quote
+62. (MUST) The Lines for a Record or a Top-Up Not Written Name the Record Key and the Missing Amount
 
 **NICE (if time is left):**
 
