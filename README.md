@@ -134,10 +134,12 @@ docs/         Kiro journal
 
 ## How this code was made
 
-This repository was written from scratch for the Kiroween 2026 hackathon. The first commit is
-dated 2026-11-17, after the submission period opened on 2026-10-30. It is separate from, and shares
-no code with, any earlier product of the author's company. Frameworks and libraries are listed in
-[`package.json`](package.json).
+This repository was written from scratch for the Kiroween 2026 hackathon. Its first commit is
+dated 2026-11-17, after the submission period opened on 2026-10-30, and every file in it was added
+in this history. No code was brought in from earlier projects. The outside material is the
+frameworks and libraries in [`package.json`](package.json), the public data files listed in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), and the CBP Form 7501 instructions and 19 CFR
+sections that the steering files and specs cite by page and section.
 
 One person directed the work with two AI tools, Kiro and Claude Code:
 
@@ -155,7 +157,7 @@ One person directed the work with two AI tools, Kiro and Claude Code:
   places where its first version went wrong.
 - **What Claude Code did.** It planned the other changes and wrote the requests that Kiro carried
   out. The first requests named the files, functions, algorithms and expected values, after the
-  approach had been tried in a throwaway prototype that is not in this repository. Later requests
+  approach had been tried in a throwaway prototype (made on 2026-11-17, not in this repository). Later requests
   gave new files in full and edits as line numbers with the current and the new text, and later
   requirements came as text in those requests, which Kiro's spec mode added to the spec. Some
   tests were written by Kiro from the spec; others were written by Claude Code and placed by Kiro
