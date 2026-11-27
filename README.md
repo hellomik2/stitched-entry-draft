@@ -133,7 +133,10 @@ docs/         Kiro journal and the longer Kiro write-up
 
 - It does not choose HTS numbers. Numbers outside the shipped subset go to Needs review.
 - The HTS table is a 33-row subset for the sample documents, not the full schedule.
-- Up to 3 documents, 4 PDF pages and 6 image pages per upload, and up to 8 invoice lines.
+- Up to 3 documents per upload, at most 4 pages in each PDF and 6 image pages in all, and up to 8
+  invoice lines.
+- A packing-list quantity with a unit word, such as `120 DZ`, is not compared with the invoice; the
+  line waits for a person, and the message calls it not fully read.
 - Exchange rate: one currency per invoice and one rate for all its lines. Amounts with a decimal
   comma are read only as `1.234,56` or `234,56`; other number forms wait for a person. The rate is
   not saved and must be entered again after a new upload.
@@ -159,8 +162,8 @@ One person directed the work with two AI tools, Kiro and Claude Code:
   and two CLI custom agents, `app-builder` and `rules-builder`; a third, read-only agent,
   `entry-reviewer`, reviewed one change, once on Claude Haiku 4.5 and once on Claude Opus 5.5. Kiro's
   spec mode also wrote the spec files. Across the journal, Kiro ran on Claude Haiku 4.5 in 133 of the
-  140 rows and on Claude Opus 5.5 in 2 (one review, one test rewrite); of the other 5 rows, 1 used
-  Kiro's Auto model, 3 record no model and 1 records the steering files we wrote by hand.
+  140 rows and on Claude Opus 5.5 in 2 (one review, one test rewrite); of the other 5 rows, 2 used
+  Kiro's Auto model, 2 record no model and 1 records the five steering files we wrote by hand.
 - **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
   steering files, it wrote 14 requirements, a design with 54 correctness properties and a task list
   of 16 tasks with 34 sub-tasks, then the project skeleton and the first rule modules with their tests); the first

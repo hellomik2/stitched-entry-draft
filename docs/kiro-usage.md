@@ -8,8 +8,9 @@ for Kiro to place word for word), ran the checks and made the commits. The numbe
 follow-ups) with its credits and what went wrong.
 
 Across the 140 journal rows, Kiro ran on Claude Haiku 4.5 in 133 and on Claude Opus 5.5 in 2;
-1 row used Kiro's Auto model, 3 record no model, and 1 records the steering files we wrote by hand.
-The app's own AI reader, which reads uploaded documents at run time, is Claude Haiku 5.5. The build
+2 rows used Kiro's Auto model, 2 record no model, and 1 records the five steering files we wrote
+by hand.
+The app's own AI reader is Claude Haiku 5.5. The build
 used about 400 Kiro credits.
 
 ## At a glance
@@ -56,11 +57,10 @@ the CLI, 10 only the IDE and 3 both. What we learned there:
   rules: `entry-reviewer`'s rules allow `lookup_hts`, so its headless runs called the tool with no
   prompt.
 
-**Web.** Not used. It needs a paid plan, and this project ran on the free plan plus the hackathon
-credits.
+**Web.** Not used; it needs a paid plan.
 
-**Crew (0.14.0).** Tried once on Windows for a read-only review. It refused to start agent
-processes because the host had no OS sandbox (`"status": "sandbox_refused"`, `"credits": 0.0`). The way around it was to turn the
+**Crew (0.14.0).** Tried twice on Windows for a read-only review. Both times it refused to start
+agent processes because the host had no OS sandbox (`"status": "sandbox_refused"`, `"credits": 0.0`). The way around it was to turn the
 sandbox requirement off or run an administrator setup, and we chose not to weaken protection on the
 build machine.
 
@@ -69,7 +69,8 @@ build machine.
 `app-builder` (code) and `rules-builder` (specs) were written by hand on day one and are unchanged.
 Both have only the `read` and `write` tools, no shell, a list of the exact paths they may write,
 and the steering files as resources. `app-builder`'s prompt says "Never add AI clients, HTTP calls,
-or API key handling."
+or API key handling." The one exception, named in the November 18 request, is
+`src/server/claudeReader.ts`, the AI reader.
 
 - The path lists split the work: when `app-builder` tried to edit `tasks.md`, the write stopped at a
   permission question; `rules-builder`, whose list includes `.kiro/specs/**`, did it. From then on
@@ -145,11 +146,11 @@ went into the spec first.
 |---|---|
 | The first design | upload front door and AI reader boundary (`a44ea4a`) |
 | An independent review by Claude | requirements 17 to 22, properties 33 to 38 (`00b717b`) |
-| The first live read, cut off at the output limit | requirements 29 and 30 |
+| The first live read, cut off at the output limit | requirement 29 |
 | The second live read, which threw away right values | requirements 34 to 39 |
 | Excel files and a customer parts list | requirements 45 and 46 |
-| CBP code tables and the manufacturer ID | requirements 47 to 49 |
-| The fourth live read: scan lines with no place on the page | requirements 58 to 60 (`bd4200a`) |
+| CBP code tables and the manufacturer ID | requirements 47 and 48 |
+| The fourth round of live reads (shipment A, November 26): scan lines with no place on the page | requirements 58 to 60 (`bd4200a`) |
 | Invoices in euros | requirements 63 and 64 (`789177b`) |
 | The recorded euro read: a subtotal that was read, reported as "No invoice subtotal was read" | requirement 65, property 92 (`3e3b008`) |
 
@@ -157,8 +158,7 @@ From the third day the order was fixed: spec (`rules-builder`, spec mode), then 
 the old code for the intended reason, then code (`app-builder`, short new sessions), then the full
 check and the task check-off in spec mode. Before requirements 58 to 60 the recorded answer was
 replayed and every rejected value was counted with its reason; the requirements came from that
-count. Spec-mode rows took 41.41 of the 230.12 credits logged from day two to day eight, about 18
-percent.
+count. Spec-mode rows took about 18 percent of the credits logged from day two to day eight.
 
 **The same defect, both ways.** On November 26 we fixed one defect twice, both times on Claude Haiku
 4.5. In the recorded read of the euro bundle, the reader read the subtotal "EUR 9.299,00" and the
@@ -241,7 +241,7 @@ Some of Kiro's properties tested nothing: an `fc.assert` without `await`, `toBeD
 `null` pass, a generator that never produced the field names it was meant to test. Running them
 showed nothing wrong; we found them by reading, and those patterns are now `property-tests.md`.
 
-That still was not enough. The Opus review (section 2) found the new tests for Requirement 65 weaker
+The Opus review (section 2) found the new tests for Requirement 65 weaker
 than they claimed. The rewrite made each property count that it reached every case and compare the
 whole CHK.INVOICE field. To see whether the new tests bite, we broke the code twice on a throwaway
 copy:
@@ -263,7 +263,8 @@ test that fails first, review a property test). Kiro wrote the files from our te
   `lookup_hts` for 9505.90.6000, after getting the tool name wrong twice (0.13 credits). In an
   earlier review run with the power installed, the skill was not loaded.
 - Its own copy of the MCP server did not connect (section 6). We uninstalled the power afterwards,
-  as planned.
+  as planned. `entry-reviewer.json` still allows the power and its tool name; after the uninstall
+  they point at nothing.
 
 Our view: for one project the power repeats what the steering, the MCP server and the agents already
 carry, and it would pay off on the next project of the same kind.
