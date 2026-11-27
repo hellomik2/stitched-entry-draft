@@ -1,6 +1,8 @@
 # Kiro journal
 
-One line per Kiro run. Raw material for the "How we used Kiro" write-up.
+One row per Kiro task: a request and its follow-ups (a row can group several Kiro runs, named by
+their request ids). The first row records the steering files we wrote by hand, not a Kiro run.
+Raw material for the "How we used Kiro" write-up ([`kiro-usage.md`](kiro-usage.md)).
 Credits are read from `kiro-cli chat --no-interactive "/usage"` before and after a run
 (the plan counter can lag, so a run's cost is the difference of two readings, not exact).
 

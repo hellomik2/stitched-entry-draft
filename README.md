@@ -63,12 +63,16 @@ documents ──► page text and page images (in the browser: pdf.js, Excel cel
   text layer to check the quote against.
 - The same `buildDraft` and `draftToCsv` run in the browser and on the command line, so the CSV
   from the screen and the CSV from `npm run draft` are the same file.
+- The AI reader is Claude Haiku 5.5. It is separate from the models Kiro used to write the code
+  (see below).
 
 ## How we used Kiro (a tour of `/.kiro`)
 
 Kiro wrote the application files; [How this code was made](#how-this-code-was-made) says who did
-what. The log of every Kiro run (what we asked, what changed, credits, what went well and what did
-not) is in [`docs/kiro-journal.md`](docs/kiro-journal.md).
+what. The journal of the Kiro work, one row per task (a request and its follow-ups) with what we
+asked, what changed, credits, what went well and what did not, is in
+[`docs/kiro-journal.md`](docs/kiro-journal.md). A longer write-up with tables and commit numbers is
+in [`docs/kiro-usage.md`](docs/kiro-usage.md).
 
 | Where | What it is |
 |---|---|
@@ -114,7 +118,7 @@ which git ignores):
 
 ```
 .kiro/        specs, steering, hooks, custom agents, MCP settings
-src/rules/    pure 7501 rules (rounding, totals, duty, MPF, HMF, weights) and their property tests
+src/rules/    pure 7501 rules (rounding, totals, duty, MPF, weights) and their property tests
 src/core/     reading check, HTS lookup, parsers, buildDraft, exchange rate, CSV, PDF and sheet text
 src/server/   the AI reader, usage caps and the cost ledger
 src/app/      Next.js board, upload panel, /api/read and /api/reader-status
@@ -122,7 +126,7 @@ data/         HTS 2026 Rev. 23 subset, CBP port code tables, country codes
 samples/      invented documents, recorded reader answers, sample layout
 scripts/      command-line draft, sample builder, PDF worker copy, the Stop hook's turn check
 tools/        hts-lookup MCP server, the cbp-7501-entry Kiro power
-docs/         Kiro journal
+docs/         Kiro journal and the longer Kiro write-up
 ```
 
 ## Known limits
@@ -148,15 +152,17 @@ sections that the steering files and specs cite by page and section.
 
 One person directed the work with two AI tools, Kiro and Claude Code:
 
-- **Kiro wrote the application files.** Each commit that changes code under `src/`, `scripts/` or
-  `tools/` (67 of the first 146 commits) names the Kiro run that wrote it: 60 in the commit
+- **Kiro wrote the application files.** The repository had 146 commits by 2026-11-26; the commits
+  after that date change only documentation. Each of the 67 commits that change
+  code under `src/`, `scripts/` or `tools/` names the Kiro run that wrote it: 60 in the commit
   message, 7 only in the matching row of `docs/kiro-journal.md`. The runs used the Kiro IDE spec flow
-  and two CLI custom agents, `app-builder` and `rules-builder` (model: Claude Haiku 4.5 in 133 of
-  the 140 journal rows, Claude Opus 5.5 in 2); a third, read-only agent, `entry-reviewer`, reviewed
-  one change, once on Claude Haiku 4.5 and once on Claude Opus 5.5. Kiro's spec mode also wrote the
-  spec files.
+  and two CLI custom agents, `app-builder` and `rules-builder`; a third, read-only agent,
+  `entry-reviewer`, reviewed one change, once on Claude Haiku 4.5 and once on Claude Opus 5.5. Kiro's
+  spec mode also wrote the spec files. Across the journal, Kiro ran on Claude Haiku 4.5 in 133 of the
+  140 rows and on Claude Opus 5.5 in 2 (one review, one test rewrite); of the other 5 rows, 1 used
+  Kiro's Auto model, 3 record no model and 1 records the steering files we wrote by hand.
 - **What Kiro designed itself:** the first spec, `entry-math` (from a short request and the
-  steering files it wrote 14 requirements, a design with 54 correctness properties and a task list
+  steering files, it wrote 14 requirements, a design with 54 correctness properties and a task list
   of 16 tasks with 34 sub-tasks, then the project skeleton and the first rule modules with their tests); the first
   draft of the second spec, `document-intake`, which we corrected in a 13-point review; and the
   prompt of the demo-data hook, revised twice on our instructions; and the rewrite of the tests of
